@@ -4,7 +4,6 @@ import atexit
 import collections.abc
 import dataclasses
 import datetime
-import enum
 import functools
 import logging
 
@@ -35,33 +34,6 @@ import util
 logger = logging.getLogger(__name__)
 ci.log.configure_default_logging()
 k8s.logging.configure_kubernetes_logging()
-
-
-class GitHubSecretLocationType(enum.StrEnum):
-    COMMIT = 'commit'
-    WIKI_COMMIT = 'wiki_commit'
-    UNKNOWN = 'unknown'
-
-
-@dataclasses.dataclass
-class SecretLocation:
-    location_type: GitHubSecretLocationType
-    path: str | None = None
-    line: int | None = None
-
-    @classmethod
-    def from_dict(cls, location: dict) -> 'SecretLocation':
-        try:
-            location_type = GitHubSecretLocationType(location.get('type'))
-        except ValueError:
-            location_type = GitHubSecretLocationType.UNKNOWN
-
-        details = location.get('details', {})
-        return cls(
-            location_type=location_type,
-            path=details.get('path'),
-            line=details.get('start_line'),
-        )
 
 
 @dataclasses.dataclass
@@ -209,30 +181,116 @@ def get_secret_alerts(
     logger.info(f'found {count} secret alerts for {github_hostname}/{org}')
 
 
-def get_secret_location(
-    location_url: str,
+def html_url_for_location(
+    location_type: odg.model.GitHubSecretLocationType,
+    details: dict,
+    repo_url: str,
     secret_factory: secret_mgmt.SecretFactory,
-) -> SecretLocation:
+) -> str | None:
+    GitHubSecretLocationType = odg.model.GitHubSecretLocationType
+
+    if html_url := details.get('html_url'):
+        return html_url
+
+    if location_type is GitHubSecretLocationType.WIKI_COMMIT:
+        return details.get('commit_url')
+    elif location_type is GitHubSecretLocationType.DISCUSSION_TITLE:
+        return details.get('discussion_title_url')
+    elif location_type is GitHubSecretLocationType.DISCUSSION_BODY:
+        return details.get('discussion_body_url')
+    elif location_type is GitHubSecretLocationType.DISCUSSION_COMMENT:
+        return details.get('discussion_comment_url')
+
+    if location_type is GitHubSecretLocationType.COMMIT:
+        path = details.get('path')
+        start_line = details.get('start_line')
+        end_line = details.get('end_line')
+        commit_sha = details.get('commit_sha')
+
+        return f'{repo_url}/blob/{commit_sha}/{path}#L{start_line}-L{end_line}'
+
+    api_url = {
+        GitHubSecretLocationType.ISSUE_TITLE: details.get('issue_title_url'),
+        GitHubSecretLocationType.ISSUE_BODY: details.get('issue_body_url'),
+        GitHubSecretLocationType.ISSUE_COMMENT: details.get('issue_comment_url'),
+        GitHubSecretLocationType.PULL_REQUEST_TITLE: details.get('pull_request_title_url'),
+        GitHubSecretLocationType.PULL_REQUEST_BODY: details.get('pull_request_body_url'),
+        GitHubSecretLocationType.PULL_REQUEST_COMMENT: details.get('pull_request_comment_url'),
+        GitHubSecretLocationType.PULL_REQUEST_REVIEW: details.get('pull_request_review_url'),
+        GitHubSecretLocationType.PULL_REQUEST_REVIEW_COMMENT: details.get(
+            'pull_request_review_comment_url',
+        ),
+    }.get(location_type)
+
+    if not api_url:
+        return None
+
+    result, _ = github_api_request(
+        url=api_url,
+        secret_factory=secret_factory,
+    )
+
+    return result.get('html_url') if result else None
+
+
+def iter_secret_locations(
+    location_url: str | None,
+    secret_factory: secret_mgmt.SecretFactory,
+) -> collections.abc.Iterable[odg.model.GitHubSecretFindingLocation]:
+    GitHubSecretLocationType = odg.model.GitHubSecretLocationType
+
+    if not location_url:
+        yield odg.model.GitHubSecretFindingLocation(
+            location_type=GitHubSecretLocationType.UNKNOWN,
+        )
+        return
+
     result, _ = github_api_request(
         url=location_url,
         secret_factory=secret_factory,
     )
+
     if not result or not isinstance(result, list):
-        return SecretLocation(
+        yield odg.model.GitHubSecretFindingLocation(
             location_type=GitHubSecretLocationType.UNKNOWN,
         )
+        return
 
-    for loc in result:
-        secret_location = SecretLocation.from_dict(loc)
-        if secret_location.location_type in (
-            GitHubSecretLocationType.COMMIT,
-            GitHubSecretLocationType.WIKI_COMMIT,
-        ):
-            return secret_location
+    parsed_url = util.urlparse(location_url)
+    path_parts = parsed_url.path.strip('/').split('/')
 
-    return SecretLocation(
-        location_type=GitHubSecretLocationType.UNKNOWN,
-    )
+    if len(path_parts) < 5:
+        logger.error(f'Cannot determine repo/org from {location_url=}')
+        yield odg.model.GitHubSecretFindingLocation(
+            location_type=GitHubSecretLocationType.UNKNOWN,
+        )
+        return
+
+    org = path_parts[3]
+    repo = path_parts[4]
+    repo_url = f'{parsed_url.scheme}://{parsed_url.hostname}/{org}/{repo}'
+
+    for location in result:
+        try:
+            location_type = GitHubSecretLocationType(location.get('type'))
+        except ValueError:
+            location_type = GitHubSecretLocationType.UNKNOWN
+
+        details = location.get('details', {})
+
+        url = html_url_for_location(
+            location_type=location_type,
+            details=details,
+            repo_url=repo_url,
+            secret_factory=secret_factory,
+        )
+
+        yield odg.model.GitHubSecretFindingLocation(
+            location_type=location_type,
+            url=url,
+            path=details.get('path'),
+            line=details.get('start_line'),
+        )
 
 
 def as_artefact_metadata(
@@ -291,7 +349,7 @@ def create_ghas_findings(
                 )
 
                 for alert in alerts:
-                    location = get_secret_location(
+                    locations = iter_secret_locations(
                         location_url=alert.locations_url,
                         secret_factory=secret_factory,
                     )
@@ -310,9 +368,7 @@ def create_ghas_findings(
                         secret=alert.secret,
                         secret_type_display_name=alert.secret_type_display_name,
                         resolution=alert.resolution,
-                        path=location.path,
-                        line=location.line,
-                        location_type=location.location_type.value,
+                        locations=list(locations),
                         url=alert.url,
                     )
             except Exception as e:
