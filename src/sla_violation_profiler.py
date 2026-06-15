@@ -30,13 +30,13 @@ def filter_rescorings_before_release_date(
         finding=finding,
         rescorings=rescorings,
     ):
-        rescoring_creation_date = rescore.utility.normalise_date(rescoring.meta.creation_date)
+        rescoring_creation_date = util.normalise_date(rescoring.meta.creation_date)
         if rescoring_creation_date < release_date:
             filtered_rescorings.append(rescoring)
 
     return sorted(
         filtered_rescorings,
-        key=lambda rescoring: rescore.utility.normalise_date(rescoring.meta.creation_date),
+        key=lambda rescoring: util.normalise_date(rescoring.meta.creation_date),
     )
 
 
@@ -45,13 +45,13 @@ def iter_policy_violations(
     sorted_rescorings: list[odg.model.ArtefactMetadata],
     release_date: datetime.datetime,
 ) -> collections.abc.Generator[odg.model.SlaViolation, None, None]:
-    discovery_date = rescore.utility.normalise_date(finding.discovery_date)
-    release_date = rescore.utility.normalise_date(release_date)
+    discovery_date = util.normalise_date(finding.discovery_date)
+    release_date = util.normalise_date(release_date)
     allowed_time = util.convert_to_timedelta(finding.allowed_processing_time)
     deadline = discovery_date + allowed_time
 
     for rescoring in sorted_rescorings:
-        rescoring_creation_date = rescore.utility.normalise_date(rescoring.meta.creation_date)
+        rescoring_creation_date = util.normalise_date(rescoring.meta.creation_date)
         if deadline and rescoring_creation_date > deadline:
             yield odg.model.SlaViolation(
                 finding=odg.model.RescoringVulnerabilityFinding(
@@ -62,7 +62,7 @@ def iter_policy_violations(
                 artefact=finding.artefact,
             )
         if rescoring.data.due_date:
-            deadline = rescore.utility.normalise_date(rescoring.data.due_date)
+            deadline = util.normalise_date(rescoring.data.due_date)
         elif rescoring.data.allowed_processing_time is None:
             deadline = None
         else:
@@ -85,9 +85,9 @@ def iter_version_sla_violations(
     rescorings: list[odg.model.ArtefactMetadata],
     release_date: datetime.datetime,
 ) -> collections.abc.Generator[odg.model.SlaViolation, None, None]:
-    release_date = rescore.utility.normalise_date(release_date)
+    release_date = util.normalise_date(release_date)
     for finding in findings:
-        if rescore.utility.normalise_date(finding.meta.creation_date) > release_date:
+        if util.normalise_date(finding.meta.creation_date) > release_date:
             continue
 
         if not finding.discovery_date:
@@ -151,7 +151,7 @@ def create_sla_violation(
 
     findings = [odg.model.ArtefactMetadata.from_dict(raw) for raw in findings_raw]
     rescorings = [odg.model.ArtefactMetadata.from_dict(raw) for raw in rescorings_raw]
-    release_date = rescore.utility.normalise_date(
+    release_date = util.normalise_date(
         util.get_creation_date(root_descriptor.component),
     )
 

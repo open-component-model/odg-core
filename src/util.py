@@ -272,6 +272,18 @@ def convert_to_timedelta(
     return datetime.timedelta(seconds=seconds)
 
 
+def normalise_date(
+    date: datetime.datetime | datetime.date | str,
+) -> datetime.datetime:
+    if isinstance(date, str):
+        date = datetime.datetime.fromisoformat(date)
+    if isinstance(date, datetime.datetime):
+        if date.tzinfo is None:
+            return date.replace(tzinfo=datetime.UTC)
+        return date.astimezone(tz=datetime.UTC)
+    return datetime.datetime.combine(date, datetime.time.min, tzinfo=datetime.UTC)
+
+
 def pluralise(
     word: str,
     count: int,

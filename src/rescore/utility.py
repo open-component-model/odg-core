@@ -89,18 +89,6 @@ def _iter_rescorings_for_finding(
         yield rescoring
 
 
-def normalise_date(
-    date: datetime.datetime | datetime.date | str,
-) -> datetime.datetime:
-    if isinstance(date, str):
-        date = datetime.datetime.fromisoformat(date)
-    if isinstance(date, datetime.datetime):
-        if date.tzinfo is None:
-            return date.replace(tzinfo=datetime.UTC)
-        return date.astimezone(tz=datetime.UTC)
-    return datetime.datetime.combine(date, datetime.time.min, tzinfo=datetime.UTC)
-
-
 def rescorings_for_finding_by_specificity(
     finding: odg.model.ArtefactMetadata,
     rescorings: collections.abc.Iterable[odg.model.ArtefactMetadata],
@@ -120,7 +108,7 @@ def rescorings_for_finding_by_specificity(
             rescorings_for_finding,
             key=lambda rescoring: (
                 rescoring.specificity,
-                normalise_date(rescoring.meta.creation_date),
+                util.normalise_date(rescoring.meta.creation_date),
             ),
             reverse=True,
         ),
