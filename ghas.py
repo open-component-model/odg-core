@@ -181,6 +181,58 @@ def get_secret_alerts(
     logger.info(f'found {count} secret alerts for {github_hostname}/{org}')
 
 
+def html_url_for_location(
+    location_type: odg.model.GitHubSecretLocationType,
+    details: dict,
+    repo_url: str,
+    secret_factory: secret_mgmt.SecretFactory,
+) -> str | None:
+    GitHubSecretLocationType = odg.model.GitHubSecretLocationType
+
+    if html_url := details.get('html_url'):
+        return html_url
+
+    if location_type is GitHubSecretLocationType.WIKI_COMMIT:
+        return details.get('commit_url')
+    elif location_type is GitHubSecretLocationType.DISCUSSION_TITLE:
+        return details.get('discussion_title_url')
+    elif location_type is GitHubSecretLocationType.DISCUSSION_BODY:
+        return details.get('discussion_body_url')
+    elif location_type is GitHubSecretLocationType.DISCUSSION_COMMENT:
+        return details.get('discussion_comment_url')
+
+    if location_type is GitHubSecretLocationType.COMMIT:
+        path = details.get('path')
+        start_line = details.get('start_line')
+        end_line = details.get('end_line')
+        commit_sha = details.get('commit_sha')
+
+        return f'{repo_url}/blob/{commit_sha}/{path}#L{start_line}-L{end_line}'
+
+    api_url = {
+        GitHubSecretLocationType.ISSUE_TITLE: details.get('issue_title_url'),
+        GitHubSecretLocationType.ISSUE_BODY: details.get('issue_body_url'),
+        GitHubSecretLocationType.ISSUE_COMMENT: details.get('issue_comment_url'),
+        GitHubSecretLocationType.PULL_REQUEST_TITLE: details.get('pull_request_title_url'),
+        GitHubSecretLocationType.PULL_REQUEST_BODY: details.get('pull_request_body_url'),
+        GitHubSecretLocationType.PULL_REQUEST_COMMENT: details.get('pull_request_comment_url'),
+        GitHubSecretLocationType.PULL_REQUEST_REVIEW: details.get('pull_request_review_url'),
+        GitHubSecretLocationType.PULL_REQUEST_REVIEW_COMMENT: details.get(
+            'pull_request_review_comment_url',
+        ),
+    }.get(location_type)
+
+    if not api_url:
+        return None
+
+    result, _ = github_api_request(
+        url=api_url,
+        secret_factory=secret_factory,
+    )
+
+    return result.get('html_url') if result else None
+
+
 def iter_secret_locations(
     location_url: str | None,
     secret_factory: secret_mgmt.SecretFactory,
@@ -204,6 +256,20 @@ def iter_secret_locations(
         )
         return
 
+    parsed_url = util.urlparse(location_url)
+    path_parts = parsed_url.path.strip('/').split('/')
+
+    if len(path_parts) < 5:
+        logger.error(f'Cannot determine repo/org from {location_url=}')
+        yield odg.model.GitHubSecretFindingLocation(
+            location_type=GitHubSecretLocationType.UNKNOWN,
+        )
+        return
+
+    org = path_parts[3]
+    repo = path_parts[4]
+    repo_url = f'{parsed_url.scheme}://{parsed_url.hostname}/{org}/{repo}'
+
     for location in result:
         try:
             location_type = GitHubSecretLocationType(location.get('type'))
@@ -212,21 +278,12 @@ def iter_secret_locations(
 
         details = location.get('details', {})
 
-        url = {
-            GitHubSecretLocationType.COMMIT: details.get('html_url'),
-            GitHubSecretLocationType.WIKI_COMMIT: details.get('commit_url'),
-            GitHubSecretLocationType.ISSUE_TITLE: details.get('html_url'),
-            GitHubSecretLocationType.ISSUE_BODY: details.get('html_url'),
-            GitHubSecretLocationType.ISSUE_COMMENT: details.get('html_url'),
-            GitHubSecretLocationType.DISCUSSION_TITLE: details.get('discussion_title_url'),
-            GitHubSecretLocationType.DISCUSSION_BODY: details.get('discussion_body_url'),
-            GitHubSecretLocationType.DISCUSSION_COMMENT: details.get('discussion_comment_url'),
-            GitHubSecretLocationType.PULL_REQUEST_TITLE: details.get('html_url'),
-            GitHubSecretLocationType.PULL_REQUEST_BODY: details.get('html_url'),
-            GitHubSecretLocationType.PULL_REQUEST_COMMENT: details.get('html_url'),
-            GitHubSecretLocationType.PULL_REQUEST_REVIEW: details.get('html_url'),
-            GitHubSecretLocationType.PULL_REQUEST_REVIEW_COMMENT: details.get('html_url'),
-        }.get(location_type)
+        url = html_url_for_location(
+            location_type=location_type,
+            details=details,
+            repo_url=repo_url,
+            secret_factory=secret_factory,
+        )
 
         yield odg.model.GitHubSecretFindingLocation(
             location_type=location_type,
