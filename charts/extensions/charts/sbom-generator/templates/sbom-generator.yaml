@@ -91,6 +91,7 @@ spec:
         - name: bdba
           secret:
             secretName: secret-factory-bdba
+            optional: true
         - name: github
           secret:
             secretName: secret-factory-github
