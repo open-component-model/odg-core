@@ -275,6 +275,14 @@ def convert_to_timedelta(
 def normalise_date(
     date: datetime.datetime | datetime.date | str,
 ) -> datetime.datetime:
+    """
+    Normalises a date/datetime to a timezone-aware UTC datetime.
+
+    Naive datetimes are assumed to already represent UTC wall-clock time
+    (just missing the tzinfo label) and are NOT shifted. This matches the
+    convention used throughout ODG: DB timestamps are TIMESTAMPTZ, and
+    internally created datetimes come from containers running in UTC.
+    """
     if isinstance(date, str):
         date = datetime.datetime.fromisoformat(date)
     if isinstance(date, datetime.datetime):
