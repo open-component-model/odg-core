@@ -278,7 +278,7 @@ def normalise_date(
     """
     Normalises a date/datetime to a timezone-aware UTC datetime.
 
-    Naive datetimes are assumed to already represent UTC wall-clock time
+    Native datetimes are assumed to already represent UTC wall-clock time
     (just missing the tzinfo label) and are NOT shifted. This matches the
     convention used throughout ODG: DB timestamps are TIMESTAMPTZ, and
     internally created datetimes come from containers running in UTC.
