@@ -317,6 +317,10 @@ def replicate_issue_for_finding_type(
     finding_type = finding_cfg.type
     finding_source = finding_type.datasource()
 
+    if not finding_cfg.matches(artefact):
+        logger.info(f'skipping issue update for {finding_type=} (artefact is filtered out)')
+        return
+
     logger.info(f'updating issues for {finding_type=} and {finding_source=}')
 
     artefact_group = finding_cfg.issues.strip_artefact(
@@ -340,7 +344,7 @@ def replicate_issue_for_finding_type(
     artefacts = tuple({cs.artefact for cs in active_compliance_snapshots})
     logger.info(f'{len(artefacts)=}')
 
-    if is_in_bom := len(active_compliance_snapshots) > 0 and finding_cfg.matches(artefact):
+    if is_in_bom := len(active_compliance_snapshots) > 0:
         findings = _iter_findings_for_artefact(
             delivery_service_client=delivery_service_client,
             artefacts=artefacts,
