@@ -177,8 +177,12 @@ class LoggingRetry(urllib3.util.retry.Retry):
         retry = super().increment(method, url, response, error, _pool, _stacktrace)
         # Use the Retry history to determine the number of retries.
         num_retries = len(self.history) if self.history else 0
+        status = response.status if response else None
+        reason = response.reason if response else None
+        content = response.data.decode() if response else None
         logger.warning(
-            f'{method=} {url=} returned {response=} {error=} {num_retries=} - trying again',
+            f'{method=} {url=} returned {status=} {reason=} {error=} {num_retries=} - trying again '
+            f'({content=})',
         )
         return retry
 
