@@ -29,7 +29,7 @@ for a step-by-step description on how to setup the Delivery-Service (and an exte
 ## Getting Started using Kind
 If you wish to deploy the Open Delivery Gear (Delivery-Service, Delivery-Dashboard, Delivery-DB,
 Extensions) in a local Kubernetes cluster using Kind, please refer to
-[this guide](https://github.com/open-component-model/odg-core/blob/master/local-setup/local-setup.md).
+[this guide](https://github.com/open-component-model/open-delivery-gear/tree/main/local-setup).
 
 # REST-API-Documentation
 
