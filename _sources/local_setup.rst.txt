@@ -10,7 +10,7 @@ In order to start with the set-up first clone the `ODG core repository <https://
    updating an existing extension. To run a full Open Delivery Gear locally,
    i.e. containing multiple extensions and a local Kubernetes cluster, please
    refer to the `Local Setup
-   <https://github.com/open-component-model/odg-core/blob/master/local-setup/local-setup.md>`_
+   <https://github.com/open-component-model/open-delivery-gear/tree/main/local-setup>`_
    guide instead.
 
 Prerequisites
