@@ -167,6 +167,11 @@ class ArtefactMetadataQueries:
                         node_filter=ocm.iter.Filter.artefacts,
                         recursion_depth=0,
                     )
+                    if artefact_node.artefact.type
+                    not in (
+                        'application/vnd.cyclonedx+json',
+                        'application/spdx+json',
+                    )
                 ]
             else:
                 # if no component version is specified, artefact specific querying must be
