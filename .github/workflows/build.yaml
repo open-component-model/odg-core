@@ -26,6 +26,8 @@ jobs:
       - prepare
     permissions:
       contents: read
+    outputs:
+      version: ${{ steps.packages.outputs.version }}
     steps:
       - name: install setuptools
         run: |
@@ -34,6 +36,7 @@ jobs:
       - uses: gardener/cc-utils/.github/actions/trusted-checkout@v1
       - uses: gardener/cc-utils/.github/actions/install-gardener-gha-libs@v1
       - name: create distribution packages
+        id: packages
         run: |
           set -eu
 
@@ -44,6 +47,7 @@ jobs:
           fi
 
           echo "version: ${version}"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
 
           # pass finalised version to setup
           export ODG_CORE_LIBS_VERSION=${version}
@@ -276,6 +280,8 @@ jobs:
       oci-platforms: linux/arm64,linux/amd64
       build-ctx-artefact: distribution-packages
       untar-build-ctx-artefact: distribution-packages.tar.gz
+      build-args: |
+        ODG_CORE_LIBS_VERSION=${{ needs.packages.outputs.version }}
       ocm-labels: |
         name: gardener.cloud/cve-categorisation
         value:
