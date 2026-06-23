@@ -4,6 +4,7 @@ import datetime
 import logging
 import time
 import typing
+import urllib.parse
 
 import dacite
 import jwt as pyjwt
@@ -266,6 +267,13 @@ class DeliveryServiceClient:
                 'authentication against delivery-service failed: '
                 f'{res.status_code=} {res.reason=} {res.content=}',
             )
+
+        parsed_url = urllib.parse.urlparse(res.url)
+        parsed_query = urllib.parse.parse_qs(parsed_url.query)
+        parsed_query['access_token'] = ('REDACTED',)
+        query = urllib.parse.urlencode(parsed_query, doseq=True)
+        url = res.url.split('?')[0]
+        res.url = f'{url}?{query}'
 
         res.raise_for_status()
 
