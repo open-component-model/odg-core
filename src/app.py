@@ -6,6 +6,7 @@ import logging
 import os
 
 import aiohttp.web
+import aiohttp.web_log
 import aiohttp_swagger3
 
 import ci.log
@@ -472,6 +473,16 @@ async def run_app():
         print()
         print(f'listening at {host}:{port}')
         print()
+
+    def _format_r(request: aiohttp.web.BaseRequest, *args, **kwargs) -> str:
+        if request is None:
+            return '-'
+        # use `path` instead of `path_qs` to _not_ log query parameters
+        return (
+            f'{request.method} {request.path} HTTP/{request.version.major}.{request.version.minor}'
+        )
+
+    aiohttp.web_log.AccessLogger._format_r = _format_r
 
     runner = aiohttp.web.AppRunner(app)
     await runner.setup()
