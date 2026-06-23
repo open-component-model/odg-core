@@ -1739,8 +1739,8 @@ def create_issue(
 
         if assignees_statuses:
             comment_body = textwrap.dedent("""\
-                There have been anomalies during initial ticket assignment, please see details below:
-                | Message Type | Message |
+                Automatic assignment encountered problems. See details below:
+                | Status | Details |
                 | --- | --- |""")
             for status in assignees_statuses:
                 comment_body += f'\n|`{status.type}`|`{status.msg}`'

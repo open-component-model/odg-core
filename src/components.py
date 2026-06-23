@@ -513,8 +513,11 @@ class ComponentResponsibles(aiohttp.web.View):
                 statuses.append(
                     responsibles.Status(
                         type='error',
-                        msg='responsibles-heuristic was not able to determine responsibles as '
-                        '(github) statistics are incomplete',
+                        msg='Automatic assignment is unavailable because required data from GitHub'
+                        ' is not accessible. This is a GitHub limitation, not an issue with your ODG'
+                        ' configuration. Please assign this issue manually and consider configuring'
+                        ' explicit assignees for this component via OCM labels to address this'
+                        ' sustainably.',
                     ),
                 )
 
