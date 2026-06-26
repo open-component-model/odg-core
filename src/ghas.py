@@ -472,12 +472,6 @@ def scan(
     all_metadata_keys = set()
 
     now = datetime.datetime.now(tz=datetime.timezone.utc)
-    all_existing_metadata = [
-        odg.model.ArtefactMetadata.from_dict(raw)
-        for raw in delivery_service_client.query_metadata(
-            type=odg.model.Datatype.GHAS_FINDING,
-        )
-    ]
 
     for finding in create_ghas_findings(
         ghas_config=ghas_config,
@@ -511,6 +505,13 @@ def scan(
 
         all_metadata.extend(metadata)
         all_metadata_keys.update([metadatum.key for metadatum in metadata])
+
+    all_existing_metadata = [
+        odg.model.ArtefactMetadata.from_dict(raw)
+        for raw in delivery_service_client.query_metadata(
+            type=odg.model.Datatype.GHAS_FINDING,
+        )
+    ]
 
     all_stale_metadata = [
         metadatum for metadatum in all_existing_metadata if metadatum.key not in all_metadata_keys
