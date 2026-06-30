@@ -5,4 +5,5 @@ aiohttp-devtools
 aiosqlite
 greenlet
 numpy
+pytest-asyncio
 scipy
