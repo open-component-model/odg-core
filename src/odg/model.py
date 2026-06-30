@@ -616,6 +616,7 @@ class CodeqlStatus(enum.StrEnum):
 @dataclasses.dataclass
 class CodeqlFinding(Finding):
     codeql_status: CodeqlStatus
+    repo_url: str | None = None
 
     @property
     def key(self) -> str:

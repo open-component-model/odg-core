@@ -137,6 +137,9 @@ def iter_artefact_metadata(
         data=odg.model.CodeqlFinding(
             codeql_status=odg.model.CodeqlStatus.NOT_ENABLED,
             severity=categorisation.id,
+            repo_url=source_node.source.access.repoUrl
+            if isinstance(source_node.source.access, ocm.GithubAccess)
+            else None,
         ),
         discovery_date=creation_timestamp.date(),
         allowed_processing_time=categorisation.allowed_processing_time_raw,
