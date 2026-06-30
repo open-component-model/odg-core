@@ -1,41 +1,85 @@
-# Open Delivery Gear Core
+# Open Delivery Gear - Core
+
+This repository is the home of the core API and feature extensions for the [Open Delivery Gear](https://github.com/open-component-model/open-delivery-gear).
 
 [![REUSE status](https://api.reuse.software/badge/github.com/open-component-model/odg-core)](https://api.reuse.software/info/github.com/open-component-model/odg-core)
-
 ![tests](https://github.com/open-component-model/odg-core/actions/workflows/non-release.yaml/badge.svg)
 ![release](https://github.com/open-component-model/odg-core/actions/workflows/release.yaml/badge.svg)
 
-This repository is used for developing the `Delivery-Service` + Extensions, which are part of the
-Open Delivery Gear. It exposes a RESTful API useful for delivery- and compliance-related tasks
-for OCM-based software deliveries.
+## Index
 
-Both Delivery-Service and (optional) Extensions are intended to be deployed into a common Kubernetes
-cluster.
+- [Technology](#technology)
+- [Getting Started](#getting-started)
+  - [Standalone](#standalone)
+  - [Kubernetes in Docker](#kubernetes-in-docker)
+- [Documentation](#documentation)
+- [Packages](#package-overview)
 
-# Local Development
+## Technology
 
-Delivery-Service and Extensions require a Python runtime environment (see `setup.py` for details) to
-run. Typically, the Python3 version from greatest released version of
-[Alpine](https://endoflife.date/alpine) Linux is used/tested (see `Dockerfile`). Greater or smaller
-versions _may_ work, but are typically untested.
+The core API implements a Python HTTP web server, intended for deployment into a Kubernetes cluster. It features compliance-related automation for software built with the [Open Component Model](ocm.software/).
 
-For Delivery-Service, use `src/app.py` as entry point. Check online-help (`app.py --help`) for further
-instructions. Note that most features of Delivery-Service are optional (features are disabled by
-default unless explicitly enabled through additional configuration).
+## Getting Started
 
-Please refer to [this guide](https://open-component-model.github.io/odg-core/local_setup.html)
-for a step-by-step description on how to setup the Delivery-Service (and an extension if desired).
+There are multiple ways to run ODG-Core locally.
 
-## Getting Started using Kind
-If you wish to deploy the Open Delivery Gear (Delivery-Service, Delivery-Dashboard, Delivery-DB,
-Extensions) in a local Kubernetes cluster using Kind, please refer to
-[this guide](https://github.com/open-component-model/open-delivery-gear/tree/main/local-setup).
+### Standalone
 
-# REST-API-Documentation
+The ODG-Core Python HTTP web server can be started locally as a standalone application. It is loosely coupled to the database and Kubernetes-specific components, therefore this option is considered best if you intend to run web server-only features (e.g. adding new endpoints).
 
-Delivery-Service exposes generated documentation through the following route: `/api/v1/doc`
+#### Dependencies and Setup
 
-> [!NOTE]  
-> For a full (-> still WIP) documentation, please visit https://open-component-model.github.io/odg-core.
+First, you need to prepare your local environment.
+The Makefile implements convenient commands for setup, but makes certain assumptions (e.g. it **does not** use virtual environments). If you have a strong opinion on how to set up your local development environment, please review the Makefile in detail.
+
+If you are fine with installing the Python packages globally, please run:
+
+```shell
+make setup
+```
+
+#### Running the Web Server
+
+The Makefile features a convenient command to run the ODG-Core web server in a lightweight fashion. This naturally has limitations, as most features will be turned off.
+If you want to run specific features, please review the Makefile and build your custom `run` command.
+
+To run ODG-Core in a simple configuration, please use:
+
+```shell
+make run
+```
+
+### Kubernetes in Docker
+
+To run the ODG-Core web server alongside dependencies and feature extensions, you need to deploy it to a Kubernetes environment.
+You can use Kubernetes-in-Docker (KinD) to deploy such a setup locally.
+
+Please refer to [this guide](https://open-component-model.github.io/open-delivery-gear/contents/how-to/01-local-setup.html) to deploy ODG to KinD.
+
+## Documentation
+
+The documentation is hosted [here](https://open-component-model.github.io/open-delivery-gear/index.html).
+
+**Quicklinks**
+
+- [Architecture Overview](https://open-component-model.github.io/open-delivery-gear/contents/concepts/00-odg-architecture.html)
+- [Onboarding Journey](https://open-component-model.github.io/open-delivery-gear/contents/getting-started/00-introduction.html)
+- [Reference Documentation](https://open-component-model.github.io/open-delivery-gear/index.html#references)
+
+## Packages
+
+ODG-Core publishes multiple software artefacts.
+This list provides an overview.
+
+| Name | Type | Description | Location |
+| --- | --- | --- | --- |
+| `odg-core-libs` | Python Package | Core APIs and functionalities. Contains the ODG web server. | [PyPi](https://pypi.org/project/odg-core-libs/) |
+| `odg-client` | Python Package | Python HTTP client library to interact with the ODG-Core API | [PyPi](https://pypi.org/project/odg-client/) |
+| `bdba-client` | Python Package | Python HTTP client library to interact with BlackDuck Binary Analysis | [PyPi](https://pypi.org/project/bdba-client/) |
+| `odg-core` | OCI Image | Filesystem to run ODG-Core and ODG extensions in cloud environments | [GCP](https://europe-docker.pkg.dev/gardener-project/releases/odg/core) |
+| `odg-core` | OCM Component | Software component referencing all delivery artefacts and metadata | [OCM Repo](https://europe-docker.pkg.dev/gardener-project/releases/component-descriptors/ocm.software/open-delivery-gear/core) |
+
+
+---
 
 <p align="center"><img alt="Bundesministerium für Wirtschaft und Energie (BMWE)-EU funding logo" src="https://apeirora.eu/assets/img/BMWK-EU.png" width="400"/></p>
