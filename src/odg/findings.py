@@ -93,6 +93,15 @@ class SASTFindingSelector:
 
 
 @dataclasses.dataclass
+class CodeqlFindingSelector:
+    """
+    :param list[str] codeql_status:
+        List of regexes to determine matching CodeQL status values.
+    """
+
+    codeql_status: list[str]
+
+@dataclasses.dataclass
 class VulnerabilityFindingSelector:
     """
     :param MinMaxRange cve_score_range:
@@ -146,7 +155,8 @@ class FindingCategorisation:
     allowed_processing_time: MetaAllowedProcessingTimes | str | int | None
     rescoring: RescoringModes | list[RescoringModes] | None
     selector: (
-        CryptoFindingSelector
+        CodeqlFindingSelector
+        | CryptoFindingSelector
         | GHASFindingSelector
         | IPFindingSelector
         | LicenseFindingSelector
@@ -893,6 +903,11 @@ def categorise_finding(
         elif isinstance(selector, SASTFindingSelector):
             for selector_sub_type in selector.sub_types:
                 if re.fullmatch(selector_sub_type, finding_property, re.IGNORECASE):
+                    return categorisation
+
+        elif isinstance(selector, CodeqlFindingSelector):
+            for selector_codeql_status in selector.codeql_status:
+                if re.fullmatch(selector_codeql_status, finding_property, re.IGNORECASE):
                     return categorisation
 
         elif isinstance(selector, VulnerabilityFindingSelector):
