@@ -73,6 +73,9 @@ findings_report:
 ghas:
   enabled: False
 
+codeql:
+  enabled: False
+
 issue_replicator:
   enabled: False
   mappings:

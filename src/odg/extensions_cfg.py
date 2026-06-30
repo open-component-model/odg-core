@@ -39,6 +39,7 @@ class Services(enum.StrEnum):
     DELIVERY_DB_BACKUP = 'deliveryDbBackup'
     FINDINGS_REPORT = 'findingsReport'
     GHAS = 'ghas'
+    CODEQL = 'codeql'
     ISSUE_REPLICATOR = 'issueReplicator'
     OSID = 'osid'
     PPMS = 'ppms'
@@ -921,6 +922,38 @@ class GHASConfig(ExtensionCfgMixins):
         return True
 
 
+@dataclasses.dataclass(kw_only=True)
+class CodeqlConfig(BacklogItemMixins):
+    """
+    :param str delivery_service_url
+    :param int interval:
+        Time after which an artefact must be re-checked at latest.
+    :param WarningVerbosities on_unsupported
+        Defines the handling if a backlog item should be processed which contains unsupported
+        properties, e.g. an unsupported artefact kind.
+    """
+
+    service: Services = Services.CODEQL
+    delivery_service_url: str
+    interval: int = 60 * 60 * 24  # 24h
+    on_unsupported: WarningVerbosities = WarningVerbosities.WARNING
+
+    def is_supported(
+        self,
+        artefact_kind: odg.model.ArtefactKind | None = None,
+    ) -> bool:
+        supported_artefact_kinds = (odg.model.ArtefactKind.SOURCE,)
+
+        if artefact_kind and artefact_kind not in supported_artefact_kinds:
+            if self.on_unsupported is WarningVerbosities.WARNING:
+                logger.warning(
+                    f'{artefact_kind=} is not supported for CodeQL scans, {supported_artefact_kinds=}',
+                )
+            return False
+
+        return True
+
+
 @dataclasses.dataclass
 class ExtensionDefinitionOcmReference:
     component_name: str
@@ -1287,6 +1320,7 @@ class ExtensionsConfiguration:
     delivery_db_backup: DeliveryDBBackup | None
     findings_report: FindingsReportConfig | None
     ghas: GHASConfig | None
+    codeql: CodeqlConfig | None
     issue_replicator: IssueReplicatorConfig | None
     odg_operator: OdgOperatorConfig | None
     osid: OsId | None

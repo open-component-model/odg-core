@@ -46,6 +46,35 @@
         malware_names:
           - .*
 
+- type: finding/codeql
+  filter:
+    - semantics: include
+      artefact_kind: source
+  issues:
+    enable_issues: False
+  rescoring_ruleset:
+    name: codeql-rescoring-v1
+    rules:
+      - name: codeql-is-optional-for-external-components
+        match:
+          - component_name: github.com/.*
+        codeql_status: not-enabled
+        operation: set-to-NONE
+  categorisations:
+    - id: NONE
+      display_name: NONE
+      value: 0
+      rescoring: manual
+      allowed_processing_time: ~
+    - id: BLOCKER
+      display_name: BLOCKER
+      value: 16
+      allowed_processing_time: 0
+      rescoring: [manual, automatic]
+      selector:
+        codeql_status:
+          - .*
+
 - type: finding/sast
   issues:
     enable_issues: False

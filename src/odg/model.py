@@ -42,6 +42,7 @@ class Datatype(enum.StrEnum):
     DIKI_FINDING = 'finding/diki'
     FALCO_FINDING = 'finding/falco'
     KYVERNO_FINDING = 'finding/kyverno'
+    CODEQL_FINDING = 'finding/codeql'
     GHAS_FINDING = 'finding/ghas'
     INVENTORY_FINDING = 'finding/inventory'
     IP_FINDING = 'finding/ip'
@@ -62,6 +63,7 @@ class Datatype(enum.StrEnum):
             Datatype.DIKI_FINDING: Datasource.DIKI,
             Datatype.FALCO_FINDING: Datasource.FALCO,
             Datatype.KYVERNO_FINDING: Datasource.KYVERNO,
+            Datatype.CODEQL_FINDING: Datasource.CODEQL,
             Datatype.GHAS_FINDING: Datasource.GHAS,
             Datatype.INVENTORY_FINDING: Datasource.INVENTORY,
             Datatype.IP_FINDING: Datasource.BLACKDUCK,
@@ -81,6 +83,7 @@ class Datasource(enum.StrEnum):
     BDBA = 'bdba'
     BLACKDUCK = 'blackduck'
     CLAMAV = 'clamav'
+    CODEQL = 'codeql'
     CRYPTO = 'crypto'
     DELIVERY_DASHBOARD = 'delivery-dashboard'
     DIKI = 'diki'
@@ -104,6 +107,7 @@ class Datasource(enum.StrEnum):
                 Datatype.VULNERABILITY_FINDING,
             ),
             Datasource.CLAMAV: (Datatype.MALWARE_FINDING,),
+            Datasource.CODEQL: (Datatype.CODEQL_FINDING,),
             Datasource.CRYPTO: (
                 Datatype.CRYPTO_FINDING,
                 Datatype.CRYPTO_ASSET,
@@ -605,6 +609,28 @@ class RescoreSastFinding:
         return _as_key(self.sast_status, self.sub_type)
 
 
+class CodeqlStatus(enum.StrEnum):
+    NOT_ENABLED = 'not-enabled'
+
+
+@dataclasses.dataclass
+class CodeqlFinding(Finding):
+    codeql_status: CodeqlStatus
+
+    @property
+    def key(self) -> str:
+        return _as_key(self.codeql_status)
+
+
+@dataclasses.dataclass
+class RescoreCodeqlFinding:
+    codeql_status: CodeqlStatus
+
+    @property
+    def key(self) -> str:
+        return _as_key(self.codeql_status)
+
+
 @dataclasses.dataclass
 class OsIdFinding(Finding):
     osid: OperatingSystemId
@@ -937,6 +963,7 @@ class CustomRescoring:
         | RescoringLicenseFinding
         | MalwareFindingDetails
         | RescoreSastFinding
+        | RescoreCodeqlFinding
         | RescoringCryptoFinding
         | RescoringDikiFinding
         | RescoreOsIdFinding
@@ -973,6 +1000,7 @@ class SlaViolation:
         | RescoringLicenseFinding
         | MalwareFindingDetails
         | RescoreSastFinding
+        | RescoreCodeqlFinding
         | RescoringCryptoFinding
         | RescoringDikiFinding
         | RescoreOsIdFinding
@@ -1647,6 +1675,7 @@ class ArtefactMetadataSpecificity(enum.Enum):
 
 FindingModels = (
     ClamAVMalwareFinding
+    | CodeqlFinding
     | CryptoFinding
     | DikiFinding
     | FalcoFinding
