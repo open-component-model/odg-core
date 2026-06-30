@@ -202,13 +202,13 @@ jobs:
           bandit_evidence="${blobs_dir}/bandit.tar.gz"
 
           bandit_extra_args="-f txt -o ${bandit_logfile}" \
-            .ci/lint
+            make lint
 
           # pass bandit.log + used cfg (pyproject.toml) as evidence
           tar czf $bandit_evidence $bandit_logfile pyproject.toml
 
           echo "running format checker"
-          .ci/check-format
+          make format
       - uses: gardener/cc-utils/.github/actions/export-ocm-fragments@v1
         with:
           ocm-resources: |
@@ -258,7 +258,7 @@ jobs:
 
           echo "running tests"
           .ci/smoke-test
-          .ci/test
+          make test
 
   oci-image:
     name: Build OCI-Image
