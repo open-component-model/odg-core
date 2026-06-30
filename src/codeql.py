@@ -29,42 +29,67 @@ ci.log.configure_default_logging()
 k8s.logging.configure_kubernetes_logging()
 
 
-def is_codeql_enabled(
+def _parse_github_coords(
+    repo_url: str,
+) -> tuple[str, str, str] | None:
+    parsed = urllib.parse.urlparse(repo_url)
+    path_parts = parsed.path.strip('/').split('/')
+    if len(path_parts) < 2:
+        return None
+    org, repo = path_parts[0], path_parts[1]
+    hostname = parsed.hostname or 'github.com'
+    api_base = (
+        f'https://{hostname}/api/v3' if hostname != 'github.com' else 'https://api.github.com'
+    )
+    return org, repo, api_base
+
+
+def fetch_repo_info(
     source_node: ocm.iter.SourceNode,
     secret_factory: secret_mgmt.SecretFactory,
-) -> bool:
+) -> tuple[bool, str | None, str | None, str | None]:
+    """
+    Returns (codeql_enabled, repo_url, settings_url, language).
+    Makes two GitHub API calls: one to /repos for metadata, one to code-scanning/analyses.
+    """
     access = source_node.source.access
     if not isinstance(access, ocm.GithubAccess):
         logger.info(
             f'source access is not GithubAccess for {source_node.source.name}, skipping CodeQL check',
         )
-        return False
+        return False, None, None, None
 
     repo_url = access.repoUrl
-    parsed = urllib.parse.urlparse(repo_url)
-    path_parts = parsed.path.strip('/').split('/')
-    if len(path_parts) < 2:
+    coords = _parse_github_coords(repo_url)
+    if not coords:
         logger.warning(f'Cannot parse org/repo from {repo_url=}')
-        return False
+        return False, repo_url, None, None
 
-    org, repo = path_parts[0], path_parts[1]
-    hostname = parsed.hostname or 'github.com'
+    org, repo, api_base = coords
 
-    api_base = (
-        f'https://{hostname}/api/v3' if hostname != 'github.com' else 'https://api.github.com'
-    )
-    url = f'{api_base}/repos/{org}/{repo}/code-scanning/analyses?tool_name=CodeQL&per_page=1'
-
-    result, _ = ghas.github_api_request(
-        url=url,
+    repo_info, _ = ghas.github_api_request(
+        url=f'{api_base}/repos/{org}/{repo}',
         secret_factory=secret_factory,
     )
 
-    if result is None:
-        logger.warning(f'CodeQL check failed for {repo_url=}')
-        return False
+    language = None
+    settings_url = None
+    if isinstance(repo_info, dict):
+        language = repo_info.get('language')
+        html_url = repo_info.get('html_url', repo_url)
+        settings_url = f'{html_url}/settings/security_analysis'
 
-    return isinstance(result, list) and len(result) > 0
+    analyses, _ = ghas.github_api_request(
+        url=f'{api_base}/repos/{org}/{repo}/code-scanning/analyses?tool_name=CodeQL&per_page=1',
+        secret_factory=secret_factory,
+    )
+
+    if analyses is None:
+        logger.warning(f'CodeQL check failed for {repo_url=}')
+        return False, repo_url, settings_url, language
+
+    codeql_enabled = isinstance(analyses, list) and len(analyses) > 0
+    return codeql_enabled, repo_url, settings_url, language
 
 
 def iter_artefact_metadata(
@@ -115,7 +140,15 @@ def iter_artefact_metadata(
         )
         return
 
-    if is_codeql_enabled(source_node=source_node, secret_factory=secret_factory):
+    codeql_enabled, repo_url, settings_url, language = fetch_repo_info(
+        source_node=source_node,
+        secret_factory=secret_factory,
+    )
+
+    if codeql_enabled:
+        return
+
+    if not repo_url:
         return
 
     categorisation = odg.findings.categorise_finding(
@@ -137,9 +170,9 @@ def iter_artefact_metadata(
         data=odg.model.CodeqlFinding(
             codeql_status=odg.model.CodeqlStatus.NOT_ENABLED,
             severity=categorisation.id,
-            repo_url=source_node.source.access.repoUrl
-            if isinstance(source_node.source.access, ocm.GithubAccess)
-            else None,
+            repo_url=repo_url,
+            settings_url=settings_url,
+            language=language,
         ),
         discovery_date=creation_timestamp.date(),
         allowed_processing_time=categorisation.allowed_processing_time_raw,

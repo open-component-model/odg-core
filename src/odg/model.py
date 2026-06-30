@@ -617,10 +617,12 @@ class CodeqlStatus(enum.StrEnum):
 class CodeqlFinding(Finding):
     codeql_status: CodeqlStatus
     repo_url: str | None = None
+    settings_url: str | None = None
+    language: str | None = None
 
     @property
     def key(self) -> str:
-        return _as_key(self.codeql_status)
+        return _as_key(self.codeql_status, self.repo_url)
 
 
 @dataclasses.dataclass
