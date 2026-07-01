@@ -1002,7 +1002,13 @@ class ArtefactMetadataQuery(aiohttp.web.View):
                 yield query
 
             if artefact_ref.artefact_kind:
-                yield dm.ArtefactMetaData.artefact_kind == artefact_ref.artefact_kind
+                yield sa.or_(
+                    sa.and_(
+                        none_ok,
+                        dm.ArtefactMetaData.artefact_kind.is_(None),
+                    ),
+                    dm.ArtefactMetaData.artefact_kind == artefact_ref.artefact_kind,
+                )
 
             if not artefact_ref.artefact:
                 return

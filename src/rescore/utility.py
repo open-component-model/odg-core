@@ -24,10 +24,17 @@ def _iter_rescorings_for_finding(
         if rescoring.data.referenced_type != finding.meta.type:
             continue
 
-        if rescoring.artefact.artefact_kind != finding.artefact.artefact_kind:
+        if (
+            rescoring.artefact.artefact_kind
+            and rescoring.artefact.artefact_kind != finding.artefact.artefact_kind
+        ):
             continue
 
-        if rescoring.artefact.artefact.artefact_type != finding.artefact.artefact.artefact_type:
+        if (
+            rescoring.artefact.artefact
+            and rescoring.artefact.artefact.artefact_type
+            and rescoring.artefact.artefact.artefact_type != finding.artefact.artefact.artefact_type
+        ):
             continue
 
         if (
@@ -44,20 +51,23 @@ def _iter_rescorings_for_finding(
             continue
 
         if (
-            rescoring.artefact.artefact.artefact_name
+            rescoring.artefact.artefact
+            and rescoring.artefact.artefact.artefact_name
             and rescoring.artefact.artefact.artefact_name != finding.artefact.artefact.artefact_name
         ):
             continue
 
         if (
-            rescoring.artefact.artefact.artefact_version
+            rescoring.artefact.artefact
+            and rescoring.artefact.artefact.artefact_version
             and rescoring.artefact.artefact.artefact_version
             != finding.artefact.artefact.artefact_version
         ):
             continue
 
         if (
-            rescoring.artefact.artefact.artefact_extra_id
+            rescoring.artefact.artefact
+            and rescoring.artefact.artefact.artefact_extra_id
             and rescoring.artefact.artefact.normalised_artefact_extra_id
             != finding.artefact.artefact.normalised_artefact_extra_id
         ):
@@ -82,6 +92,7 @@ def _iter_rescorings_for_finding(
                 rescoring.data.finding.labels,
             ) != sorted(finding.data.labels):
                 continue
+
         else:
             if rescoring.data.finding.key != finding.data.key:
                 continue
