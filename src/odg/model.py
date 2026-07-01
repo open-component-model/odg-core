@@ -203,13 +203,22 @@ class OsStatus(enum.StrEnum):
 
 def normalise_artefact_extra_id(
     artefact_extra_id: dict[str, str],
+    omit_version: bool = False,
 ) -> str:
     """
     generate stable representation of `artefact_extra_id`
 
     sorted by key in alphabetical order and concatinated following pattern:
     key1:value1_key2:value2_ ...
+
+    If `omit_version` is set, a possible `version` property is removed from the `artefact_extra_id`.
+    This might be used for scoped values which should be specific for a single artefact (e.g. a
+    certain os distribution of an image) but independent of its version.
     """
+    if omit_version and 'version' in artefact_extra_id:
+        artefact_extra_id = artefact_extra_id.copy()
+        del artefact_extra_id['version']
+
     s = sorted(artefact_extra_id.items(), key=lambda items: items[0])
     return '_'.join([':'.join(values) for values in s])
 

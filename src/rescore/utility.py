@@ -20,6 +20,11 @@ def _iter_rescorings_for_finding(
     finding: odg.model.ArtefactMetadata,
     rescorings: collections.abc.Iterable[odg.model.ArtefactMetadata],
 ) -> collections.abc.Generator[odg.model.ArtefactMetadata, None, None]:
+    normalised_finding_extra_identity = odg.model.normalise_artefact_extra_id(
+        artefact_extra_id=finding.artefact.artefact.artefact_extra_id,
+        omit_version=True,
+    )
+
     for rescoring in rescorings:
         if rescoring.data.referenced_type != finding.meta.type:
             continue
@@ -68,8 +73,11 @@ def _iter_rescorings_for_finding(
         if (
             rescoring.artefact.artefact
             and rescoring.artefact.artefact.artefact_extra_id
-            and rescoring.artefact.artefact.normalised_artefact_extra_id
-            != finding.artefact.artefact.normalised_artefact_extra_id
+            and odg.model.normalise_artefact_extra_id(
+                artefact_extra_id=rescoring.artefact.artefact.artefact_extra_id,
+                omit_version=True,
+            )
+            != normalised_finding_extra_identity
         ):
             continue
 
