@@ -35,17 +35,17 @@ class Services(enum.StrEnum):
     BDBA = 'bdba'
     CACHE_MANAGER = 'cacheManager'
     CLAMAV = 'clamav'
+    CODEQL = 'codeql'
     CRYPTO = 'crypto'
     DELIVERY_DB_BACKUP = 'deliveryDbBackup'
     FINDINGS_REPORT = 'findingsReport'
     GHAS = 'ghas'
-    CODEQL = 'codeql'
     ISSUE_REPLICATOR = 'issueReplicator'
+    ODG_OPERATOR = 'odg-operator'
     OSID = 'osid'
     PPMS = 'ppms'
     RESPONSIBLES = 'responsibles'
     SAST = 'sast'
-    ODG_OPERATOR = 'odg-operator'
     SBOM_GENERATOR = 'sbomGenerator'
     SLA_VIOLATION_PROFILER = 'slaViolationProfiler'
 
@@ -1320,11 +1320,11 @@ class ExtensionsConfiguration:
     blackduck: BlackDuckConfig | None
     cache_manager: CacheManagerConfig | None
     clamav: ClamAVConfig | None
+    codeql: CodeqlConfig | None
     crypto: CryptoConfig | None
     delivery_db_backup: DeliveryDBBackup | None
     findings_report: FindingsReportConfig | None
     ghas: GHASConfig | None
-    codeql: CodeqlConfig | None
     issue_replicator: IssueReplicatorConfig | None
     odg_operator: OdgOperatorConfig | None
     osid: OsId | None

@@ -38,14 +38,14 @@ class Datatype(enum.StrEnum):
     SLA_VIOLATION = 'sla_violation'
 
     # finding types
+    CODEQL_FINDING = 'finding/codeql'
     CRYPTO_FINDING = 'finding/crypto'
     DIKI_FINDING = 'finding/diki'
     FALCO_FINDING = 'finding/falco'
-    KYVERNO_FINDING = 'finding/kyverno'
-    CODEQL_FINDING = 'finding/codeql'
     GHAS_FINDING = 'finding/ghas'
     INVENTORY_FINDING = 'finding/inventory'
     IP_FINDING = 'finding/ip'
+    KYVERNO_FINDING = 'finding/kyverno'
     LICENSE_FINDING = 'finding/license'
     MALWARE_FINDING = 'finding/malware'
     OSID_FINDING = 'finding/osid'
@@ -59,14 +59,14 @@ class Datatype(enum.StrEnum):
 
     def datasource(self) -> 'Datasource':
         return {
+            Datatype.CODEQL_FINDING: Datasource.CODEQL,
             Datatype.CRYPTO_FINDING: Datasource.CRYPTO,
             Datatype.DIKI_FINDING: Datasource.DIKI,
             Datatype.FALCO_FINDING: Datasource.FALCO,
-            Datatype.KYVERNO_FINDING: Datasource.KYVERNO,
-            Datatype.CODEQL_FINDING: Datasource.CODEQL,
             Datatype.GHAS_FINDING: Datasource.GHAS,
             Datatype.INVENTORY_FINDING: Datasource.INVENTORY,
             Datatype.IP_FINDING: Datasource.BLACKDUCK,
+            Datatype.KYVERNO_FINDING: Datasource.KYVERNO,
             Datatype.LICENSE_FINDING: Datasource.BDBA,
             Datatype.MALWARE_FINDING: Datasource.CLAMAV,
             Datatype.OSID_FINDING: Datasource.OSID,
