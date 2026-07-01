@@ -50,7 +50,7 @@ format:
 # Testing
 test:
 	@echo "Running tests..."
-	@bash .ci/test ""
+	@bash .ci/test
 
 # Build client packages (bdba and odg)
 build-clients:
