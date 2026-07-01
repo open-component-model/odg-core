@@ -17,7 +17,7 @@ This repository is the home of the core API and feature extensions for the [Open
 
 ## Technology
 
-The core API implements a Python HTTP web server, intended for deployment into a Kubernetes cluster. It features compliance-related automation for software built with the [Open Component Model](ocm.software/).
+The core API implements a Python HTTP web server, intended for deployment into a Kubernetes cluster. It features compliance-related automation for software built with the [Open Component Model](https://ocm.software/).
 
 ## Getting Started
 
