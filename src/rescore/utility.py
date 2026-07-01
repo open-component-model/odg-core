@@ -1,4 +1,5 @@
 import collections.abc
+import copy
 import datetime
 import json
 import re
@@ -128,6 +129,61 @@ def rescorings_for_finding_by_specificity(
             reverse=True,
         ),
     )
+
+
+def _scoped_artefact_id(
+    artefact_id: odg.model.LocalArtefactId | None,
+    scope: odg.model.ArtefactMetadataSpecificity,
+) -> odg.model.LocalArtefactId:
+    if not artefact_id:
+        return odg.model.LocalArtefactId()
+
+    artefact_id = copy.deepcopy(artefact_id)
+
+    if scope <= odg.model.ArtefactMetadataSpecificity.GLOBAL:
+        pass
+
+    if scope <= odg.model.ArtefactMetadataSpecificity.COMPONENT:
+        artefact_id.artefact_name = None
+        artefact_id.artefact_type = None
+        artefact_id.artefact_extra_id = {}
+
+    if scope <= odg.model.ArtefactMetadataSpecificity.ARTEFACT:
+        artefact_id.artefact_version = None
+
+        if 'version' in artefact_id.artefact_extra_id:
+            del artefact_id.artefact_extra_id['version']
+
+    if scope <= odg.model.ArtefactMetadataSpecificity.SINGLE:
+        pass
+
+    return artefact_id
+
+
+def scoped_component_artefact_id(
+    component_artefact_id: odg.model.ComponentArtefactId,
+    scope: odg.model.ArtefactMetadataSpecificity,
+) -> odg.model.ComponentArtefactId:
+    component_artefact_id = copy.deepcopy(component_artefact_id)
+
+    if scope <= odg.model.ArtefactMetadataSpecificity.GLOBAL:
+        component_artefact_id.component_name = None
+
+    if scope <= odg.model.ArtefactMetadataSpecificity.COMPONENT:
+        component_artefact_id.artefact_kind = None
+
+    if scope <= odg.model.ArtefactMetadataSpecificity.ARTEFACT:
+        component_artefact_id.component_version = None
+
+    if scope <= odg.model.ArtefactMetadataSpecificity.SINGLE:
+        pass
+
+    component_artefact_id.artefact = _scoped_artefact_id(
+        artefact_id=component_artefact_id.artefact,
+        scope=scope,
+    )
+
+    return component_artefact_id
 
 
 def find_cve_categorisation(

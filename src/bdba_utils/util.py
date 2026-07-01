@@ -19,6 +19,7 @@ import odg.cvss
 import odg.findings
 import odg.model
 import odg_client
+import rescore.utility
 
 
 logger = logging.getLogger(__name__)
@@ -73,12 +74,9 @@ def iter_artefact_metadata(
     # rescoring should not reference artefact version so that the `ARTEFACT` rescoring scope will be
     # used -> rescoring will be used for future versions as well, so there is no need to replicate
     # BDBA triages to new BDBA scans
-    rescoring_artefact_ref = dataclasses.replace(
-        finding_artefact_ref,
-        artefact=dataclasses.replace(
-            finding_artefact_ref.artefact,
-            artefact_version=None,
-        ),
+    rescoring_artefact_ref = rescore.utility.scoped_component_artefact_id(
+        component_artefact_id=artefact_ref,
+        scope=odg.model.ArtefactMetadataSpecificity.ARTEFACT,
     )
 
     existing_findings_by_key = {

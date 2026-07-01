@@ -241,3 +241,158 @@ def test_generate_sast_rescorings(
     assert isinstance(rescoring.data, odg.model.CustomRescoring)
     assert rescoring.data.matching_rules == ['central-linting-is-optional-for-external-components']
     assert rescoring.data.severity == 'no-linter-required'
+
+
+@pytest.fixture
+def full_component_artefact_id() -> odg.model.ComponentArtefactId:
+    return odg.model.ComponentArtefactId(
+        component_name='example.org/my-component',
+        component_version='1.2.3',
+        artefact_kind=odg.model.ArtefactKind.RESOURCE,
+        artefact=odg.model.LocalArtefactId(
+            artefact_name='my-artefact',
+            artefact_type='ociImage',
+            artefact_version='1.0.0',
+            artefact_extra_id={
+                'platform': 'linux/amd64',
+                'version': '1.0.0',
+            },
+        ),
+    )
+
+
+def test_scoped_component_artefact_id_single(
+    full_component_artefact_id: odg.model.ComponentArtefactId,
+):
+    result = rescore.utility.scoped_component_artefact_id(
+        component_artefact_id=full_component_artefact_id,
+        scope=odg.model.ArtefactMetadataSpecificity.SINGLE,
+    )
+
+    # SINGLE scope does not clear any fields
+    assert result.component_name == 'example.org/my-component'
+    assert result.component_version == '1.2.3'
+    assert result.artefact_kind == odg.model.ArtefactKind.RESOURCE
+    assert result.artefact.artefact_name == 'my-artefact'
+    assert result.artefact.artefact_type == 'ociImage'
+    assert result.artefact.artefact_version == '1.0.0'
+    assert result.artefact.artefact_extra_id == {
+        'platform': 'linux/amd64',
+        'version': '1.0.0',
+    }
+
+
+def test_scoped_component_artefact_id_artefact(
+    full_component_artefact_id: odg.model.ComponentArtefactId,
+):
+    result = rescore.utility.scoped_component_artefact_id(
+        component_artefact_id=full_component_artefact_id,
+        scope=odg.model.ArtefactMetadataSpecificity.ARTEFACT,
+    )
+
+    # ARTEFACT scope clears component_version and artefact_version + 'version' extra id key
+    assert result.component_name == 'example.org/my-component'
+    assert result.component_version is None
+    assert result.artefact_kind == odg.model.ArtefactKind.RESOURCE
+    assert result.artefact.artefact_name == 'my-artefact'
+    assert result.artefact.artefact_type == 'ociImage'
+    assert result.artefact.artefact_version is None
+    assert 'version' not in result.artefact.artefact_extra_id
+    assert result.artefact.artefact_extra_id == {
+        'platform': 'linux/amd64',
+    }
+
+
+def test_scoped_component_artefact_id_component(
+    full_component_artefact_id: odg.model.ComponentArtefactId,
+):
+    result = rescore.utility.scoped_component_artefact_id(
+        component_artefact_id=full_component_artefact_id,
+        scope=odg.model.ArtefactMetadataSpecificity.COMPONENT,
+    )
+
+    # COMPONENT scope additionally clears artefact_kind and all artefact fields except name
+    assert result.component_name == 'example.org/my-component'
+    assert result.component_version is None
+    assert result.artefact_kind is None
+    assert result.artefact.artefact_name is None
+    assert result.artefact.artefact_type is None
+    assert result.artefact.artefact_version is None
+    assert result.artefact.artefact_extra_id == {}
+
+
+def test_scoped_component_artefact_id_global(
+    full_component_artefact_id: odg.model.ComponentArtefactId,
+):
+    result = rescore.utility.scoped_component_artefact_id(
+        component_artefact_id=full_component_artefact_id,
+        scope=odg.model.ArtefactMetadataSpecificity.GLOBAL,
+    )
+
+    # GLOBAL scope additionally clears component_name
+    assert result.component_name is None
+    assert result.component_version is None
+    assert result.artefact_kind is None
+    assert result.artefact.artefact_name is None
+    assert result.artefact.artefact_type is None
+    assert result.artefact.artefact_version is None
+    assert result.artefact.artefact_extra_id == {}
+
+
+def test_scoped_component_artefact_id_does_not_mutate_input(
+    full_component_artefact_id: odg.model.ComponentArtefactId,
+):
+    original_name = full_component_artefact_id.component_name
+    original_version = full_component_artefact_id.component_version
+    original_extra_id = dict(full_component_artefact_id.artefact.artefact_extra_id)
+
+    rescore.utility.scoped_component_artefact_id(
+        component_artefact_id=full_component_artefact_id,
+        scope=odg.model.ArtefactMetadataSpecificity.GLOBAL,
+    )
+
+    assert full_component_artefact_id.component_name == original_name
+    assert full_component_artefact_id.component_version == original_version
+    assert full_component_artefact_id.artefact.artefact_extra_id == original_extra_id
+
+
+def test_scoped_component_artefact_id_no_artefact():
+    component_artefact_id = odg.model.ComponentArtefactId(
+        component_name='example.org/my-component',
+        component_version='1.2.3',
+        artefact_kind=odg.model.ArtefactKind.RESOURCE,
+        artefact=None,
+    )
+
+    result = rescore.utility.scoped_component_artefact_id(
+        component_artefact_id=component_artefact_id,
+        scope=odg.model.ArtefactMetadataSpecificity.ARTEFACT,
+    )
+
+    assert result.artefact is not None
+    assert result.artefact.artefact_name is None
+    assert result.artefact.artefact_version is None
+
+
+def test_scoped_component_artefact_id_artefact_extra_id_without_version_key():
+    component_artefact_id = odg.model.ComponentArtefactId(
+        component_name='example.org/my-component',
+        component_version='1.2.3',
+        artefact=odg.model.LocalArtefactId(
+            artefact_name='my-artefact',
+            artefact_version='1.0.0',
+            artefact_extra_id={
+                'platform': 'linux/amd64',
+            },
+        ),
+    )
+
+    result = rescore.utility.scoped_component_artefact_id(
+        component_artefact_id=component_artefact_id,
+        scope=odg.model.ArtefactMetadataSpecificity.ARTEFACT,
+    )
+
+    assert result.artefact.artefact_version is None
+    assert result.artefact.artefact_extra_id == {
+        'platform': 'linux/amd64',
+    }
