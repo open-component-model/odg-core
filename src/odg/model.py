@@ -622,7 +622,7 @@ class CodeqlFinding(Finding):
 
     @property
     def key(self) -> str:
-        return _as_key(self.codeql_status, self.repo_url)
+        return _as_key(self.codeql_status, self.repo_url, self.language)
 
 
 @dataclasses.dataclass
