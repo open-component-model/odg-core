@@ -60,11 +60,21 @@ Please refer to [this guide](https://open-component-model.github.io/open-deliver
 
 The documentation is hosted [here](https://open-component-model.github.io/open-delivery-gear/index.html).
 
-**Quicklinks**
+### Quicklinks
 
 - [Architecture Overview](https://open-component-model.github.io/open-delivery-gear/contents/concepts/00-odg-architecture.html)
 - [Onboarding Journey](https://open-component-model.github.io/open-delivery-gear/contents/getting-started/00-introduction.html)
 - [Reference Documentation](https://open-component-model.github.io/open-delivery-gear/index.html#references)
+
+### Open-API Specification
+
+Additionally, each ODG-Core instance hosts an Open-API specification.
+It is available at:
+`https://<odg-core>/api/v1/doc/`
+
+You can also checkout the documentation hosted by the public demo instance, but please be aware that the running version might differ from your installation.
+
+-> [Public ODG Demo Open-API](https://delivery-service.demo.ci.gardener.cloud/api/v1/doc/)
 
 ## Packages
 
@@ -78,7 +88,6 @@ This list provides an overview.
 | `bdba-client` | Python Package | Python HTTP client library to interact with BlackDuck Binary Analysis | [PyPi](https://pypi.org/project/bdba-client/) |
 | `odg-core` | OCI Image | Filesystem to run ODG-Core and ODG extensions in cloud environments | [GCP](https://europe-docker.pkg.dev/gardener-project/releases/odg/core) |
 | `odg-core` | OCM Component | Software component referencing all delivery artefacts and metadata | [OCM Repo](https://europe-docker.pkg.dev/gardener-project/releases/component-descriptors/ocm.software/open-delivery-gear/core) |
-
 
 ---
 
