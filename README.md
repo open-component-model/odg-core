@@ -13,7 +13,7 @@ This repository is the home of the core API and feature extensions for the [Open
   - [Standalone](#standalone)
   - [Kubernetes in Docker](#kubernetes-in-docker)
 - [Documentation](#documentation)
- [Packages](`#packages`)
+- [Packages](#packages)
 
 ## Technology
 
