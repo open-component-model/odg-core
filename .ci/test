@@ -9,7 +9,7 @@ if ! which pytest &>/dev/null; then
   exit 1
 fi
 
-if PYTHONPATH="${repo_root}:${PYTHONPATH:-}" pytest "${repo_root}" "${@}"; then
+if PYTHONPATH="${repo_root}:${PYTHONPATH:-}" pytest "${repo_root}" "$@"; then
   echo 'Unittest executions succeeded'
   exit 0
 else
