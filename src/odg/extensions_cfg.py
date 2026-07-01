@@ -931,12 +931,16 @@ class CodeqlConfig(BacklogItemMixins):
     :param WarningVerbosities on_unsupported
         Defines the handling if a backlog item should be processed which contains unsupported
         properties, e.g. an unsupported artefact kind.
+    :param list[str] languages:
+        If non-empty, only repositories whose primary language is in this list will be checked.
+        If empty or omitted, all repositories are checked regardless of language.
     """
 
     service: Services = Services.CODEQL
     delivery_service_url: str
     interval: int = 60 * 60 * 24  # 24h
     on_unsupported: WarningVerbosities = WarningVerbosities.WARNING
+    languages: list[str] = dataclasses.field(default_factory=list)
 
     def is_supported(
         self,

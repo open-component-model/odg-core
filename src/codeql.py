@@ -145,10 +145,16 @@ def iter_artefact_metadata(
         secret_factory=secret_factory,
     )
 
-    if codeql_enabled:
+    if not repo_url:
         return
 
-    if not repo_url:
+    if codeql_config.languages and language not in codeql_config.languages:
+        logger.info(
+            f'skipping CodeQL check for {repo_url=}: {language=} not in configured {codeql_config.languages=}',
+        )
+        return
+
+    if codeql_enabled:
         return
 
     categorisation = odg.findings.categorise_finding(
