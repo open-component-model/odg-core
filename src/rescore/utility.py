@@ -95,8 +95,7 @@ def rescorings_for_finding_by_specificity(
 ) -> tuple[odg.model.ArtefactMetadata]:
     """
     Returns all rescorings of `rescorings` which match the given `finding`. If multiple
-    rescorings match the finding, they are ordered based on their specificity (greatest
-    specificity first and if the specificity is the same, the latest rescorings wins).
+    rescorings match the finding, they are ordered based on their creation date.
     """
     rescorings_for_finding = _iter_rescorings_for_finding(
         finding=finding,
@@ -106,10 +105,7 @@ def rescorings_for_finding_by_specificity(
     return tuple(
         sorted(
             rescorings_for_finding,
-            key=lambda rescoring: (
-                rescoring.specificity,
-                util.normalise_date(rescoring.meta.creation_date),
-            ),
+            key=lambda rescoring: util.normalise_date(rescoring.meta.creation_date),
             reverse=True,
         ),
     )
