@@ -530,6 +530,8 @@ class Finding:
 
     def _validate(self):
         match self.type:
+            case odg.model.Datatype.CODEQL_FINDING:
+                self._validate_codeql()
             case odg.model.Datatype.OSID_FINDING:
                 self._validate_osid()
             case odg.model.Datatype.CRYPTO_FINDING:
@@ -561,6 +563,18 @@ class Finding:
         if not violations:
             return
         e = ModelValidationError('osid finding model violations found:')
+        e.add_note('\n'.join(violations))
+        raise e
+
+    def _validate_codeql(self):
+        violations = self._validate_categorisations(
+            expected_selector=CodeqlFindingSelector,
+        )
+
+        if not violations:
+            return
+
+        e = ModelValidationError('codeql finding model violations found:')
         e.add_note('\n'.join(violations))
         raise e
 
