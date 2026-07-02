@@ -47,38 +47,36 @@ def _parse_github_coords(
 def fetch_repo_info(
     source_node: ocm.iter.SourceNode,
     secret_factory: secret_mgmt.SecretFactory,
-) -> tuple[str | None, str | None, set[str]]:
+) -> tuple[str | None, set[str], set[str]]:
     """
-    Returns (repo_url, settings_url, active_codeql_languages).
+    Returns (repo_url, repo_languages, active_codeql_languages).
 
-    active_codeql_languages is the set of languages CodeQL is currently
-    scanning on the default branch, extracted from code-scanning/analyses
-    environment field. Empty set means CodeQL is not enabled for any language.
+    repo_languages: languages present in the repo (from /languages endpoint).
+    active_codeql_languages: languages CodeQL is currently scanning on the
+    default branch (from code-scanning/analyses environment field).
     """
     access = source_node.source.access
     if not isinstance(access, ocm.GithubAccess):
         logger.info(
             f'source access is not GithubAccess for {source_node.source.name}, skipping CodeQL check',
         )
-        return None, None, set()
+        return None, set(), set()
 
     repo_url = access.repoUrl
     coords = _parse_github_coords(repo_url)
     if not coords:
         logger.warning(f'Cannot parse org/repo from {repo_url=}')
-        return repo_url, None, set()
+        return repo_url, set(), set()
 
     org, repo, api_base = coords
 
-    repo_info, _ = ghas.github_api_request(
-        url=f'{api_base}/repos/{org}/{repo}',
+    languages_raw, _ = ghas.github_api_request(
+        url=f'{api_base}/repos/{org}/{repo}/languages',
         secret_factory=secret_factory,
     )
-
-    settings_url = None
-    if isinstance(repo_info, dict):
-        html_url = repo_info.get('html_url', repo_url)
-        settings_url = f'{html_url}/settings/security_analysis'
+    repo_languages = set()
+    if isinstance(languages_raw, dict):
+        repo_languages = {lang.lower() for lang in languages_raw}
 
     analyses = list(ghas.github_api_request_paginated(
         url=f'{api_base}/repos/{org}/{repo}/code-scanning/analyses?tool_name=CodeQL&ref=refs/heads/{access.branch or "main"}&per_page=100',
@@ -99,8 +97,10 @@ def fetch_repo_info(
         if lang := env.get('language'):
             active_languages.add(lang.lower())
 
-    logger.info(f'{repo_url=}: active CodeQL languages={active_languages}')
-    return repo_url, settings_url, active_languages
+    logger.info(
+        f'{repo_url=}: {repo_languages=}, active CodeQL languages={active_languages}',
+    )
+    return repo_url, repo_languages, active_languages
 
 
 def iter_artefact_metadata(
@@ -151,7 +151,14 @@ def iter_artefact_metadata(
         )
         return
 
-    repo_url, settings_url, active_languages = fetch_repo_info(
+    if not codeql_config.languages:
+        logger.warning(
+            f'No languages configured for CodeQL extension, skipping {artefact=}. '
+            'Set languages in codeql extension config to enable checks.',
+        )
+        return
+
+    repo_url, repo_languages, active_languages = fetch_repo_info(
         source_node=source_node,
         secret_factory=secret_factory,
     )
@@ -159,27 +166,17 @@ def iter_artefact_metadata(
     if not repo_url:
         return
 
-    languages_to_check = [l.lower() for l in codeql_config.languages] if codeql_config.languages else None
-
-    if languages_to_check is None:
-        if not active_languages:
-            yield _make_finding(
-                artefact=artefact,
-                codeql_finding_config=codeql_finding_config,
-                repo_url=repo_url,
-                settings_url=settings_url,
-                language=None,
-                creation_timestamp=creation_timestamp,
+    for language in [l.lower() for l in codeql_config.languages]:
+        if language not in repo_languages:
+            logger.info(
+                f'skipping CodeQL check for {language=}: not present in {repo_url=}',
             )
-        return
-
-    for language in languages_to_check:
+            continue
         if language not in active_languages:
             finding = _make_finding(
                 artefact=artefact,
                 codeql_finding_config=codeql_finding_config,
                 repo_url=repo_url,
-                settings_url=settings_url,
                 language=language,
                 creation_timestamp=creation_timestamp,
             )
@@ -191,8 +188,7 @@ def _make_finding(
     artefact: odg.model.ComponentArtefactId,
     codeql_finding_config: odg.findings.Finding,
     repo_url: str,
-    settings_url: str | None,
-    language: str | None,
+    language: str,
     creation_timestamp: datetime.datetime,
 ) -> odg.model.ArtefactMetadata | None:
     categorisation = odg.findings.categorise_finding(
@@ -213,7 +209,6 @@ def _make_finding(
             codeql_status=odg.model.CodeqlStatus.NOT_ENABLED,
             severity=categorisation.id,
             repo_url=repo_url,
-            settings_url=settings_url,
             language=language,
         ),
         discovery_date=creation_timestamp.date(),

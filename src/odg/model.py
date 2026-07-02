@@ -616,9 +616,8 @@ class CodeqlStatus(enum.StrEnum):
 @dataclasses.dataclass
 class CodeqlFinding(Finding):
     codeql_status: CodeqlStatus
-    repo_url: str | None = None
-    settings_url: str | None = None
-    language: str | None = None
+    repo_url: str
+    language: str
 
     @property
     def key(self) -> str:
@@ -628,10 +627,12 @@ class CodeqlFinding(Finding):
 @dataclasses.dataclass
 class RescoreCodeqlFinding:
     codeql_status: CodeqlStatus
+    repo_url: str
+    language: str
 
     @property
     def key(self) -> str:
-        return _as_key(self.codeql_status)
+        return _as_key(self.codeql_status, self.repo_url, self.language)
 
 
 @dataclasses.dataclass
