@@ -110,15 +110,27 @@ def find_token_for_api_url(
     secret_factory: secret_mgmt.SecretFactory,
     api_url: str,
 ) -> str | None:
-    hostname = util.urlparse(api_url).hostname
-    path_parts = util.urlparse(api_url).path.strip('/').split('/')
+    parsed = util.urlparse(api_url)
+    hostname = parsed.hostname
+    path_parts = parsed.path.strip('/').split('/')
 
     if len(path_parts) < 2:
         logger.error(f'Cannot determine repo/org from {api_url=}')
         return None
 
-    org = path_parts[3]
-    repo_url = f'{hostname}/{org}'
+    # github.com: https://api.github.com/repos/{org}/...  -> path_parts[1]
+    # github enterprise: https://host/api/v3/repos/{org}/... -> path_parts[3]
+    if hostname == 'api.github.com':
+        org_index = 1
+    else:
+        org_index = 3
+
+    if len(path_parts) <= org_index:
+        logger.error(f'Cannot determine org from {api_url=}')
+        return None
+
+    org = path_parts[org_index]
+    repo_url = f'github.com/{org}' if hostname == 'api.github.com' else f'{hostname}/{org}'
 
     return find_token_for_repo_url(
         secret_factory=secret_factory,
