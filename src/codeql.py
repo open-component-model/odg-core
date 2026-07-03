@@ -10,7 +10,6 @@ import cnudie.retrieve
 import ocm
 import ocm.iter
 
-import ctx_util
 import ghas
 import k8s.util
 import k8s.logging
@@ -276,12 +275,9 @@ def main():
         logger.info('CodeQL findings are disabled, exiting...')
         return
 
-    secret_factory = ctx_util.secret_factory()
-
     scan_callback = functools.partial(
         scan,
         codeql_finding_config=codeql_finding_config,
-        secret_factory=secret_factory,
     )
 
     odg.util.process_backlog_items(
