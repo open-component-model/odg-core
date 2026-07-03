@@ -10,7 +10,7 @@ import cnudie.retrieve
 import ocm
 import ocm.iter
 
-import ghas
+import github_util
 import k8s.util
 import k8s.logging
 import odg.extensions_cfg
@@ -78,7 +78,7 @@ def fetch_repo_info(
         return repo_url, set(), set()
 
     ref = access.ref if access.ref.startswith('refs/') else f'refs/heads/{access.ref}'
-    languages_raw, _ = ghas.github_api_request(
+    languages_raw, _ = github_util.github_api_request(
         url=f'{api_base}/repos/{org}/{repo}/languages',
         secret_factory=secret_factory,
     )
@@ -86,7 +86,7 @@ def fetch_repo_info(
     if isinstance(languages_raw, dict):
         repo_languages = {lang.lower() for lang in languages_raw}
 
-    analyses = list(ghas.github_api_request_paginated(
+    analyses = list(github_util.github_api_request_paginated(
         url=f'{api_base}/repos/{org}/{repo}/code-scanning/analyses?tool_name=CodeQL&ref={ref}&per_page=100',
         secret_factory=secret_factory,
     ))
