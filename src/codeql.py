@@ -33,13 +33,17 @@ def _parse_github_coords(
     repo_url: str,
 ) -> tuple[str, str, str] | None:
     parsed = urllib.parse.urlparse(repo_url)
+    if not parsed.hostname:
+        logger.warning(f'Cannot determine hostname from {repo_url=}')
+        return None
     path_parts = parsed.path.strip('/').split('/')
     if len(path_parts) < 2:
         return None
     org, repo = path_parts[0], path_parts[1]
-    hostname = parsed.hostname or 'github.com'
     api_base = (
-        f'https://{hostname}/api/v3' if hostname != 'github.com' else 'https://api.github.com'
+        f'https://{parsed.hostname}/api/v3'
+        if parsed.hostname != 'github.com'
+        else 'https://api.github.com'
     )
     return org, repo, api_base
 
@@ -70,6 +74,11 @@ def fetch_repo_info(
 
     org, repo, api_base = coords
 
+    if not access.ref:
+        logger.warning(f'No ref configured in OCM access for {repo_url=}, skipping CodeQL check')
+        return repo_url, set(), set()
+
+    ref = access.ref if access.ref.startswith('refs/') else f'refs/heads/{access.ref}'
     languages_raw, _ = ghas.github_api_request(
         url=f'{api_base}/repos/{org}/{repo}/languages',
         secret_factory=secret_factory,
@@ -79,7 +88,7 @@ def fetch_repo_info(
         repo_languages = {lang.lower() for lang in languages_raw}
 
     analyses = list(ghas.github_api_request_paginated(
-        url=f'{api_base}/repos/{org}/{repo}/code-scanning/analyses?tool_name=CodeQL&ref=refs/heads/{access.branch or "main"}&per_page=100',
+        url=f'{api_base}/repos/{org}/{repo}/code-scanning/analyses?tool_name=CodeQL&ref={ref}&per_page=100',
         secret_factory=secret_factory,
     ))
 
