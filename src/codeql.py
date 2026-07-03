@@ -31,6 +31,8 @@ k8s.logging.configure_kubernetes_logging()
 def _parse_github_coords(
     repo_url: str,
 ) -> tuple[str, str, str] | None:
+    if not repo_url.startswith('http'):
+        repo_url = f'https://{repo_url}'
     parsed = urllib.parse.urlparse(repo_url)
     if not parsed.hostname:
         logger.warning(f'Cannot determine hostname from {repo_url=}')
