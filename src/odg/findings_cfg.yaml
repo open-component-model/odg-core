@@ -52,14 +52,6 @@
       artefact_kind: source
   issues:
     enable_issues: False
-  rescoring_ruleset:
-    name: codeql-rescoring-v1
-    rules:
-      - name: codeql-is-optional-for-external-components
-        match:
-          - component_name: github.com/.*
-        codeql_status: not-enabled
-        operation: set-to-NONE
   categorisations:
     - id: NONE
       display_name: NONE
