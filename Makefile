@@ -36,6 +36,22 @@ help:
 setup:
 	@echo "Installing development dependencies..."
 	@pip3 install --break-system-packages -r requirements-dev.txt
+	@echo "Generating RSA key pair as signing configuration..."
+	@keypath=$$(mktemp); \
+	unlink "$${keypath}"; \
+	ssh-keygen -t rsa -b 4096 -f "$${keypath}" -m PEM -N "" < /dev/null; \
+	private_key=$$(cat "$${keypath}"); \
+	public_key=$$(openssl rsa -in "$${keypath}" -pubout -outform PEM 2>/dev/null); \
+	unlink "$${keypath}"; \
+	unlink "$${keypath}.pub"; \
+	{ \
+		printf 'algorithm: RS256\n'; \
+		printf 'id: %s\n' "$$(python3 -c 'import uuid; print(uuid.uuid4())')"; \
+		printf 'private_key: |\n'; \
+		echo "$${private_key}" | sed 's/^/  /'; \
+		printf 'public_key: |\n'; \
+		echo "$${public_key}" | sed 's/^/  /'; \
+	} > src/secrets/signing-cfg/local.yaml
 	@echo "Setup complete"
 
 # Linting
