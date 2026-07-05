@@ -6,7 +6,7 @@ extensions_cfg:
     enabled: true
   artefact_enumerator:
     components:
-      - component_name: ocm.software/ocm-gear
+      - component_name: ocm.software/open-delivery-gear
   bdba:
     enabled: False # disable in default because of missing BDBA credentials and `group-id`
     mappings:
@@ -15,7 +15,7 @@ extensions_cfg:
   cache_manager:
     prefill_function_caches:
       components:
-        - component_name: ocm.software/ocm-gear
+        - component_name: ocm.software/open-delivery-gear
   clamav:
     mappings:
       - prefix: ''
@@ -86,8 +86,8 @@ ocm_repo_mappings:
 
 features_cfg:
   specialComponents:
-    - id: e60f2588-3f97-4d6f-9ac4-92ab36dcdb4e
-      name: ocm.software/ocm-gear
+    - id: e60f2588-3f97-4d6f-9ac4-92ab36dcdb4f
+      name: ocm.software/open-delivery-gear
       displayName: Open Delivery Gear
       type: ODG
       version: greatest

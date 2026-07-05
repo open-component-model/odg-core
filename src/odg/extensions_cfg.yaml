@@ -8,7 +8,7 @@ access_manager:
 artefact_enumerator:
   enabled: False
   components:
-    - component_name: ocm.software/ocm-gear
+    - component_name: ocm.software/open-delivery-gear
       ocm_repo_url: europe-docker.pkg.dev/gardener-project/releases
 
 backlog_controller:
@@ -32,7 +32,7 @@ cache_manager:
   enabled: False
   prefill_function_caches:
     components:
-      - component_name: ocm.software/ocm-gear
+      - component_name: ocm.software/open-delivery-gear
 
 clamav:
   enabled: False
@@ -66,7 +66,7 @@ findings_report:
   mappings:
     - type: finding/malware
       component:
-        component_name: ocm.software/ocm-gear
+        component_name: ocm.software/open-delivery-gear
         time_range: {}
       github_repository: my-github-repository # <str> must be set
 
@@ -108,7 +108,7 @@ sbom_generator:
 sla_violation_profiler:
   enabled: False
   components:
-    - component_name: ocm.software/ocm-gear
+    - component_name: ocm.software/open-delivery-gear
       ocm_repo_url: europe-docker.pkg.dev/gardener-project/releases
       version: greatest
       max_versions_limit: 1
