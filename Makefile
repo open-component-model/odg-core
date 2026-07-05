@@ -1,4 +1,4 @@
-.PHONY: help setup lint format test build-clients build-core build-docker run clean
+.PHONY: help setup lint format test build-clients build-core build-docker run-db run clean
 
 # Configuration variables with defaults
 DB_PASSWORD ?= MyPassword
@@ -18,6 +18,7 @@ help:
 	@echo "  build-clients - Build bdba and odg client packages"
 	@echo "  build-core    - Build odg-core-libs package"
 	@echo "  build-docker  - Build Docker image"
+	@echo "  run-db        - Run a PostgreSQL database instance"
 	@echo "  run           - Run the development server"
 	@echo "  clean         - Remove build artifacts"
 	@echo ""
@@ -93,6 +94,17 @@ build-docker:
 		-f Dockerfile \
 		.
 	@echo "Docker image built: odg-core:$(ODG_CORE_LIBS_VERSION)"
+
+# Run PostgreSQL database instance
+run-db:
+	@echo "Starting PostgreSQL database instance..."
+	@echo "Database port: $(DB_PORT)"
+	@docker run -dit --name postgres \
+		-e "POSTGRES_USER=$(DB_USER)" \
+		-e "POSTGRES_PASSWORD=$(DB_PASSWORD)" \
+		-e "POSTGRES_DB=$(DB_NAME)" \
+		-p "$(DB_PORT):5432" \
+		postgres:16
 
 # Run development server
 run:
