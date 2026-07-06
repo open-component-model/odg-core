@@ -1259,6 +1259,93 @@ class ComplianceSummary(aiohttp.web.View):
         )
 
 
+async def _stream_sbom_tar(
+    db_session: sqlasync.session.AsyncSession,
+    rows: list,
+    write_fn: collections.abc.Callable[[bytes], collections.abc.Awaitable[None]],
+) -> None:
+    '''
+    Streams the gzip-compressed tar archive of SBOM blobs by iterating `rows` (ArtefactMetaData
+    query results) and writing each compressed chunk via `write_fn`. LOB data is read in 4096-byte
+    chunks and is never held in memory beyond a single iteration.
+
+    `write_fn` must be an async callable accepting a single `bytes` argument, e.g.
+    `response.write` or a counting coroutine.
+    '''
+    compressor = zlib.compressobj(zlib.Z_BEST_COMPRESSION, wbits=31)
+
+    async def write_compressed(data: bytes) -> None:
+        if chunk := compressor.compress(data):
+            await write_fn(chunk)
+
+    for row in rows:
+        artefact_metadatum = du.db_artefact_metadata_row_to_dso(row)
+        artefact = artefact_metadatum.artefact.artefact
+        digest = artefact_metadatum.data['digest']
+
+        blob_stmt = sa.select(dm.BlobStore).where(dm.BlobStore.digest == digest)
+        blob_metadata = (await db_session.execute(statement=blob_stmt)).one()[0]
+
+        component_dir = (
+            f'{artefact_metadatum.artefact.component_name}_'
+            f'{artefact_metadatum.artefact.component_version}'
+        ).replace('/', '_')
+
+        artefact_file = f'{artefact.artefact_name}_{artefact.artefact_type}'
+        if artefact.artefact_extra_id:
+            artefact_file += f'_{artefact.normalised_artefact_extra_id}'
+        artefact_file = artefact_file.replace('/', '_').replace(':', '_')
+
+        tarinfo = tarfile.TarInfo(name=f'{component_dir}/{artefact_file}.json')
+        tarinfo.size = blob_metadata.size
+
+        tarinfo_bytes = tarinfo.tobuf()
+        await write_compressed(tarinfo_bytes)
+        written_bytes = len(tarinfo_bytes)
+
+        conn = None
+        lo_fd = None
+        try:
+            conn = await db_session.connection()
+            result = await conn.exec_driver_sql(
+                statement='SELECT lo_open(%(oid)s, %(mode)s)',
+                parameters={
+                    'oid': int(blob_metadata.ref),
+                    'mode': int('0x20000', base=0),  # 0x20000 = Read mode
+                },
+            )
+            lo_fd = result.scalar()
+
+            while True:
+                result = await conn.exec_driver_sql(
+                    statement='SELECT loread(%(fd)s, %(len)s)',
+                    parameters={'fd': lo_fd, 'len': 4096},
+                )
+
+                if not (buffer := result.scalar()):
+                    break
+
+                await write_compressed(buffer)
+                written_bytes += len(buffer)
+
+            # pad to full blocks
+            if remainder := written_bytes % tarfile.BLOCKSIZE:
+                missing = tarfile.BLOCKSIZE - remainder
+                await write_compressed(tarfile.NUL * missing)
+        finally:
+            if conn is not None and lo_fd is not None:
+                await conn.exec_driver_sql(
+                    statement='SELECT lo_close(%(fd)s)',
+                    parameters={'fd': lo_fd},
+                )
+
+    # terminate tarchive w/ two empty blocks
+    await write_compressed(tarfile.NUL * tarfile.BLOCKSIZE * 2)
+
+    if final_chunk := compressor.flush(zlib.Z_FINISH):
+        await write_fn(final_chunk)
+
+
 class DownloadSBOM(aiohttp.web.View):
     required_features = (features.FeatureDeliveryDB,)
 
@@ -1266,10 +1353,12 @@ class DownloadSBOM(aiohttp.web.View):
         """
         ---
         description:
-          Streams a tar archive containing the SBOM documents for all artefacts included in the given
-          component (and its transitive dependencies). Artefacts which do not (yet) have an existing
-          SBOM document are being skipped without notice. Each entry in the archive is placed under a
-          directory named `<component_name>_<component_version>/<artefact_name>_<artefact_type>.json`
+          Streams a gzip-compressed tar archive containing the SBOM documents for all artefacts
+          included in the given component (and its transitive dependencies). Artefacts which do not
+          (yet) have an existing SBOM document are being skipped without notice. Each entry in the
+          archive is placed under a directory named
+          `<component_name>_<component_version>/<artefact_name>_<artefact_type>.json`. The response
+          includes a Content-Length header so that clients can track download progress.
         tags:
         - Components
         parameters:
@@ -1298,7 +1387,7 @@ class DownloadSBOM(aiohttp.web.View):
           "200":
             description: Successful operation.
             content:
-              application/x-tar:
+              application/gzip:
                 schema:
                   type: string
                   format: binary
@@ -1387,91 +1476,30 @@ class DownloadSBOM(aiohttp.web.View):
             sa.or_(*artefact_queries),
         )
 
-        db_stream = await db_session.stream(db_statement)
+        # Pass 1: stream all SBOM blobs through a compressor into a byte counter to determine
+        # the exact compressed content length before sending any response headers.
+        compressed_size = 0
 
-        filename = f'{component.name}_{component.version}.sboms.tar'.replace('/', '_')
+        async def count_bytes(data: bytes) -> None:
+            nonlocal compressed_size
+            compressed_size += len(data)
+
+        rows = (await db_session.execute(db_statement)).all()
+        await _stream_sbom_tar(db_session, rows, count_bytes)
+
+        # Pass 2: stream again to the client, now with Content-Length set.
+        filename = f'{component.name}_{component.version}.sboms.tar.gz'.replace('/', '_')
         response = aiohttp.web.StreamResponse(
             headers={
-                'Content-Type': 'application/x-tar',
-                'Content-Encoding': 'gzip',
+                'Content-Type': 'application/gzip',
+                'Content-Length': str(compressed_size),
                 'Content-Disposition': f'attachment; filename="{filename}"',
             },
         )
         await response.prepare(self.request)
 
-        compressor = zlib.compressobj(zlib.Z_BEST_COMPRESSION, wbits=31)
-
-        async def write_compressed(data: bytes) -> None:
-            if chunk := compressor.compress(data):
-                await response.write(chunk)
-
-        async for partition in db_stream.partitions(size=50):
-            for row in partition:
-                artefact_metadatum = du.db_artefact_metadata_row_to_dso(row)
-                artefact = artefact_metadatum.artefact.artefact
-                digest = artefact_metadatum.data['digest']
-
-                db_statement = sa.select(dm.BlobStore).where(dm.BlobStore.digest == digest)
-                blob_metadata = (await db_session.execute(statement=db_statement)).one()[0]
-
-                component_dir = (
-                    f'{artefact_metadatum.artefact.component_name}_'
-                    f'{artefact_metadatum.artefact.component_version}'
-                ).replace('/', '_')
-
-                artefact_file = f'{artefact.artefact_name}_{artefact.artefact_type}'
-                if artefact.artefact_extra_id:
-                    artefact_file += f'_{artefact.normalised_artefact_extra_id}'
-                artefact_file = artefact_file.replace('/', '_').replace(':', '_')
-
-                tarinfo = tarfile.TarInfo(name=f'{component_dir}/{artefact_file}.json')
-                tarinfo.size = blob_metadata.size
-
-                tarinfo_bytes = tarinfo.tobuf()
-                await write_compressed(tarinfo_bytes)
-                written_bytes = len(tarinfo_bytes)
-
-                conn = None
-                lo_fd = None
-                try:
-                    conn = await db_session.connection()
-                    result = await conn.exec_driver_sql(
-                        statement='SELECT lo_open(%(oid)s, %(mode)s)',
-                        parameters={
-                            'oid': int(blob_metadata.ref),
-                            'mode': int('0x20000', base=0),  # 0x20000 = Read mode
-                        },
-                    )
-                    lo_fd = result.scalar()
-
-                    while True:
-                        result = await conn.exec_driver_sql(
-                            statement='SELECT loread(%(fd)s, %(len)s)',
-                            parameters={'fd': lo_fd, 'len': 4096},
-                        )
-
-                        if not (buffer := result.scalar()):
-                            break
-
-                        await write_compressed(buffer)
-                        written_bytes += len(buffer)
-
-                    # pad to full blocks
-                    if remainder := written_bytes % tarfile.BLOCKSIZE:
-                        missing = tarfile.BLOCKSIZE - remainder
-                        await write_compressed(tarfile.NUL * missing)
-                finally:
-                    if conn is not None and lo_fd is not None:
-                        await conn.exec_driver_sql(
-                            statement='SELECT lo_close(%(fd)s)',
-                            parameters={'fd': lo_fd},
-                        )
-
-        # terminate tarchive w/ two empty blocks
-        await write_compressed(tarfile.NUL * tarfile.BLOCKSIZE * 2)
-
-        if final_chunk := compressor.flush(zlib.Z_FINISH):
-            await response.write(final_chunk)
+        rows = (await db_session.execute(db_statement)).all()
+        await _stream_sbom_tar(db_session, rows, response.write)
 
         await response.write_eof()
         return response
