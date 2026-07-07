@@ -932,8 +932,9 @@ class CodeqlConfig(BacklogItemMixins):
         Defines the handling if a backlog item should be processed which contains unsupported
         properties, e.g. an unsupported artefact kind.
     :param list[str] languages:
-        If non-empty, only repositories whose primary language is in this list will be checked.
-        If empty or omitted, all repositories are checked regardless of language.
+        Languages to check CodeQL coverage for. Must be non-empty; if empty,
+        all artefacts are skipped. A finding is emitted for each language that
+        is present in the repository but not actively scanned by CodeQL.
     """
 
     service: Services = Services.CODEQL
