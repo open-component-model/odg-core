@@ -103,7 +103,8 @@ def fetch_repo_info(
         if isinstance(env, str):
             try:
                 env = json.loads(env)
-            except Exception:
+            except Exception as e:
+                logger.warning(f'Failed to parse environment field {env!r}: {e}')
                 continue
         if lang := env.get('language'):
             active_languages.add(lang.lower())
