@@ -69,11 +69,6 @@ def fetch_repo_info(
 
     org, repo, api_base = coords
 
-    if not access.ref:
-        logger.warning(f'No ref configured in OCM access for {repo_url=}, skipping CodeQL check')
-        return repo_url, set(), set()
-
-    ref = access.ref if access.ref.startswith('refs/') else f'refs/heads/{access.ref}'
     languages_raw, _ = github_util.github_api_request(
         url=f'{api_base}/repos/{org}/{repo}/languages',
         secret_factory=secret_factory,
@@ -81,6 +76,20 @@ def fetch_repo_info(
     repo_languages = set()
     if isinstance(languages_raw, dict):
         repo_languages = {lang.lower() for lang in languages_raw}
+
+    repo_info, _ = github_util.github_api_request(
+        url=f'{api_base}/repos/{org}/{repo}',
+        secret_factory=secret_factory,
+    )
+
+    if access.ref:
+        ref = access.ref if access.ref.startswith('refs/') else f'refs/heads/{access.ref}'
+    elif isinstance(repo_info, dict) and (default_branch := repo_info.get('default_branch')):
+        ref = f'refs/heads/{default_branch}'
+        logger.info(f'No ref in OCM access for {repo_url=}, falling back to default branch {default_branch!r}')
+    else:
+        logger.warning(f'No ref in OCM access and could not determine default branch for {repo_url=}, skipping')
+        return repo_url, set(), set()
 
     active_languages = set()
     for analysis in github_util.github_api_request_paginated(
