@@ -8,10 +8,6 @@ import functools
 import logging
 
 import dacite
-import requests
-import requests.adapters
-import urllib3.util.retry
-
 import ci.log
 import cnudie.retrieve
 import ocm
@@ -28,8 +24,6 @@ import odg.util
 import odg_client
 import paths
 import secret_mgmt
-import secret_mgmt.github
-import util
 
 
 logger = logging.getLogger(__name__)
