@@ -258,7 +258,17 @@ def scan(
     secret_factory: secret_mgmt.SecretFactory,
     **kwargs,
 ):
-    all_metadata = list(
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    existing_findings = [
+        odg.model.ArtefactMetadata.from_dict(raw)
+        for raw in delivery_service_client.query_metadata(
+            artefacts=[artefact],
+            type=odg.model.Datatype.CODEQL_FINDING,
+        )
+    ]
+
+    new_metadata = list(
         iter_artefact_metadata(
             artefact=artefact,
             component_descriptor_lookup=component_descriptor_lookup,
@@ -267,8 +277,38 @@ def scan(
             secret_factory=secret_factory,
         ),
     )
+    new_keys = {m.data.key for m in new_metadata if m.meta.type == odg.model.Datatype.CODEQL_FINDING}
 
-    delivery_service_client.update_metadata(data=all_metadata)
+    for stale in existing_findings:
+        if stale.data.key in new_keys:
+            continue
+
+        rescoring = odg.model.ArtefactMetadata(
+            artefact=stale.artefact,
+            meta=odg.model.Metadata(
+                datasource=stale.meta.datasource,
+                type=odg.model.Datatype.RESCORING,
+                creation_date=now,
+                last_update=now,
+            ),
+            data=odg.model.CustomRescoring(
+                finding=odg.model.RescoreCodeqlFinding(
+                    codeql_status=stale.data.codeql_status,
+                    repo_url=stale.data.repo_url,
+                    language=stale.data.language,
+                ),
+                referenced_type=odg.model.Datatype.CODEQL_FINDING,
+                severity='accepted',
+                user=odg.model.User(
+                    username='codeql-extension-auto-rescoring',
+                    type='codeql-extension-user',
+                ),
+                comment='Automatically rescored: CodeQL is now enabled for this language.',
+            ),
+        )
+        new_metadata.append(rescoring)
+
+    delivery_service_client.update_metadata(data=new_metadata)
 
 
 def main():
