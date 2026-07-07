@@ -2,6 +2,7 @@
 import collections.abc
 import datetime
 import functools
+import json
 import logging
 import urllib.parse
 
@@ -100,9 +101,8 @@ def fetch_repo_info(
             continue
         env = analysis.get('environment', {})
         if isinstance(env, str):
-            import json as _json
             try:
-                env = _json.loads(env)
+                env = json.loads(env)
             except Exception:
                 continue
         if lang := env.get('language'):
