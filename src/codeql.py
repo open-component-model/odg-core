@@ -61,12 +61,6 @@ def fetch_repo_info(
     default branch (from code-scanning/analyses environment field).
     """
     access = source_node.source.access
-    if not isinstance(access, ocm.GithubAccess):
-        logger.info(
-            f'source access is not GithubAccess for {source_node.source.name}, skipping CodeQL check',
-        )
-        return None, set(), set()
-
     repo_url = access.repoUrl
     coords = _parse_github_coords(repo_url)
     if not coords:
@@ -141,6 +135,13 @@ def iter_artefact_metadata(
 
     if not source_node:
         logger.info(f'did not find source node for {artefact=}, skipping...')
+        return
+
+    if not codeql_config.is_supported(access=source_node.source.access):
+        if codeql_config.on_unsupported is odg.extensions_cfg.WarningVerbosities.FAIL:
+            raise TypeError(
+                f'{type(source_node.source.access)} is not supported by the CodeQL extension',
+            )
         return
 
     yield odg.model.ArtefactMetadata(
