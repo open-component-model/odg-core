@@ -578,7 +578,7 @@ def reconcile(
     group: str = odgm.ODGMeta.group,
     plural: str = odgm.ODGMeta.plural,
     resource_version: str = '',
-):
+) -> str:
     """
     watches for events of ODG custom-resource
     creates, updates and deletes ODG installations using managed-resources
@@ -592,7 +592,7 @@ def reconcile(
         version='v1',
         plural=plural,
         resource_version=resource_version,
-        timeout_seconds=0,
+        timeout_seconds=300,
     ):
         try:
             odg_raw = event['object']
@@ -819,6 +819,8 @@ def reconcile(
             )
             logger.error(e)
 
+    return resource_version
+
 
 def _iter_extension_definitions_from_resource_node(
     resource_node: ocm.iter.ResourceNode,
@@ -988,12 +990,15 @@ if __name__ == '__main__':
     logger.info(f'known extension definitions: {[e.name for e in extension_definitions]}')
     kubernetes_api = k8s.util.kubernetes_api(kubeconfig_path=parsed.kubeconfig)
 
+    resource_version = ''
+
     while True:
-        reconcile(
+        resource_version = reconcile(
             extension_definitions=extension_definitions,
             required_extensions=odg_operator_cfg.required_extension_names,
             cluster_identity=odg_operator_cfg.cluster_identity,
             component_descriptor_lookup=component_descriptor_lookup,
             oci_client=oci_client,
             kubernetes_api=kubernetes_api,
+            resource_version=resource_version,
         )
