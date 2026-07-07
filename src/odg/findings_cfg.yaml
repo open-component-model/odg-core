@@ -53,13 +53,13 @@
   issues:
     enable_issues: False
   categorisations:
-    - id: NONE
-      display_name: NONE
+    - id: accepted
+      display_name: Accepted
       value: 0
       rescoring: manual
       allowed_processing_time: ~
-    - id: BLOCKER
-      display_name: BLOCKER
+    - id: not-enabled
+      display_name: Not Enabled
       value: 16
       allowed_processing_time: 0
       rescoring: [manual, automatic]
