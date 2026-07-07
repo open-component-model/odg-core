@@ -4,7 +4,6 @@ import atexit
 import collections.abc
 import dataclasses
 import datetime
-import functools
 import logging
 
 import dacite
@@ -42,50 +41,6 @@ class SecretAlert:
     url: str | None
 
 
-@functools.cache
-def find_token_for_repo_url(
-    secret_factory: secret_mgmt.SecretFactory,
-    repo_url: str,
-) -> str | None:
-    return github_util.find_token_for_repo_url(
-        secret_factory=secret_factory,
-        repo_url=repo_url,
-    )
-
-
-@functools.cache
-def find_token_for_api_url(
-    secret_factory: secret_mgmt.SecretFactory,
-    api_url: str,
-) -> str | None:
-    return github_util.find_token_for_api_url(
-        secret_factory=secret_factory,
-        api_url=api_url,
-    )
-
-
-def github_api_request(
-    url: str,
-    secret_factory: secret_mgmt.SecretFactory,
-    token: str | None = None,
-) -> tuple[list | dict | None, str | None]:
-    return github_util.github_api_request(
-        url=url,
-        secret_factory=secret_factory,
-        token=token,
-    )
-
-
-def github_api_request_paginated(
-    url: str,
-    secret_factory: secret_mgmt.SecretFactory,
-) -> collections.abc.Iterable[dict]:
-    return github_util.github_api_request_paginated(
-        url=url,
-        secret_factory=secret_factory,
-    )
-
-
 def get_secret_alerts(
     github_hostname: str,
     org: str,
@@ -114,7 +69,7 @@ def get_secret_alerts(
     seen_urls = set()
 
     # default alerts
-    for alert_raw in github_api_request_paginated(
+    for alert_raw in github_util.github_api_request_paginated(
         url=url,
         secret_factory=secret_factory,
     ):
@@ -126,7 +81,7 @@ def get_secret_alerts(
     # generic alerts
     url = f'{url}&secret_type={",".join(secret_types)}'
 
-    for alert_raw in github_api_request_paginated(
+    for alert_raw in github_util.github_api_request_paginated(
         url=url,
         secret_factory=secret_factory,
     ):
@@ -184,7 +139,7 @@ def html_url_for_location(
     if not api_url:
         return None
 
-    result, _ = github_api_request(
+    result, _ = github_util.github_api_request(
         url=api_url,
         secret_factory=secret_factory,
     )
@@ -204,7 +159,7 @@ def iter_secret_locations(
         )
         return
 
-    result, _ = github_api_request(
+    result, _ = github_util.github_api_request(
         url=location_url,
         secret_factory=secret_factory,
     )
@@ -449,7 +404,7 @@ def scan(
         html_url = stale_finding.data.html_url
         api_url = stale_finding.data.url
 
-        stale_alert_data, _ = github_api_request(
+        stale_alert_data, _ = github_util.github_api_request(
             url=api_url,
             secret_factory=secret_factory,
         )
