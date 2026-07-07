@@ -82,13 +82,11 @@ def fetch_repo_info(
     if isinstance(languages_raw, dict):
         repo_languages = {lang.lower() for lang in languages_raw}
 
-    analyses = list(github_util.github_api_request_paginated(
+    active_languages = set()
+    for analysis in github_util.github_api_request_paginated(
         url=f'{api_base}/repos/{org}/{repo}/code-scanning/analyses?tool_name=CodeQL&ref={ref}&per_page=100',
         secret_factory=secret_factory,
-    ))
-
-    active_languages = set()
-    for analysis in analyses:
+    ):
         if not isinstance(analysis, dict):
             continue
         env = analysis.get('environment', {})
