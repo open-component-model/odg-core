@@ -28,6 +28,14 @@ logger = logging.getLogger(__name__)
 ci.log.configure_default_logging()
 k8s.logging.configure_kubernetes_logging()
 
+# CodeQL uses different language names than GitHub's /languages endpoint.
+# This mapping expands CodeQL language identifiers to their GitHub equivalents
+# so that config entries like 'javascript' match CodeQL's 'javascript-typescript'.
+_CODEQL_LANGUAGE_ALIASES: dict[str, set[str]] = {
+    'javascript-typescript': {'javascript', 'typescript'},
+    'c-cpp': {'c', 'c++'},
+}
+
 
 def _parse_github_coords(
     repo_url: str,
@@ -107,7 +115,8 @@ def fetch_repo_info(
                 logger.warning(f'Failed to parse environment field {env!r}: {e}')
                 continue
         if lang := env.get('language'):
-            active_languages.add(lang.lower())
+            lang = lang.lower()
+            active_languages.update(_CODEQL_LANGUAGE_ALIASES.get(lang, {lang}))
 
     logger.info(
         f'{repo_url=}: {repo_languages=}, active CodeQL languages={active_languages}',
