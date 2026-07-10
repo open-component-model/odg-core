@@ -23,6 +23,7 @@ import odg.util
 import odg_client
 import paths
 import secret_mgmt
+import util
 
 
 logger = logging.getLogger(__name__)
