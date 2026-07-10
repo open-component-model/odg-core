@@ -533,12 +533,15 @@ extensions_cfg:
     interval: 86400 # 24h
     # @param extensions_cfg.codeql.languages list of programming languages to check CodeQL coverage
     # for. A finding is emitted for each language that is present in the repository but not actively
-    # scanned by CodeQL. Must be non-empty; if empty, all artefacts are skipped.
+    # scanned by CodeQL. Use CodeQL language identifiers, which may differ from GitHub language
+    # names (e.g. 'javascript-typescript' covers both JavaScript and TypeScript, 'c-cpp' covers
+    # C and C++). See supported languages:
+    # https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/customizing-your-advanced-setup-for-code-scanning#changing-the-languages-that-are-analyzed
     # e.g.
     # languages:
     #   - go
     #   - python
-    #   - java
+    #   - javascript-typescript
     languages:
       - ""
     # @param extensions_cfg.codeql.on_unsupported behaviour in case the detected artefact
