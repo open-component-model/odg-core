@@ -1,5 +1,6 @@
 - name: default
   finding_types:
+    - finding/codeql
     - finding/crypto
     - finding/diki
     - finding/falco
