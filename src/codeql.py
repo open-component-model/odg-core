@@ -8,7 +8,6 @@ import urllib.parse
 
 import ci.log
 import cnudie.retrieve
-import ocm
 import ocm.iter
 
 import github_util
@@ -95,9 +94,15 @@ def fetch_repo_info(
         ref = access.ref if access.ref.startswith('refs/') else f'refs/heads/{access.ref}'
     elif isinstance(repo_info, dict) and (default_branch := repo_info.get('default_branch')):
         ref = f'refs/heads/{default_branch}'
-        logger.info(f'No ref in OCM access for {repo_url=}, falling back to default branch {default_branch!r}')
+        logger.info(
+            f'No ref in OCM access for {repo_url=}, '
+            f'falling back to default branch {default_branch!r}',
+        )
     else:
-        logger.warning(f'No ref in OCM access and could not determine default branch for {repo_url=}, skipping')
+        logger.warning(
+            f'No ref in OCM access and could not determine default branch '
+            f'for {repo_url=}, skipping',
+        )
         return repo_url, set(), set()
 
     active_languages = set()
@@ -194,7 +199,7 @@ def iter_artefact_metadata(
     if not repo_url:
         return
 
-    for language in [l.lower() for l in codeql_config.languages]:
+    for language in [lang.lower() for lang in codeql_config.languages]:
         if language not in repo_languages:
             logger.info(
                 f'skipping CodeQL check for {language=}: not present in {repo_url=}',

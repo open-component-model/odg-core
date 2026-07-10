@@ -956,7 +956,8 @@ class CodeqlConfig(BacklogItemMixins):
         if artefact_kind and artefact_kind not in supported_artefact_kinds:
             if self.on_unsupported is WarningVerbosities.WARNING:
                 logger.warning(
-                    f'{artefact_kind=} is not supported for CodeQL scans, {supported_artefact_kinds=}',
+                    f'{artefact_kind=} is not supported for CodeQL scans, '
+                    f'{supported_artefact_kinds=}',
                 )
             return False
 

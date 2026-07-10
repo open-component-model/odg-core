@@ -101,6 +101,7 @@ class CodeqlFindingSelector:
 
     codeql_status: list[str]
 
+
 @dataclasses.dataclass
 class VulnerabilityFindingSelector:
     """
