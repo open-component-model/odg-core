@@ -477,10 +477,14 @@ async def run_app():
     def _format_r(request: aiohttp.web.BaseRequest, *args, **kwargs) -> str:
         if request is None:
             return '-'
-        # use `path` instead of `path_qs` to _not_ log query parameters
-        return (
-            f'{request.method} {request.path} HTTP/{request.version.major}.{request.version.minor}'
-        )
+
+        if request.path.startswith('/auth'):
+            # use `path` instead of `path_qs` to _not_ log query parameters
+            path = request.path
+        else:
+            path = request.path_qs
+
+        return f'{request.method} {path} HTTP/{request.version.major}.{request.version.minor}'
 
     aiohttp.web_log.AccessLogger._format_r = _format_r
 
