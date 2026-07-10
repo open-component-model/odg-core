@@ -21,6 +21,10 @@ clamav:
   deployment:
     annotations: []
   enabled: false
+codeql:
+  deployment:
+    annotations: []
+  enabled: false
 crypto:
   deployment:
     annotations: []
