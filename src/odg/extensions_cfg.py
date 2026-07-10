@@ -941,7 +941,7 @@ class CodeqlConfig(BacklogItemMixins):
     delivery_service_url: str
     interval: int = 60 * 60 * 24  # 24h
     on_unsupported: WarningVerbosities = WarningVerbosities.WARNING
-    languages: list[str] = dataclasses.field(default_factory=list)
+    languages: list[str]
 
     def is_supported(
         self,

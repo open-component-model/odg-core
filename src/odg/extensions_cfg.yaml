@@ -75,7 +75,7 @@ ghas:
 
 codeql:
   enabled: False
-  # languages: [Go, Python, Java, JavaScript, TypeScript, C, C++, C#, Kotlin, Ruby, Swift]
+  languages: []  # required, e.g. [go, python, javascript-typescript]
 
 issue_replicator:
   enabled: False
