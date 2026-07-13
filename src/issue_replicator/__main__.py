@@ -487,9 +487,6 @@ def replicate_issue(
         logger.warning('did not find any sprints, exiting...')
         return
 
-    # cache clear is necessary to prevent creating duplicated issues
-    github_util.all_issues.cache_clear()
-
     mapping = extension_cfg.mapping(artefact.component_name)
     gh_api = odg.extensions_cfg.github_api(mapping.github_repository)
     repo = odg.extensions_cfg.github_repository(mapping.github_repository)
@@ -505,6 +502,10 @@ def replicate_issue(
     )
 
     for finding_cfg in finding_cfgs:
+        # cache clear is necessary to prevent creating duplicated issues and to force
+        # re-authentication
+        github_util.all_issues.cache_clear()
+
         replicate_issue_for_finding_type(
             artefact=artefact,
             finding_cfg=finding_cfg,
