@@ -14,6 +14,8 @@ COPY src/malware/clamav_entrypoint.sh /
 COPY src/malware/clamd.conf /etc/clamav/clamd.conf
 COPY --from=cbomkit-theia-builder /cbomkit-theia/cbomkit-theia /usr/bin/cbomkit-theia
 
+ARG ODG_CORE_LIBS_VERSION
+
 RUN --mount=type=bind,source=/dist,target=/dist \
     apk add --no-cache \
     bash \
@@ -40,7 +42,7 @@ RUN --mount=type=bind,source=/dist,target=/dist \
 && update-ca-certificates \
 && mkdir -p $HOME/.config/pip \
 && echo -e "[global]\nbreak-system-packages = true" >> $HOME/.config/pip/pip.conf \
-&& pip3 install --upgrade --no-cache-dir --find-links ./dist odg-core-libs \
+&& pip3 install --upgrade --no-cache-dir --find-links ./dist odg-core-libs==${ODG_CORE_LIBS_VERSION} \
 && apk del --no-cache \
     libc-dev \
     libffi-dev \
