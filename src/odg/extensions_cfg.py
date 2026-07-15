@@ -925,10 +925,10 @@ class GHASConfig(ExtensionCfgMixins):
 @dataclasses.dataclass(kw_only=True)
 class CodeqlConfig(BacklogItemMixins):
     """
-    :param str delivery_service_url
+    :param str delivery_service_url:
     :param int interval:
         Time after which an artefact must be re-checked at latest.
-    :param WarningVerbosities on_unsupported
+    :param WarningVerbosities on_unsupported:
         Defines the handling if a backlog item should be processed which contains unsupported
         properties, e.g. an unsupported artefact kind.
     :param list[str] languages:
@@ -953,7 +953,7 @@ class CodeqlConfig(BacklogItemMixins):
         supported_artefact_kinds = (odg.model.ArtefactKind.SOURCE,)
         supported_access_types = (ocm.AccessType.GITHUB,)
 
-        if artefact_kind and artefact_kind not in supported_artefact_kinds:
+        if artefact_kind is not None and artefact_kind not in supported_artefact_kinds:
             if self.on_unsupported is WarningVerbosities.WARNING:
                 logger.warning(
                     f'{artefact_kind=} is not supported for CodeQL scans, '
