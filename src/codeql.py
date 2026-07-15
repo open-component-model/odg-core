@@ -87,11 +87,13 @@ def fetch_repo_info(
         logger.warning(f'Failed to fetch repository languages for {repo_url=}, skipping')
         return repo_url, set(), set(), False
 
-    repo_languages = (
-        {lang.lower() for lang in languages_raw}
-        if isinstance(languages_raw, dict)
-        else set()
-    )
+    if not isinstance(languages_raw, dict):
+        logger.warning(
+            f'Unexpected response type from /languages endpoint for {repo_url=}, skipping',
+        )
+        return repo_url, set(), set(), False
+
+    repo_languages = {lang.lower() for lang in languages_raw}
 
     repo_info, _ = github_util.github_api_request(
         url=f'{api_base}/repos/{org}/{repo}',
