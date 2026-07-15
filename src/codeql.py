@@ -145,11 +145,9 @@ def iter_artefact_metadata(
     codeql_finding_config: odg.findings.Finding,
     codeql_config: odg.extensions_cfg.CodeqlConfig,
     secret_factory: secret_mgmt.SecretFactory,
-    existing_findings: list[odg.model.ArtefactMetadata] | None = None,
+    existing_findings: list[odg.model.ArtefactMetadata],
     creation_timestamp: datetime.datetime = datetime.datetime.now(datetime.timezone.utc),
 ) -> collections.abc.Generator[odg.model.ArtefactMetadata, None, None]:
-    if existing_findings is None:
-        existing_findings = []
     if not codeql_finding_config.matches(artefact):
         logger.info(f'CodeQL findings are filtered out for {artefact=}, skipping...')
         return
