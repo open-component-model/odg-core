@@ -60,20 +60,21 @@ def _parse_github_coords(
 def fetch_repo_info(
     source_node: ocm.iter.SourceNode,
     secret_factory: secret_mgmt.SecretFactory,
-) -> tuple[str | None, set[str], set[str]]:
+) -> tuple[str | None, set[str], set[str], bool]:
     """
-    Returns (repo_url, repo_languages, active_codeql_languages).
+    Returns (repo_url, repo_languages, active_codeql_languages, api_success).
 
-    repo_languages: languages present in the repo (from /languages endpoint).
-    active_codeql_languages: languages CodeQL is currently scanning on the
-    default branch (from code-scanning/analyses environment field).
+    api_success is False when the GitHub API could not be reached (e.g. auth
+    failure, network error). Callers must not treat empty language sets as
+    "CodeQL disabled" when api_success is False — stale findings should be
+    preserved rather than rescored in that case.
     """
     access = source_node.source.access
     repo_url = access.repoUrl
     coords = _parse_github_coords(repo_url)
     if not coords:
         logger.warning(f'Cannot parse org/repo from {repo_url=}')
-        return repo_url, set(), set()
+        return repo_url, set(), set(), False
 
     org, repo, api_base = coords
 
@@ -81,9 +82,15 @@ def fetch_repo_info(
         url=f'{api_base}/repos/{org}/{repo}/languages',
         secret_factory=secret_factory,
     )
-    repo_languages = set()
-    if isinstance(languages_raw, dict):
-        repo_languages = {lang.lower() for lang in languages_raw}
+    if languages_raw is None:
+        logger.warning(f'Failed to fetch repository languages for {repo_url=}, skipping')
+        return repo_url, set(), set(), False
+
+    repo_languages = (
+        {lang.lower() for lang in languages_raw}
+        if isinstance(languages_raw, dict)
+        else set()
+    )
 
     repo_info, _ = github_util.github_api_request(
         url=f'{api_base}/repos/{org}/{repo}',
@@ -103,7 +110,7 @@ def fetch_repo_info(
             f'No ref in OCM access and could not determine default branch '
             f'for {repo_url=}, skipping',
         )
-        return repo_url, set(), set()
+        return repo_url, set(), set(), False
 
     active_languages = set()
     for analysis in github_util.github_api_request_paginated(
@@ -126,7 +133,7 @@ def fetch_repo_info(
     logger.info(
         f'{repo_url=}: {repo_languages=}, active CodeQL languages={active_languages}',
     )
-    return repo_url, repo_languages, active_languages
+    return repo_url, repo_languages, active_languages, True
 
 
 def iter_artefact_metadata(
@@ -135,8 +142,11 @@ def iter_artefact_metadata(
     codeql_finding_config: odg.findings.Finding,
     codeql_config: odg.extensions_cfg.CodeqlConfig,
     secret_factory: secret_mgmt.SecretFactory,
+    existing_findings: list[odg.model.ArtefactMetadata] | None = None,
     creation_timestamp: datetime.datetime = datetime.datetime.now(datetime.timezone.utc),
 ) -> collections.abc.Generator[odg.model.ArtefactMetadata, None, None]:
+    if existing_findings is None:
+        existing_findings = []
     if not codeql_finding_config.matches(artefact):
         logger.info(f'CodeQL findings are filtered out for {artefact=}, skipping...')
         return
@@ -191,12 +201,12 @@ def iter_artefact_metadata(
         )
         return
 
-    repo_url, repo_languages, active_languages = fetch_repo_info(
+    repo_url, repo_languages, active_languages, api_success = fetch_repo_info(
         source_node=source_node,
         secret_factory=secret_factory,
     )
 
-    if not repo_url:
+    if not repo_url or not api_success:
         return
 
     for language in [lang.lower() for lang in codeql_config.languages]:
@@ -215,6 +225,40 @@ def iter_artefact_metadata(
             )
             if finding:
                 yield finding
+
+    new_keys = {
+        f'not-enabled|{repo_url}|{lang.lower()}'
+        for lang in codeql_config.languages
+        if lang.lower() in repo_languages and lang.lower() not in active_languages
+    }
+
+    for stale in existing_findings:
+        if stale.data.key in new_keys:
+            continue
+        rescoring = odg.model.ArtefactMetadata(
+            artefact=stale.artefact,
+            meta=odg.model.Metadata(
+                datasource=stale.meta.datasource,
+                type=odg.model.Datatype.RESCORING,
+                creation_date=creation_timestamp,
+                last_update=creation_timestamp,
+            ),
+            data=odg.model.CustomRescoring(
+                finding=odg.model.RescoreCodeqlFinding(
+                    codeql_status=stale.data.codeql_status,
+                    repo_url=stale.data.repo_url,
+                    language=stale.data.language,
+                ),
+                referenced_type=odg.model.Datatype.CODEQL_FINDING,
+                severity='accepted',
+                user=odg.model.User(
+                    username='codeql-extension-auto-rescoring',
+                    type='codeql-extension-user',
+                ),
+                comment='Automatically rescored: CodeQL is now enabled for this language.',
+            ),
+        )
+        yield rescoring
 
 
 def _make_finding(
@@ -272,8 +316,6 @@ def scan(
     secret_factory: secret_mgmt.SecretFactory,
     **kwargs,
 ):
-    now = datetime.datetime.now(tz=datetime.timezone.utc)
-
     existing_findings = [
         odg.model.ArtefactMetadata.from_dict(raw)
         for raw in delivery_service_client.query_metadata(
@@ -289,38 +331,9 @@ def scan(
             codeql_finding_config=codeql_finding_config,
             codeql_config=extension_cfg,
             secret_factory=secret_factory,
+            existing_findings=existing_findings,
         ),
     )
-    new_keys = {m.data.key for m in new_metadata if m.meta.type == odg.model.Datatype.CODEQL_FINDING}
-
-    for stale in existing_findings:
-        if stale.data.key in new_keys:
-            continue
-
-        rescoring = odg.model.ArtefactMetadata(
-            artefact=stale.artefact,
-            meta=odg.model.Metadata(
-                datasource=stale.meta.datasource,
-                type=odg.model.Datatype.RESCORING,
-                creation_date=now,
-                last_update=now,
-            ),
-            data=odg.model.CustomRescoring(
-                finding=odg.model.RescoreCodeqlFinding(
-                    codeql_status=stale.data.codeql_status,
-                    repo_url=stale.data.repo_url,
-                    language=stale.data.language,
-                ),
-                referenced_type=odg.model.Datatype.CODEQL_FINDING,
-                severity='accepted',
-                user=odg.model.User(
-                    username='codeql-extension-auto-rescoring',
-                    type='codeql-extension-user',
-                ),
-                comment='Automatically rescored: CodeQL is now enabled for this language.',
-            ),
-        )
-        new_metadata.append(rescoring)
 
     delivery_service_client.update_metadata(data=new_metadata)
 
