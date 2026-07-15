@@ -33,6 +33,7 @@ k8s.logging.configure_kubernetes_logging()
 _CODEQL_LANGUAGE_ALIASES: dict[str, set[str]] = {
     'javascript-typescript': {'javascript', 'typescript'},
     'c-cpp': {'c', 'c++'},
+    'java-kotlin': {'java', 'kotlin'},
 }
 
 
@@ -169,10 +170,10 @@ def iter_artefact_metadata(
         logger.info(f'did not find source node for {artefact=}, skipping...')
         return
 
-    if not codeql_config.is_supported(access=source_node.source.access):
+    if not codeql_config.is_supported(access_type=source_node.source.access.type):
         if codeql_config.on_unsupported is odg.extensions_cfg.WarningVerbosities.FAIL:
             raise TypeError(
-                f'{type(source_node.source.access)} is not supported by the CodeQL extension',
+                f'{source_node.source.access.type} is not supported by the CodeQL extension',
             )
         return
 

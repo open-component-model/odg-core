@@ -948,10 +948,10 @@ class CodeqlConfig(BacklogItemMixins):
     def is_supported(
         self,
         artefact_kind: odg.model.ArtefactKind | None = None,
-        access: object | None = None,
+        access_type: ocm.AccessType | None = None,
     ) -> bool:
         supported_artefact_kinds = (odg.model.ArtefactKind.SOURCE,)
-        supported_access_types = (ocm.GithubAccess,)
+        supported_access_types = (ocm.AccessType.GITHUB,)
 
         if artefact_kind and artefact_kind not in supported_artefact_kinds:
             if self.on_unsupported is WarningVerbosities.WARNING:
@@ -961,10 +961,10 @@ class CodeqlConfig(BacklogItemMixins):
                 )
             return False
 
-        if access is not None and not isinstance(access, supported_access_types):
+        if access_type is not None and access_type not in supported_access_types:
             if self.on_unsupported is WarningVerbosities.WARNING:
                 logger.warning(
-                    f'{type(access)=} is not supported for CodeQL scans, {supported_access_types=}',
+                    f'{access_type=} is not supported for CodeQL scans, {supported_access_types=}',
                 )
             return False
 
