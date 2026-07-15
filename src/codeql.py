@@ -210,6 +210,7 @@ def iter_artefact_metadata(
     if not repo_url or not api_success:
         return
 
+    new_keys = set()
     for language in [lang.lower() for lang in codeql_config.languages]:
         if language not in repo_languages:
             logger.info(
@@ -225,13 +226,8 @@ def iter_artefact_metadata(
                 creation_timestamp=creation_timestamp,
             )
             if finding:
+                new_keys.add(finding.data.key)
                 yield finding
-
-    new_keys = {
-        f'not-enabled|{repo_url}|{lang.lower()}'
-        for lang in codeql_config.languages
-        if lang.lower() in repo_languages and lang.lower() not in active_languages
-    }
 
     for stale in existing_findings:
         if stale.data.key in new_keys:
