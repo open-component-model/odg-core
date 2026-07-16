@@ -1203,6 +1203,7 @@ class SBOMGeneratorConfig(BacklogItemMixins):
     processing_mode: bdba.model.ProcessingMode = bdba.model.ProcessingMode.FORCE_UPLOAD
     interval: int = 60 * 60 * 24  # 24h
     generation_mode: odg.model.SbomGenerationMode = odg.model.SbomGenerationMode.SYFT
+    on_exist: odg.model.OnExist = odg.model.OnExist.OVERWRITE
 
     def is_supported(
         self,

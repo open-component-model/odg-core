@@ -732,6 +732,11 @@ extensions_cfg:
     # - syft (default)
     # - bdba
     generation_mode: syft
+    # @param extensions_cfg.sbom_generator.on_exist controls how to behave in case a to-be generated
+    # SBoM exists already, following options are supported:
+    # - overwrite (default)
+    # - skip
+    on_exist: overwrite
     # @param extensions_cfg.sbom_generator.output_format define desired SBoM format, following
     # options are supported:
     # cyclonedx (default)
