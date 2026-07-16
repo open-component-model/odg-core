@@ -1793,3 +1793,8 @@ def artefact_scan_info(
 class SbomGenerationMode(enum.StrEnum):
     SYFT = 'syft'
     BDBA = 'bdba'
+
+
+class OnExist(enum.StrEnum):
+    SKIP = 'skip'
+    OVERWRITE = 'overwrite'
