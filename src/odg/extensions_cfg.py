@@ -932,18 +932,19 @@ class CodeqlConfig(BacklogItemMixins):
         Defines the handling if a backlog item should be processed which contains unsupported
         properties, e.g. an unsupported artefact kind.
     :param list[str] languages:
-        Languages to check CodeQL coverage for, using GitHub repository language names
-        (e.g. 'go', 'python', 'javascript'). The extension automatically handles
-        CodeQL-specific identifiers (e.g. 'javascript-typescript' is treated as
-        covering 'javascript' and 'typescript'). A finding is emitted for each
-        configured language that is present in the repository but not actively scanned.
+        Languages to exclude from CodeQL coverage checks, using GitHub repository language names
+        (e.g. 'yaml', 'dockerfile'). If empty (default), findings are created for every language
+        present in the repository that is not actively scanned by CodeQL. If non-empty, the listed
+        languages are skipped and no finding is created for them regardless of CodeQL status.
+        The extension automatically handles CodeQL-specific identifiers (e.g. 'javascript-typescript'
+        covers both 'javascript' and 'typescript').
     """
 
     service: Services = Services.CODEQL
     delivery_service_url: str
     interval: int = 60 * 60 * 24  # 24h
     on_unsupported: WarningVerbosities = WarningVerbosities.WARNING
-    languages: list[str]
+    languages: list[str] = dataclasses.field(default_factory=list)
 
     def is_supported(
         self,

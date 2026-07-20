@@ -75,7 +75,7 @@ ghas:
 
 codeql:
   enabled: False
-  languages: []  # required, e.g. [go, python, javascript-typescript]
+  languages: []  # optional list of languages to exclude from checks, e.g. [yaml, dockerfile]
 
 issue_replicator:
   enabled: False

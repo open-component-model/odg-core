@@ -531,18 +531,18 @@ extensions_cfg:
     # @param extensions_cfg.codeql.interval time (in seconds) after which a component should be
     # re-checked the latest
     interval: 86400 # 24h
-    # @param extensions_cfg.codeql.languages list of programming languages to check CodeQL coverage
-    # for. A finding is emitted for each language that is present in the repository but not actively
-    # scanned by CodeQL. Use the language names as returned by the GitHub repository languages API
-    # (e.g. 'go', 'python', 'javascript'). The extension automatically handles CodeQL-specific
-    # language identifiers (e.g. maps 'javascript-typescript' back to 'javascript').
+    # @param extensions_cfg.codeql.languages optional list of languages to exclude from CodeQL
+    # coverage checks. By default (empty list), a finding is created for every language present in
+    # the repository that is not actively scanned by CodeQL. If non-empty, the listed languages are
+    # skipped regardless of their CodeQL status — useful to suppress findings for languages CodeQL
+    # does not support (e.g. 'yaml', 'dockerfile', 'shell'). Use GitHub repository language names.
+    # See: https://docs.github.com/en/rest/repos/repos#list-repository-languages
     # e.g.
     # languages:
-    #   - go
-    #   - python
-    #   - javascript
-    languages:
-      - ""
+    #   - yaml
+    #   - dockerfile
+    #   - shell
+    languages: []
     # @param extensions_cfg.codeql.on_unsupported behaviour in case the detected artefact
     # kind/type/access is not supported
     # options:

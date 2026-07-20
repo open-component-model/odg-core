@@ -197,13 +197,6 @@ def iter_artefact_metadata(
         )
         return
 
-    if not codeql_config.languages:
-        logger.warning(
-            f'No languages configured for CodeQL extension, skipping {artefact=}. '
-            'Set languages in codeql extension config to enable checks.',
-        )
-        return
-
     repo_url, repo_languages, active_languages, api_success = fetch_repo_info(
         source_node=source_node,
         secret_factory=secret_factory,
@@ -212,11 +205,13 @@ def iter_artefact_metadata(
     if not repo_url or not api_success:
         return
 
+    excluded_languages = {lang.lower() for lang in codeql_config.languages}
+
     new_keys = set()
-    for language in [lang.lower() for lang in codeql_config.languages]:
-        if language not in repo_languages:
+    for language in repo_languages:
+        if language in excluded_languages:
             logger.info(
-                f'skipping CodeQL check for {language=}: not present in {repo_url=}',
+                f'skipping CodeQL check for {language=}: excluded by config for {repo_url=}',
             )
             continue
         if language not in active_languages:
