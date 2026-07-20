@@ -59,7 +59,8 @@ def _parse_github_coords(
 
 
 def fetch_repo_info(
-    source_node: ocm.iter.SourceNode,
+    repo_url: str,
+    ref: str | None,
     secret_factory: secret_mgmt.SecretFactory,
 ) -> tuple[str | None, set[str], set[str], bool]:
     """
@@ -70,8 +71,6 @@ def fetch_repo_info(
     "CodeQL disabled" when api_success is False — stale findings should be
     preserved rather than rescored in that case.
     """
-    access = source_node.source.access
-    repo_url = access.repoUrl
     coords = _parse_github_coords(repo_url)
     if not coords:
         logger.warning(f'Cannot parse org/repo from {repo_url=}')
@@ -100,17 +99,17 @@ def fetch_repo_info(
         secret_factory=secret_factory,
     )
 
-    if access.ref:
-        ref = access.ref if access.ref.startswith('refs/') else f'refs/heads/{access.ref}'
+    if ref:
+        ref = ref if ref.startswith('refs/') else f'refs/heads/{ref}'
     elif isinstance(repo_info, dict) and (default_branch := repo_info.get('default_branch')):
         ref = f'refs/heads/{default_branch}'
         logger.info(
-            f'No ref in OCM access for {repo_url=}, '
+            f'No ref provided for {repo_url=}, '
             f'falling back to default branch {default_branch!r}',
         )
     else:
         logger.warning(
-            f'No ref in OCM access and could not determine default branch '
+            f'No ref provided and could not determine default branch '
             f'for {repo_url=}, skipping',
         )
         return repo_url, set(), set(), False
@@ -197,8 +196,10 @@ def iter_artefact_metadata(
         )
         return
 
+    access = source_node.source.access
     repo_url, repo_languages, active_languages, api_success = fetch_repo_info(
-        source_node=source_node,
+        repo_url=access.repoUrl,
+        ref=access.ref,
         secret_factory=secret_factory,
     )
 
