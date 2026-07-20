@@ -517,8 +517,10 @@ extensions_cfg:
     on_unsupported: warning
 
   # @param extensions_cfg.codeql worker which checks whether GitHub Advanced Security CodeQL is
-  # enabled for each OCM source artefact and creates findings for languages that are configured but
-  # not actively scanned
+  # actively scanning each OCM source artefact. A finding is created for every language present in
+  # the repository that is not covered by an active CodeQL analysis — including the case where
+  # CodeQL is not enabled at all. Languages not supported by CodeQL (e.g. yaml, dockerfile) can be
+  # excluded via the languages parameter to suppress false positives.
   codeql:
     # @param extensions_cfg.codeql.enabled allows disabling of extension without removing its
     # configuration
