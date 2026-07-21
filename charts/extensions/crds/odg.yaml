@@ -57,6 +57,7 @@ spec:
                     - delivery-db-backup
                     - delivery-service
                     - envoy-gateway
+                    - codeql
                     - findings-report
                     - ghas
                     - issue-replicator

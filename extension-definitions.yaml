@@ -493,6 +493,32 @@ installation:
     name: ocm.software/open-delivery-gear/core
     version: 0.1355.0-dev
   value_templates:
+  - helm_attribute: codeql.target_namespace
+    helm_chart_name: extensions
+    value: ${target_namespace}
+    value_type: python-string-template
+  - helm_attribute: codeql.enabled
+    helm_chart_name: extensions
+    value: true
+    value_type: literal
+name: codeql
+outputs: []
+---
+dependencies:
+- delivery-service
+installation:
+  ocm_references:
+  - artefact:
+      name: extensions
+      version: 0.1355.0-dev
+    helm_chart_name: extensions
+    mappings:
+    - artefact_type: helmchart-imagemap
+      name: extensions
+      version: 0.1355.0-dev
+    name: ocm.software/open-delivery-gear/core
+    version: 0.1355.0-dev
+  value_templates:
   - helm_attribute: sbom-generator.target_namespace
     helm_chart_name: extensions
     value: ${target_namespace}
