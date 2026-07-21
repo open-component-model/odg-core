@@ -233,7 +233,7 @@ class BDBAApi:
         try:
             timeout = kwargs.pop('timeout')
         except KeyError:
-            timeout = (4, 121)
+            timeout = (4, 301)
 
         return functools.partial(
             method,
