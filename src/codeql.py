@@ -104,13 +104,11 @@ def fetch_repo_info(
     elif isinstance(repo_info, dict) and (default_branch := repo_info.get('default_branch')):
         ref = f'refs/heads/{default_branch}'
         logger.info(
-            f'No ref provided for {repo_url=}, '
-            f'falling back to default branch {default_branch!r}',
+            f'No ref provided for {repo_url=}, falling back to default branch {default_branch!r}',
         )
     else:
         logger.warning(
-            f'No ref provided and could not determine default branch '
-            f'for {repo_url=}, skipping',
+            f'No ref provided and could not determine default branch for {repo_url=}, skipping',
         )
         return repo_url, set(), set(), False
 
