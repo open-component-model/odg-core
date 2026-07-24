@@ -501,6 +501,10 @@ installation:
     helm_chart_name: extensions
     value: true
     value_type: literal
+  - helm_attribute: codeql.deployment.annotations."resources.gardener.cloud/preserve-replicas"
+    helm_chart_name: extensions
+    value: '"true"'
+    value_type: literal
 name: codeql
 outputs: []
 ---
