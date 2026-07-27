@@ -283,6 +283,8 @@ def init_logging_thread(
 
 class JSONFormatter(logging.Formatter):
     def formatMessage(self, record) -> str:
+        if json is None:
+            return super().formatMessage(record)
         record.message = json.dumps(record.message)
         if (size := len(record.message.encode('utf-8'))) > 10000:
             record.message = f'"Request entity body is too large: {size} bytes"'
