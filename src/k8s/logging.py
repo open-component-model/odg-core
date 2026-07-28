@@ -286,7 +286,9 @@ class JSONFormatter(logging.Formatter):
         # Check if json module was already cleared during interpreter shutdown
         if json is None:
             # Fallback: Manually escape to guarantee valid JSON output
-            escaped_msg = str(record.message).replace('\\', '\\\\').replace('"', '\\"')
+            escaped_msg = str(record.message)
+                .replace('\\', '\\\\').replace('"', '\\"')
+                .replace('\n', '\\n').replace('\r', '\\r')
             record.message = f'"{escaped_msg}"'
         else:
             record.message = json.dumps(record.message)
