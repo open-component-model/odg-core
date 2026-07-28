@@ -44,13 +44,10 @@ spec:
           ports:
             - containerPort: 8080
               name: default
+          {{- with (.Values.freshclam).resources }}
           resources:
-            requests:
-              memory: 500Mi
-              cpu: 1000m
-            limits:
-              memory: 1Gi
-              cpu: 1500m
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

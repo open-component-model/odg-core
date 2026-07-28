@@ -70,13 +70,10 @@ spec:
                 command:
                   - sleep
                   - "60"
+          {{- with (.Values.deployment).resources }}
           resources:
-            requests:
-              memory: 100Mi
-              cpu: 250m
-            limits:
-              memory: 300Mi
-              cpu: 500m
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       volumes:
         - name: github
           secret:

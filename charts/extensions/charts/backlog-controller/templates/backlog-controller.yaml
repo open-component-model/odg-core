@@ -41,13 +41,10 @@ spec:
               mountPath: /secrets/github
             - name: github-app
               mountPath: /secrets/github-app
+          {{- with (.Values.deployment).resources }}
           resources:
-            requests:
-              memory: 100Mi
-              cpu: 30m
-            limits:
-              memory: 300Mi
-              cpu: 300m
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       volumes:
         - name: kubernetes
           secret:

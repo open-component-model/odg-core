@@ -120,13 +120,10 @@ spec:
               mountPath: "/addressbook"
             - name: github-mappings
               mountPath: "/github_mappings"
+          {{- with (.Values.deployment).resources }}
           resources:
-            requests:
-              memory: 1Gi
-              cpu: 100m
-            limits:
-              memory: 5Gi
-              cpu: 500m
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       volumes:
         - name: delivery-db
           secret:

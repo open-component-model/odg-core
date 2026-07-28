@@ -45,6 +45,10 @@ spec:
                   mountPath: /secrets/kubernetes
                 - name: oauth-cfg
                   mountPath: /secrets/oauth-cfg
+              {{- with (.Values.cronjob).resources }}
+              resources:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
           volumes:
             - name: delivery-db
               secret:
