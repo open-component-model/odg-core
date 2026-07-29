@@ -29,6 +29,9 @@ dependencies:
   - name: ghas
     repository: file://charts/ghas
     condition: ghas.enabled
+  - name: codeql
+    repository: file://charts/codeql
+    condition: codeql.enabled
   - name: issue-replicator
     repository: file://charts/issue-replicator
     condition: issue-replicator.enabled

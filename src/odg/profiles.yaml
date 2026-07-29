@@ -1,5 +1,6 @@
 - name: default
   finding_types:
+    - finding/codeql
     - finding/crypto
     - finding/diki
     - finding/falco
@@ -13,4 +14,4 @@
     - finding/sast
     - finding/vulnerability
   special_component_ids:
-    - 03e237b4-434e-4e1c-b786-5ceb6cc76c1c
+    - 03e237b4-434e-4e1c-b786-5ceb6cc76c1d

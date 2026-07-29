@@ -6,10 +6,12 @@ import json
 import logging
 import os
 import tempfile
+import time
 
 import ci.log
 import cnudie.retrieve
 import oci.client
+import requests.exceptions
 
 import bdba.client
 import bdba.model
@@ -185,6 +187,31 @@ def generate_sbom_with_bdba(
     return sbom_result
 
 
+def find_existing_sbom_metadata(
+    artefact: odg.model.ComponentArtefactId,
+    delivery_service_client: odg_client.DeliveryServiceClient,
+) -> dict | None:
+    """
+    Query for existing SBOM metadata for the given artefact.
+
+    Returns the metadata entry if found, None otherwise.
+    Failures are logged and treated as "no existing SBOM" (safe fallback).
+    """
+    try:
+        metadata_entries = delivery_service_client.query_metadata(
+            artefacts=[artefact],
+            type=odg.model.Datatype.ARTEFACT_SCAN_INFO,
+            datasource=odg.model.Datasource.SBOM_GENERATOR,
+        )
+
+        if metadata_entries:
+            return metadata_entries[0]
+        return None
+    except Exception as e:
+        logger.warning(f'Failed to query existing SBOM metadata for {artefact}: {e}')
+        return None
+
+
 def generate_sbom_for_artefact(
     artefact: odg.model.ComponentArtefactId,
     extension_cfg: odg.extensions_cfg.SBOMGeneratorConfig,
@@ -193,7 +220,7 @@ def generate_sbom_for_artefact(
     oci_client: oci.client.Client,
     secret_factory: secret_mgmt.SecretFactory,
     **kwargs,
-) -> SBOM:
+) -> SBOM | None:
     """
     Generates Software Bill of Materials (SBOM) for a component artefact.
     Resolves the component descriptor from OCM repositories,
@@ -225,6 +252,30 @@ def generate_sbom_for_artefact(
                 'to filter out this artefact kind, access type, or artefact type',
             )
         return
+
+    # Check for existing SBOM and handle based on on_exist configuration
+    existing_metadata = find_existing_sbom_metadata(
+        artefact=artefact,
+        delivery_service_client=delivery_service_client,
+    )
+
+    old_digest = None
+    if existing_metadata:
+        old_digest = existing_metadata.get('data', {}).get('digest')
+
+        if extension_cfg.on_exist is odg.model.OnExist.SKIP:
+            logger.info(
+                f'SBOM already exists for {artefact}, skipping generation (digest: {old_digest})',
+            )
+            return None
+
+        logger.info(
+            f'SBOM exists for {artefact}, will overwrite and clean up old blob '
+            f'(old digest: {old_digest})',
+        )
+
+    else:
+        logger.info(f'No existing SBOM found for {artefact}, generating new one')
 
     logger.info(f'Scanning using mode {extension_cfg.generation_mode}')
 
@@ -332,6 +383,68 @@ def generate_sbom_for_artefact(
             ),
         ],
     )
+
+    if digest == old_digest:
+        # digest remained stable, shortcut blob deletion
+        return sbom_result
+
+    # Clean up old blob if overwriting
+    if old_digest and extension_cfg.on_exist is odg.model.OnExist.OVERWRITE:
+        max_retries = 3
+        retry_delay = 5  # Start with 5 seconds
+
+        def handle_retry_logic(
+            error_msg: str,
+            current_attempt: int,
+            current_delay: int,
+        ) -> int:
+            """Handle retry logic for blob deletion failures. Returns updated delay."""
+            if current_attempt < max_retries - 1:
+                logger.warning(
+                    f'Failed to delete old SBOM blob {old_digest} for {artefact} '
+                    f'(attempt {current_attempt + 1}/{max_retries}): {error_msg}. '
+                    f'Retrying in {current_delay} seconds...',
+                )
+                time.sleep(current_delay)
+                return current_delay * 2  # Exponential backoff
+            else:
+                logger.error(
+                    f'Failed to delete old SBOM blob {old_digest} for {artefact} '
+                    f'after {max_retries} attempts: {error_msg}. '
+                    'The blob remains orphaned in storage.',
+                )
+                return current_delay
+
+        for attempt in range(max_retries):
+            try:
+                logger.info(
+                    f'Deleting old SBOM blob: {old_digest} (attempt {attempt + 1}/{max_retries})',
+                )
+                delivery_service_client.delete_blob(digest=old_digest)
+                logger.info(f'Successfully deleted old SBOM blob: {old_digest}')
+                break  # Success, exit retry loop
+
+            except requests.exceptions.HTTPError as e:
+                # Check if it's a 404 - blob already deleted, mission accomplished
+                if e.response is not None and e.response.status_code == 404:
+                    logger.info(
+                        f'Old SBOM blob {old_digest} not found (404), '
+                        'assuming already deleted - cleanup goal achieved',
+                    )
+                    break  # No need to retry, blob is gone
+
+                error_msg = f'HTTP {e.response.status_code if e.response else "error"} - {e}'
+                retry_delay = handle_retry_logic(
+                    error_msg=error_msg,
+                    current_attempt=attempt,
+                    current_delay=retry_delay,
+                )
+            except Exception as e:
+                retry_delay = handle_retry_logic(
+                    error_msg=str(e),
+                    current_attempt=attempt,
+                    current_delay=retry_delay,
+                )
 
     return sbom_result
 

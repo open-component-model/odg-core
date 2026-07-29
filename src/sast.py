@@ -65,8 +65,10 @@ def create_missing_linter_finding(
     artefact: odg.model.ComponentArtefactId,
     sub_type: odg.model.SastSubType,
     categorisation: odg.findings.FindingCategorisation,
-    creation_timestamp: datetime.datetime = datetime.datetime.now(tz=datetime.timezone.utc),
+    creation_timestamp: datetime.datetime | None = None,
 ) -> odg.model.ArtefactMetadata | None:
+    if creation_timestamp is None:
+        creation_timestamp = datetime.datetime.now(tz=datetime.timezone.utc)
     return odg.model.ArtefactMetadata(
         artefact=artefact,
         meta=odg.model.Metadata(
@@ -89,8 +91,10 @@ def iter_sast_artefacts_for_sub_type(
     sast_finding_config: odg.findings.Finding,
     sub_type: odg.model.SastSubType,
     artefact: odg.model.ComponentArtefactId,
-    creation_timestamp: datetime.datetime = datetime.datetime.now(datetime.timezone.utc),
+    creation_timestamp: datetime.datetime | None = None,
 ) -> collections.abc.Generator[odg.model.ArtefactMetadata, None, None]:
+    if creation_timestamp is None:
+        creation_timestamp = datetime.datetime.now(tz=datetime.timezone.utc)
     categorisation = odg.findings.categorise_finding(
         finding_cfg=sast_finding_config,
         finding_property=sub_type,
@@ -133,12 +137,14 @@ def iter_artefact_metadata(
     component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
     sast_finding_config: odg.findings.Finding,
     sast_config: odg.extensions_cfg.SASTConfig,
-    creation_timestamp: datetime.datetime = datetime.datetime.now(datetime.timezone.utc),
+    creation_timestamp: datetime.datetime | None = None,
 ) -> collections.abc.Generator[odg.model.ArtefactMetadata, None, None]:
     """
     Processes source nodes for a given component descriptor, yielding SAST metadata.
     Handles resource filtering, local linter findings, and rescoring logic.
     """
+    if creation_timestamp is None:
+        creation_timestamp = datetime.datetime.now(tz=datetime.timezone.utc)
     if not sast_finding_config.matches(artefact):
         logger.info(f'SAST findings are filtered out for {artefact=}, skipping...')
         return

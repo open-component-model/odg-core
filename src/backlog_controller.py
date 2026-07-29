@@ -145,7 +145,7 @@ def main():
                 namespace=namespace,
                 plural=k8s.model.BacklogItemCrd.PLURAL_NAME,
                 resource_version=resource_version,
-                timeout_seconds=0,
+                timeout_seconds=300,
             ):
                 if (type := str(event['type'])) == 'MODIFIED':
                     continue

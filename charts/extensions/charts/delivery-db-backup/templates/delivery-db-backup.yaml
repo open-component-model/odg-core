@@ -49,6 +49,10 @@ spec:
               mountPath: /secrets/oci-registry
             - name: extensions-cfg
               mountPath: /extensions_cfg
+            {{- with (.Values.cronjob).resources }}
+            resources:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
           volumes:
             - name: delivery-db
               secret:

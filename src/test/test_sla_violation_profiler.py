@@ -52,6 +52,7 @@ def test_violation_when_deadline_before_release(test_data):
     )
 
     assert len(violations) == 1
+    assert violations[0].severity == 'HIGH'
 
 
 def test_violation_when_rescoring_happens_after_deadline(test_data):
@@ -68,6 +69,7 @@ def test_violation_when_rescoring_happens_after_deadline(test_data):
     )
 
     assert len(violations) == 1
+    assert violations[0].severity == 'NONE'
 
 
 def test_rescoring_filtered_out_when_created_after_release(test_data):
@@ -132,6 +134,7 @@ def test_violation_when_rescoring_extends_deadline_not_enough(test_data):
     )
 
     assert len(violations) == 1
+    assert violations[0].severity == 'MEDIUM'
 
 
 def test_no_violation_when_rescoring_sets_due_date(test_data):
@@ -164,6 +167,7 @@ def test_violation_when_rescoring_due_date_before_release(test_data):
     )
 
     assert len(violations) == 1
+    assert violations[0].severity == 'MEDIUM'
 
 
 def test_finding_skipped_when_created_after_release(test_data):
@@ -291,6 +295,7 @@ def test_multiple_rescorings_last_restores_deadline(test_data):
     )
 
     assert len(violations) == 1
+    assert violations[0].severity == 'HIGH'
 
 
 def test_due_date_takes_priority_over_allowed_processing_time(test_data):

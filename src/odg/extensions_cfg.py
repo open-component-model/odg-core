@@ -35,16 +35,17 @@ class Services(enum.StrEnum):
     BDBA = 'bdba'
     CACHE_MANAGER = 'cacheManager'
     CLAMAV = 'clamav'
+    CODEQL = 'codeql'
     CRYPTO = 'crypto'
     DELIVERY_DB_BACKUP = 'deliveryDbBackup'
     FINDINGS_REPORT = 'findingsReport'
     GHAS = 'ghas'
     ISSUE_REPLICATOR = 'issueReplicator'
+    ODG_OPERATOR = 'odg-operator'
     OSID = 'osid'
     PPMS = 'ppms'
     RESPONSIBLES = 'responsibles'
     SAST = 'sast'
-    ODG_OPERATOR = 'odg-operator'
     SBOM_GENERATOR = 'sbomGenerator'
     SLA_VIOLATION_PROFILER = 'slaViolationProfiler'
 
@@ -921,6 +922,56 @@ class GHASConfig(ExtensionCfgMixins):
         return True
 
 
+@dataclasses.dataclass(kw_only=True)
+class CodeqlConfig(BacklogItemMixins):
+    """
+    :param str delivery_service_url:
+    :param int interval:
+        Time after which an artefact must be re-checked at latest.
+    :param WarningVerbosities on_unsupported:
+        Defines the handling if a backlog item should be processed which contains unsupported
+        properties, e.g. an unsupported artefact kind.
+    :param list[str] languages:
+        Languages to exclude from CodeQL coverage checks, using GitHub repository language names
+        (e.g. 'yaml', 'dockerfile'). If empty (default), findings are created for every language
+        present in the repository that is not actively scanned by CodeQL. If non-empty, the listed
+        languages are skipped and no finding is created for them regardless of CodeQL status.
+        The extension automatically handles CodeQL-specific identifiers (e.g. 'javascript-typescript'
+        covers both 'javascript' and 'typescript').
+    """
+
+    service: Services = Services.CODEQL
+    delivery_service_url: str
+    interval: int = 60 * 60 * 24  # 24h
+    on_unsupported: WarningVerbosities = WarningVerbosities.WARNING
+    languages: list[str] = dataclasses.field(default_factory=list)
+
+    def is_supported(
+        self,
+        artefact_kind: odg.model.ArtefactKind | None = None,
+        access_type: ocm.AccessType | None = None,
+    ) -> bool:
+        supported_artefact_kinds = (odg.model.ArtefactKind.SOURCE,)
+        supported_access_types = (ocm.AccessType.GITHUB,)
+
+        if artefact_kind is not None and artefact_kind not in supported_artefact_kinds:
+            if self.on_unsupported is WarningVerbosities.WARNING:
+                logger.warning(
+                    f'{artefact_kind=} is not supported for CodeQL scans, '
+                    f'{supported_artefact_kinds=}',
+                )
+            return False
+
+        if access_type is not None and access_type not in supported_access_types:
+            if self.on_unsupported is WarningVerbosities.WARNING:
+                logger.warning(
+                    f'{access_type=} is not supported for CodeQL scans, {supported_access_types=}',
+                )
+            return False
+
+        return True
+
+
 @dataclasses.dataclass
 class ExtensionDefinitionOcmReference:
     component_name: str
@@ -1203,6 +1254,7 @@ class SBOMGeneratorConfig(BacklogItemMixins):
     processing_mode: bdba.model.ProcessingMode = bdba.model.ProcessingMode.FORCE_UPLOAD
     interval: int = 60 * 60 * 24  # 24h
     generation_mode: odg.model.SbomGenerationMode = odg.model.SbomGenerationMode.SYFT
+    on_exist: odg.model.OnExist = odg.model.OnExist.OVERWRITE
 
     def is_supported(
         self,
@@ -1282,6 +1334,7 @@ class ExtensionsConfiguration:
     blackduck: BlackDuckConfig | None
     cache_manager: CacheManagerConfig | None
     clamav: ClamAVConfig | None
+    codeql: CodeqlConfig | None
     crypto: CryptoConfig | None
     delivery_db_backup: DeliveryDBBackup | None
     findings_report: FindingsReportConfig | None

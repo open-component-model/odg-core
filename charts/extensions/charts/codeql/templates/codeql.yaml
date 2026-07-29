@@ -1,4 +1,4 @@
-{{- $podName := "crypto" }}
+{{- $podName := "codeql" }}
 
 apiVersion: apps/v1
 kind: Deployment
@@ -16,12 +16,12 @@ spec:
   selector:
     matchLabels:
       app: {{ $podName }}
-      delivery-gear.gardener.cloud/service: crypto
+      delivery-gear.gardener.cloud/service: codeql
   template:
     metadata:
       labels:
         app: {{ $podName }}
-        delivery-gear.gardener.cloud/service: crypto
+        delivery-gear.gardener.cloud/service: codeql
     spec:
       topologySpreadConstraints:
         - maxSkew: 1
@@ -38,7 +38,7 @@ spec:
           command:
             - python3
             - -m
-            - crypto_extension
+            - codeql
           securityContext:
             allowPrivilegeEscalation: false
           env:
@@ -53,16 +53,10 @@ spec:
             - name: K8S_TARGET_NAMESPACE
               value: {{ .Values.target_namespace | default .Release.Namespace }}
           volumeMounts:
-            - name: aws
-              mountPath: /secrets/aws
             - name: github
               mountPath: /secrets/github
             - name: github-app
               mountPath: /secrets/github-app
-            - name: kubernetes
-              mountPath: /secrets/kubernetes
-            - name: oci-registry
-              mountPath: /secrets/oci-registry
             - name: extensions-cfg
               mountPath: /extensions_cfg
             - name: findings-cfg
@@ -71,7 +65,7 @@ spec:
               mountPath: /ocm_repo_mappings
               readOnly: true
           lifecycle:
-            preStop: # hook ensures that just created pods have at least enough time alive to add a termination signal handler
+            preStop:
               exec:
                 command:
                   - sleep
@@ -81,10 +75,6 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
       volumes:
-        - name: aws
-          secret:
-            secretName: secret-factory-aws
-            optional: true # aws client is optional
         - name: github
           secret:
             secretName: secret-factory-github
@@ -93,14 +83,6 @@ spec:
           secret:
             secretName: secret-factory-github-app
             optional: true
-        - name: kubernetes
-          secret:
-            secretName: secret-factory-kubernetes
-            optional: true # might use incluster config
-        - name: oci-registry
-          secret:
-            secretName: secret-factory-oci-registry
-            optional: true # oci authentication is optional
         - name: extensions-cfg
           configMap:
             name: extensions-cfg
@@ -114,7 +96,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-egress-from-crypto
+  name: allow-egress-from-codeql
   namespace: {{ .Values.target_namespace | default .Release.Namespace }}
 spec:
   podSelector:

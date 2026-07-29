@@ -578,7 +578,7 @@ def reconcile(
     group: str = odgm.ODGMeta.group,
     plural: str = odgm.ODGMeta.plural,
     resource_version: str = '',
-):
+) -> str:
     """
     watches for events of ODG custom-resource
     creates, updates and deletes ODG installations using managed-resources
@@ -592,7 +592,7 @@ def reconcile(
         version='v1',
         plural=plural,
         resource_version=resource_version,
-        timeout_seconds=0,
+        timeout_seconds=300,
     ):
         try:
             odg_raw = event['object']
@@ -790,20 +790,6 @@ def reconcile(
             else:
                 raise NotImplementedError(f'event type {event["type"]} not implemented')
 
-        except kubernetes.client.rest.ApiException as e:
-            if e.status == http.HTTPStatus.GONE:
-                resource_version = ''
-                logger.info('API resource watching expired, will start new watch')
-            else:
-                raise e
-
-        except urllib3.exceptions.ProtocolError:
-            # this is a known error which has no impact on the functionality, thus rather be
-            # degregated to a warning or even info
-            # [ref](https://github.com/kiwigrid/k8s-sidecar/issues/233#issuecomment-1332358459)
-            resource_version = ''
-            logger.info('API resource watching received protocol error, will start new watch')
-
         except ODGException as e:
             import traceback
 
@@ -818,6 +804,8 @@ def reconcile(
                 },
             )
             logger.error(e)
+
+    return resource_version
 
 
 def _iter_extension_definitions_from_resource_node(
@@ -988,12 +976,36 @@ if __name__ == '__main__':
     logger.info(f'known extension definitions: {[e.name for e in extension_definitions]}')
     kubernetes_api = k8s.util.kubernetes_api(kubeconfig_path=parsed.kubeconfig)
 
+    resource_version = ''
+
     while True:
-        reconcile(
-            extension_definitions=extension_definitions,
-            required_extensions=odg_operator_cfg.required_extension_names,
-            cluster_identity=odg_operator_cfg.cluster_identity,
-            component_descriptor_lookup=component_descriptor_lookup,
-            oci_client=oci_client,
-            kubernetes_api=kubernetes_api,
-        )
+        try:
+            resource_version = reconcile(
+                extension_definitions=extension_definitions,
+                required_extensions=odg_operator_cfg.required_extension_names,
+                cluster_identity=odg_operator_cfg.cluster_identity,
+                component_descriptor_lookup=component_descriptor_lookup,
+                oci_client=oci_client,
+                kubernetes_api=kubernetes_api,
+                resource_version=resource_version,
+            )
+
+        except kubernetes.client.rest.ApiException as e:
+            if e.status == http.HTTPStatus.GONE:
+                resource_version = ''
+                logger.info('API resource watching expired, will start new watch')
+            else:
+                raise e
+
+        except urllib3.exceptions.ProtocolError:
+            # this is a known error which has no impact on the functionality, thus rather be
+            # degregated to a warning or even info
+            # [ref](https://github.com/kiwigrid/k8s-sidecar/issues/233#issuecomment-1332358459)
+            resource_version = ''
+            logger.info('API resource watching received protocol error, will start new watch')
+
+        except urllib3.exceptions.MaxRetryError as e:
+            if not isinstance(e.reason, urllib3.exceptions.ProtocolError):
+                raise
+            resource_version = ''
+            logger.info('API resource watching received protocol error, will start new watch')

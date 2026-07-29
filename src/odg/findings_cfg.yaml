@@ -46,6 +46,27 @@
         malware_names:
           - .*
 
+- type: finding/codeql
+  filter:
+    - semantics: include
+      artefact_kind: source
+  issues:
+    enable_issues: False
+  categorisations:
+    - id: accepted
+      display_name: Accepted
+      value: 0
+      rescoring: manual
+      allowed_processing_time: ~
+    - id: not-enabled
+      display_name: Not Enabled
+      value: 16
+      allowed_processing_time: 0
+      rescoring: [manual, automatic]
+      selector:
+        codeql_status:
+          - .*
+
 - type: finding/sast
   issues:
     enable_issues: False

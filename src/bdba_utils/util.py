@@ -19,6 +19,7 @@ import odg.cvss
 import odg.findings
 import odg.model
 import odg_client
+import rescore.utility
 
 
 logger = logging.getLogger(__name__)
@@ -51,7 +52,6 @@ def iter_artefact_metadata(
     delivery_service_client: odg_client.DeliveryServiceClient,
     vulnerability_cfg: odg.findings.Finding | None = None,
     license_cfg: odg.findings.Finding | None = None,
-    create_rescorings_for_upstream_re_ratings: bool = False,
 ) -> collections.abc.Generator[odg.model.ArtefactMetadata, None, None]:
     now = datetime.datetime.now(tz=datetime.timezone.utc)
     discovery_date = datetime.date.today()
@@ -73,12 +73,9 @@ def iter_artefact_metadata(
     # rescoring should not reference artefact version so that the `ARTEFACT` rescoring scope will be
     # used -> rescoring will be used for future versions as well, so there is no need to replicate
     # BDBA triages to new BDBA scans
-    rescoring_artefact_ref = dataclasses.replace(
-        finding_artefact_ref,
-        artefact=dataclasses.replace(
-            finding_artefact_ref.artefact,
-            artefact_version=None,
-        ),
+    rescoring_artefact_ref = rescore.utility.scoped_component_artefact_id(
+        component_artefact_id=artefact_ref,
+        scope=odg.model.ArtefactMetadataSpecificity.ARTEFACT,
     )
 
     existing_findings_by_key = {
@@ -252,8 +249,7 @@ def iter_artefact_metadata(
                 yield artefact_metadata
 
                 if (
-                    create_rescorings_for_upstream_re_ratings
-                    and (existing_finding := existing_findings_by_key.get(artefact_metadata.key))
+                    (existing_finding := existing_findings_by_key.get(artefact_metadata.key))
                     and existing_finding.data.cvss_v3_score != artefact_metadata.data.cvss_v3_score
                     and existing_finding.data.severity != artefact_metadata.data.severity
                     and existing_finding.allowed_processing_time

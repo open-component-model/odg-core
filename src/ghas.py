@@ -4,20 +4,16 @@ import atexit
 import collections.abc
 import dataclasses
 import datetime
-import functools
 import logging
 
 import dacite
-import requests
-import requests.adapters
-import urllib3.util.retry
-
 import ci.log
 import cnudie.retrieve
 import ocm
 import ocm.util
 
 import ctx_util
+import github_util
 import k8s.logging
 import lookups
 import odg.extensions_cfg
@@ -27,7 +23,6 @@ import odg.util
 import odg_client
 import paths
 import secret_mgmt
-import secret_mgmt.github
 import util
 
 
@@ -45,117 +40,6 @@ class SecretAlert:
     resolution: str | None
     locations_url: str | None
     url: str | None
-
-
-@functools.cache
-def find_token_for_repo_url(
-    secret_factory: secret_mgmt.SecretFactory,
-    repo_url: str,
-) -> str | None:
-    github_api = secret_mgmt.github.github_api(
-        secret_factory=secret_factory,
-        repo_url=repo_url,
-        absent_ok=True,
-    )
-
-    if not github_api:
-        logger.error(f'No GitHub token found for {repo_url=}')
-        return None
-
-    return github_api.session.auth.token
-
-
-@functools.cache
-def find_token_for_api_url(
-    secret_factory: secret_mgmt.SecretFactory,
-    api_url: str,
-) -> str | None:
-    hostname = util.urlparse(api_url).hostname
-    path_parts = util.urlparse(api_url).path.strip('/').split('/')
-
-    if len(path_parts) < 2:
-        logger.error(f'Cannot determine repo/org from {api_url=}')
-        return None
-
-    org = path_parts[3]
-    repo_url = f'{hostname}/{org}'
-
-    return find_token_for_repo_url(
-        secret_factory=secret_factory,
-        repo_url=repo_url,
-    )
-
-
-def github_api_request(
-    url: str,
-    secret_factory: secret_mgmt.SecretFactory,
-    token: str | None = None,
-) -> tuple[list | dict | None, str | None]:
-    """
-    Perform a single authenticated GET request to the GitHub API.
-
-    Returns a tuple of (response_body, next_url), where response_body is the
-    parsed JSON (list or dict) and next_url is the URL of the next page taken
-    from the Link header, or None if there are no further pages. Both values
-    are None if the request fails.
-    """
-    if not token:
-        token = find_token_for_api_url(
-            secret_factory=secret_factory,
-            api_url=url,
-        )
-
-    if not token:
-        return None, None
-
-    # setup session with retry configuration
-    session = requests.Session()
-    retries = urllib3.util.retry.Retry(
-        total=5,
-        backoff_factor=1,
-        status_forcelist=[429, 500, 502, 503, 504],
-        allowed_methods=['GET'],
-    )
-    session.mount('https://', requests.adapters.HTTPAdapter(max_retries=retries))
-
-    try:
-        response = session.get(
-            url,
-            headers={
-                'Authorization': f'token {token}',
-                'Accept': 'application/vnd.github+json',
-            },
-            timeout=30,
-        )
-        response.raise_for_status()
-        next_url = response.links.get('next', {}).get('url')
-        return response.json(), next_url
-    except Exception as e:
-        logger.error(f'GitHub API request failed for {url}: {e}')
-        return None, None
-
-
-def github_api_request_paginated(
-    url: str,
-    secret_factory: secret_mgmt.SecretFactory,
-) -> collections.abc.Iterable[dict]:
-    next_url = url
-
-    while next_url:
-        # `next_url` might not contain the org-name but only the org-id, hence use default url
-        token = find_token_for_api_url(
-            secret_factory=secret_factory,
-            api_url=url,
-        )
-
-        page_items, next_url = github_api_request(
-            url=next_url,
-            secret_factory=secret_factory,
-            token=token,
-        )
-
-        if page_items:
-            yield from page_items
 
 
 def get_secret_alerts(
@@ -186,7 +70,7 @@ def get_secret_alerts(
     seen_urls = set()
 
     # default alerts
-    for alert_raw in github_api_request_paginated(
+    for alert_raw in github_util.github_api_request_paginated(
         url=url,
         secret_factory=secret_factory,
     ):
@@ -198,7 +82,7 @@ def get_secret_alerts(
     # generic alerts
     url = f'{url}&secret_type={",".join(secret_types)}'
 
-    for alert_raw in github_api_request_paginated(
+    for alert_raw in github_util.github_api_request_paginated(
         url=url,
         secret_factory=secret_factory,
     ):
@@ -256,7 +140,7 @@ def html_url_for_location(
     if not api_url:
         return None
 
-    result, _ = github_api_request(
+    result, _ = github_util.github_api_request(
         url=api_url,
         secret_factory=secret_factory,
     )
@@ -276,7 +160,7 @@ def iter_secret_locations(
         )
         return
 
-    result, _ = github_api_request(
+    result, _ = github_util.github_api_request(
         url=location_url,
         secret_factory=secret_factory,
     )
@@ -521,7 +405,7 @@ def scan(
         html_url = stale_finding.data.html_url
         api_url = stale_finding.data.url
 
-        stale_alert_data, _ = github_api_request(
+        stale_alert_data, _ = github_util.github_api_request(
             url=api_url,
             secret_factory=secret_factory,
         )

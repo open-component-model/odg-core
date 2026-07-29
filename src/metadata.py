@@ -1002,7 +1002,13 @@ class ArtefactMetadataQuery(aiohttp.web.View):
                 yield query
 
             if artefact_ref.artefact_kind:
-                yield dm.ArtefactMetaData.artefact_kind == artefact_ref.artefact_kind
+                yield sa.or_(
+                    sa.and_(
+                        none_ok,
+                        dm.ArtefactMetaData.artefact_kind.is_(None),
+                    ),
+                    dm.ArtefactMetaData.artefact_kind == artefact_ref.artefact_kind,
+                )
 
             if not artefact_ref.artefact:
                 return
@@ -1035,12 +1041,18 @@ class ArtefactMetadataQuery(aiohttp.web.View):
                 )
 
             if artefact_extra_id := artefact_ref.artefact.normalised_artefact_extra_id:
+                stripped_artefact_extra_id = odg.model.normalise_artefact_extra_id(
+                    artefact_extra_id=artefact_ref.artefact.artefact_extra_id,
+                    omit_version=True,
+                )
+
                 yield sa.or_(
                     sa.and_(
                         none_ok,
                         dm.ArtefactMetaData.artefact_extra_id_normalised == '',
                     ),
                     dm.ArtefactMetaData.artefact_extra_id_normalised == artefact_extra_id,
+                    dm.ArtefactMetaData.artefact_extra_id_normalised == stripped_artefact_extra_id,
                 )
 
         async def artefact_refs_queries(artefact_refs: list[odg.model.ComponentArtefactId]):

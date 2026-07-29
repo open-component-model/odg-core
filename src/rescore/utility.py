@@ -1,4 +1,5 @@
 import collections.abc
+import copy
 import datetime
 import json
 import re
@@ -20,14 +21,26 @@ def _iter_rescorings_for_finding(
     finding: odg.model.ArtefactMetadata,
     rescorings: collections.abc.Iterable[odg.model.ArtefactMetadata],
 ) -> collections.abc.Generator[odg.model.ArtefactMetadata, None, None]:
+    normalised_finding_extra_identity = odg.model.normalise_artefact_extra_id(
+        artefact_extra_id=finding.artefact.artefact.artefact_extra_id,
+        omit_version=True,
+    )
+
     for rescoring in rescorings:
         if rescoring.data.referenced_type != finding.meta.type:
             continue
 
-        if rescoring.artefact.artefact_kind != finding.artefact.artefact_kind:
+        if (
+            rescoring.artefact.artefact_kind
+            and rescoring.artefact.artefact_kind != finding.artefact.artefact_kind
+        ):
             continue
 
-        if rescoring.artefact.artefact.artefact_type != finding.artefact.artefact.artefact_type:
+        if (
+            rescoring.artefact.artefact
+            and rescoring.artefact.artefact.artefact_type
+            and rescoring.artefact.artefact.artefact_type != finding.artefact.artefact.artefact_type
+        ):
             continue
 
         if (
@@ -44,22 +57,28 @@ def _iter_rescorings_for_finding(
             continue
 
         if (
-            rescoring.artefact.artefact.artefact_name
+            rescoring.artefact.artefact
+            and rescoring.artefact.artefact.artefact_name
             and rescoring.artefact.artefact.artefact_name != finding.artefact.artefact.artefact_name
         ):
             continue
 
         if (
-            rescoring.artefact.artefact.artefact_version
+            rescoring.artefact.artefact
+            and rescoring.artefact.artefact.artefact_version
             and rescoring.artefact.artefact.artefact_version
             != finding.artefact.artefact.artefact_version
         ):
             continue
 
         if (
-            rescoring.artefact.artefact.artefact_extra_id
-            and rescoring.artefact.artefact.normalised_artefact_extra_id
-            != finding.artefact.artefact.normalised_artefact_extra_id
+            rescoring.artefact.artefact
+            and rescoring.artefact.artefact.artefact_extra_id
+            and odg.model.normalise_artefact_extra_id(
+                artefact_extra_id=rescoring.artefact.artefact.artefact_extra_id,
+                omit_version=True,
+            )
+            != normalised_finding_extra_identity
         ):
             continue
 
@@ -82,6 +101,7 @@ def _iter_rescorings_for_finding(
                 rescoring.data.finding.labels,
             ) != sorted(finding.data.labels):
                 continue
+
         else:
             if rescoring.data.finding.key != finding.data.key:
                 continue
@@ -95,8 +115,7 @@ def rescorings_for_finding_by_specificity(
 ) -> tuple[odg.model.ArtefactMetadata]:
     """
     Returns all rescorings of `rescorings` which match the given `finding`. If multiple
-    rescorings match the finding, they are ordered based on their specificity (greatest
-    specificity first and if the specificity is the same, the latest rescorings wins).
+    rescorings match the finding, they are ordered based on their creation date.
     """
     rescorings_for_finding = _iter_rescorings_for_finding(
         finding=finding,
@@ -106,13 +125,65 @@ def rescorings_for_finding_by_specificity(
     return tuple(
         sorted(
             rescorings_for_finding,
-            key=lambda rescoring: (
-                rescoring.specificity,
-                util.normalise_date(rescoring.meta.creation_date),
-            ),
+            key=lambda rescoring: util.normalise_date(rescoring.meta.creation_date),
             reverse=True,
         ),
     )
+
+
+def _scoped_artefact_id(
+    artefact_id: odg.model.LocalArtefactId | None,
+    scope: odg.model.ArtefactMetadataSpecificity,
+) -> odg.model.LocalArtefactId:
+    if not artefact_id:
+        return odg.model.LocalArtefactId()
+
+    artefact_id = copy.deepcopy(artefact_id)
+
+    if scope <= odg.model.ArtefactMetadataSpecificity.GLOBAL:
+        pass
+
+    if scope <= odg.model.ArtefactMetadataSpecificity.COMPONENT:
+        artefact_id.artefact_name = None
+        artefact_id.artefact_type = None
+        artefact_id.artefact_extra_id = {}
+
+    if scope <= odg.model.ArtefactMetadataSpecificity.ARTEFACT:
+        artefact_id.artefact_version = None
+
+        if 'version' in artefact_id.artefact_extra_id:
+            del artefact_id.artefact_extra_id['version']
+
+    if scope <= odg.model.ArtefactMetadataSpecificity.SINGLE:
+        pass
+
+    return artefact_id
+
+
+def scoped_component_artefact_id(
+    component_artefact_id: odg.model.ComponentArtefactId,
+    scope: odg.model.ArtefactMetadataSpecificity,
+) -> odg.model.ComponentArtefactId:
+    component_artefact_id = copy.deepcopy(component_artefact_id)
+
+    if scope <= odg.model.ArtefactMetadataSpecificity.GLOBAL:
+        component_artefact_id.component_name = None
+
+    if scope <= odg.model.ArtefactMetadataSpecificity.COMPONENT:
+        component_artefact_id.artefact_kind = None
+
+    if scope <= odg.model.ArtefactMetadataSpecificity.ARTEFACT:
+        component_artefact_id.component_version = None
+
+    if scope <= odg.model.ArtefactMetadataSpecificity.SINGLE:
+        pass
+
+    component_artefact_id.artefact = _scoped_artefact_id(
+        artefact_id=component_artefact_id.artefact,
+        scope=scope,
+    )
+
+    return component_artefact_id
 
 
 def find_cve_categorisation(

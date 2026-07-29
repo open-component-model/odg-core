@@ -516,6 +516,43 @@ extensions_cfg:
     # - warning: skip processing and log a warning message (default)
     on_unsupported: warning
 
+  # @param extensions_cfg.codeql worker which checks whether GitHub Advanced Security CodeQL is
+  # actively scanning each OCM source artefact. A finding is created for every language present in
+  # the repository that is not covered by an active CodeQL analysis — including the case where
+  # CodeQL is not enabled at all. Languages not supported by CodeQL (e.g. yaml, dockerfile) can be
+  # excluded via the languages parameter to suppress false positives.
+  codeql:
+    # @param extensions_cfg.codeql.enabled allows disabling of extension without removing its
+    # configuration
+    enabled: true
+    # @param extensions_cfg.codeql.delivery_service_url url to access the delivery-service (cluster
+    # internal url is sufficient)
+    # e.g.
+    # delivery_service_url: http://delivery-service.<namespace>.svc.cluster.local:8080
+    delivery_service_url: ""
+    # @param extensions_cfg.codeql.interval time (in seconds) after which a component should be
+    # re-checked the latest
+    interval: 86400 # 24h
+    # @param extensions_cfg.codeql.languages optional list of languages to exclude from CodeQL
+    # coverage checks. By default (empty list), a finding is created for every language present in
+    # the repository that is not actively scanned by CodeQL. If non-empty, the listed languages are
+    # skipped regardless of their CodeQL status — useful to suppress findings for languages CodeQL
+    # does not support (e.g. 'yaml', 'dockerfile', 'shell'). Use GitHub repository language names.
+    # See: https://docs.github.com/en/rest/repos/repos#list-repository-languages
+    # e.g.
+    # languages:
+    #   - yaml
+    #   - dockerfile
+    #   - shell
+    languages: []
+    # @param extensions_cfg.codeql.on_unsupported behaviour in case the detected artefact
+    # kind/type/access is not supported
+    # options:
+    # - fail: raise an exception
+    # - ignore: skip processing
+    # - warning: skip processing and log a warning message (default)
+    on_unsupported: warning
+
   # @param extensions_cfg.issue_replicator worker which takes care of the GitHub issue lifecycle for
   # detected findings
   issue_replicator:
@@ -732,6 +769,11 @@ extensions_cfg:
     # - syft (default)
     # - bdba
     generation_mode: syft
+    # @param extensions_cfg.sbom_generator.on_exist controls how to behave in case a to-be generated
+    # SBoM exists already, following options are supported:
+    # - overwrite (default)
+    # - skip
+    on_exist: overwrite
     # @param extensions_cfg.sbom_generator.output_format define desired SBoM format, following
     # options are supported:
     # cyclonedx (default)
@@ -1163,6 +1205,7 @@ features_cfg:
 findings:
     # @param findings[].type type of finding this configuration is used for
     # options:
+    # - finding/codeql
     # - finding/crypto
     # - finding/diki
     # - finding/falco
@@ -1543,6 +1586,7 @@ profiles:
     # @param profiles[].finding_types list of finding types which should be displayed for users who
     # selected this profile in the delivery-dashboard
     # options:
+    # - finding/codeql
     # - finding/crypto
     # - finding/diki
     # - finding/falco

@@ -117,6 +117,11 @@ async def _find_rescorings(
     artefact: odg.model.ComponentArtefactId,
     type_filter: list[str] = [],
 ) -> list[odg.model.ArtefactMetadata]:
+    stripped_artefact_extra_id = odg.model.normalise_artefact_extra_id(
+        artefact_extra_id=artefact.artefact.artefact_extra_id,
+        omit_version=True,
+    )
+
     db_statement = sa.select(dm.ArtefactMetaData).where(
         sa.and_(
             dm.ArtefactMetaData.type == odg.model.Datatype.RESCORING,
@@ -145,9 +150,18 @@ async def _find_rescorings(
                 dm.ArtefactMetaData.artefact_extra_id_normalised == '',
                 dm.ArtefactMetaData.artefact_extra_id_normalised
                 == artefact.artefact.normalised_artefact_extra_id,
+                dm.ArtefactMetaData.artefact_extra_id_normalised == stripped_artefact_extra_id,
             ),
-            dm.ArtefactMetaData.artefact_kind == artefact.artefact_kind,
-            dm.ArtefactMetaData.artefact_type == artefact.artefact.artefact_type,
+            sa.or_(
+                dm.ArtefactMetaData.artefact_kind == sa.null(),
+                dm.ArtefactMetaData.artefact_kind == '',
+                dm.ArtefactMetaData.artefact_kind == artefact.artefact_kind,
+            ),
+            sa.or_(
+                dm.ArtefactMetaData.artefact_type == sa.null(),
+                dm.ArtefactMetaData.artefact_type == '',
+                dm.ArtefactMetaData.artefact_type == artefact.artefact.artefact_type,
+            ),
         ),
     )
 
@@ -169,6 +183,11 @@ async def _find_scanner_writebacks(
     db_session: sqlasync.session.AsyncSession,
     artefact: odg.model.ComponentArtefactId,
 ) -> list[odg.model.ArtefactMetadata]:
+    stripped_artefact_extra_id = odg.model.normalise_artefact_extra_id(
+        artefact_extra_id=artefact.artefact.artefact_extra_id,
+        omit_version=True,
+    )
+
     db_statement = sa.select(dm.ArtefactMetaData).where(
         sa.and_(
             dm.ArtefactMetaData.type == odg.model.Datatype.SCANNER_WRITEBACK,
@@ -196,9 +215,18 @@ async def _find_scanner_writebacks(
                 dm.ArtefactMetaData.artefact_extra_id_normalised == '',
                 dm.ArtefactMetaData.artefact_extra_id_normalised
                 == artefact.artefact.normalised_artefact_extra_id,
+                dm.ArtefactMetaData.artefact_extra_id_normalised == stripped_artefact_extra_id,
             ),
-            dm.ArtefactMetaData.artefact_kind == artefact.artefact_kind,
-            dm.ArtefactMetaData.artefact_type == artefact.artefact.artefact_type,
+            sa.or_(
+                dm.ArtefactMetaData.artefact_kind == sa.null(),
+                dm.ArtefactMetaData.artefact_kind == '',
+                dm.ArtefactMetaData.artefact_kind == artefact.artefact_kind,
+            ),
+            sa.or_(
+                dm.ArtefactMetaData.artefact_type == sa.null(),
+                dm.ArtefactMetaData.artefact_type == '',
+                dm.ArtefactMetaData.artefact_type == artefact.artefact.artefact_type,
+            ),
         ),
     )
 

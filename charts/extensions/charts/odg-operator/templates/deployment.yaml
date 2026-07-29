@@ -72,13 +72,10 @@ spec:
             - name: extension-definitions
               mountPath: /extension-definitions/
           {{- end}}
+          {{- with (.Values.deployment).resources }}
           resources:
-            requests:
-              memory: 128Mi
-              cpu: 32m
-            limits:
-              memory: 1024Mi
-              cpu: 256m
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       volumes:
         - name: ocm-repo-mappings
           configMap:

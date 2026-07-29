@@ -249,8 +249,6 @@ jobs:
           if ! pip3 install --pre --upgrade --break-system-packages \
             --find-links /tmp/dist \
             -r requirements-dev.txt \
-            "pytest<9.1" \
-            pytest-asyncio \
               > /tmp/pip3-install.log; then
             echo "error while trying to install packages:"
             cat /tmp/pip3-install.log

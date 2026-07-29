@@ -93,6 +93,16 @@ class SASTFindingSelector:
 
 
 @dataclasses.dataclass
+class CodeqlFindingSelector:
+    """
+    :param list[str] codeql_status:
+        List of regexes to determine matching CodeQL status values.
+    """
+
+    codeql_status: list[str]
+
+
+@dataclasses.dataclass
 class VulnerabilityFindingSelector:
     """
     :param MinMaxRange cve_score_range:
@@ -146,7 +156,8 @@ class FindingCategorisation:
     allowed_processing_time: MetaAllowedProcessingTimes | str | int | None
     rescoring: RescoringModes | list[RescoringModes] | None
     selector: (
-        CryptoFindingSelector
+        CodeqlFindingSelector
+        | CryptoFindingSelector
         | GHASFindingSelector
         | IPFindingSelector
         | LicenseFindingSelector
@@ -520,6 +531,8 @@ class Finding:
 
     def _validate(self):
         match self.type:
+            case odg.model.Datatype.CODEQL_FINDING:
+                self._validate_codeql()
             case odg.model.Datatype.OSID_FINDING:
                 self._validate_osid()
             case odg.model.Datatype.CRYPTO_FINDING:
@@ -551,6 +564,18 @@ class Finding:
         if not violations:
             return
         e = ModelValidationError('osid finding model violations found:')
+        e.add_note('\n'.join(violations))
+        raise e
+
+    def _validate_codeql(self):
+        violations = self._validate_categorisations(
+            expected_selector=CodeqlFindingSelector,
+        )
+
+        if not violations:
+            return
+
+        e = ModelValidationError('codeql finding model violations found:')
         e.add_note('\n'.join(violations))
         raise e
 
@@ -893,6 +918,11 @@ def categorise_finding(
         elif isinstance(selector, SASTFindingSelector):
             for selector_sub_type in selector.sub_types:
                 if re.fullmatch(selector_sub_type, finding_property, re.IGNORECASE):
+                    return categorisation
+
+        elif isinstance(selector, CodeqlFindingSelector):
+            for selector_codeql_status in selector.codeql_status:
+                if re.fullmatch(selector_codeql_status, finding_property, re.IGNORECASE):
                     return categorisation
 
         elif isinstance(selector, VulnerabilityFindingSelector):

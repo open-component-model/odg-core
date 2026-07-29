@@ -1,4 +1,4 @@
-.PHONY: help setup lint format test build-clients build-core build-docker run clean
+.PHONY: help setup lint format test build-clients build-core build-docker run-db run clean
 
 # Configuration variables with defaults
 DB_PASSWORD ?= MyPassword
@@ -18,6 +18,7 @@ help:
 	@echo "  build-clients - Build bdba and odg client packages"
 	@echo "  build-core    - Build odg-core-libs package"
 	@echo "  build-docker  - Build Docker image"
+	@echo "  run-db        - Run a PostgreSQL database instance"
 	@echo "  run           - Run the development server"
 	@echo "  clean         - Remove build artifacts"
 	@echo ""
@@ -35,6 +36,22 @@ help:
 setup:
 	@echo "Installing development dependencies..."
 	@pip3 install --break-system-packages -r requirements-dev.txt
+	@echo "Generating RSA key pair as signing configuration..."
+	@keypath=$$(mktemp); \
+	unlink "$${keypath}"; \
+	ssh-keygen -t rsa -b 4096 -f "$${keypath}" -m PEM -N "" < /dev/null; \
+	private_key=$$(cat "$${keypath}"); \
+	public_key=$$(openssl rsa -in "$${keypath}" -pubout -outform PEM 2>/dev/null); \
+	unlink "$${keypath}"; \
+	unlink "$${keypath}.pub"; \
+	{ \
+		printf 'algorithm: RS256\n'; \
+		printf 'id: %s\n' "$$(python3 -c 'import uuid; print(uuid.uuid4())')"; \
+		printf 'private_key: |\n'; \
+		echo "$${private_key}" | sed 's/^/  /'; \
+		printf 'public_key: |\n'; \
+		echo "$${public_key}" | sed 's/^/  /'; \
+	} > src/secrets/signing-cfg/local.yaml
 	@echo "Setup complete"
 
 # Linting
@@ -93,6 +110,17 @@ build-docker:
 		-f Dockerfile \
 		.
 	@echo "Docker image built: odg-core:$(ODG_CORE_LIBS_VERSION)"
+
+# Run PostgreSQL database instance
+run-db:
+	@echo "Starting PostgreSQL database instance..."
+	@echo "Database port: $(DB_PORT)"
+	@docker run -dit --name postgres \
+		-e "POSTGRES_USER=$(DB_USER)" \
+		-e "POSTGRES_PASSWORD=$(DB_PASSWORD)" \
+		-e "POSTGRES_DB=$(DB_NAME)" \
+		-p "$(DB_PORT):5432" \
+		postgres:16
 
 # Run development server
 run:

@@ -59,6 +59,7 @@ def iter_policy_violations(
                     cve=finding.data.cve,
                 ),
                 referenced_type=odg.model.Datatype.VULNERABILITY_FINDING,
+                severity=rescoring.data.severity,
                 artefact=finding.artefact,
             )
         if rescoring.data.due_date:
@@ -70,12 +71,16 @@ def iter_policy_violations(
             deadline = discovery_date + allowed_time
 
     if deadline and deadline < release_date:
+        severity = (
+            sorted_rescorings[-1].data.severity if sorted_rescorings else finding.data.severity
+        )
         yield odg.model.SlaViolation(
             finding=odg.model.RescoringVulnerabilityFinding(
                 package_name=finding.data.package_name,
                 cve=finding.data.cve,
             ),
             referenced_type=odg.model.Datatype.VULNERABILITY_FINDING,
+            severity=severity,
             artefact=finding.artefact,
         )
 
