@@ -285,11 +285,7 @@ class JSONFormatter(logging.Formatter):
     def formatMessage(self, record) -> str:
         # Check if json module was already cleared during interpreter shutdown
         if json is None:
-            # Fallback: Manually escape to guarantee valid JSON output
-            escaped_msg = str(record.message)
-                .replace('\\', '\\\\').replace('"', '\\"')
-                .replace('\n', '\\n').replace('\r', '\\r')
-            record.message = f'"{escaped_msg}"'
+            record.message = '"json module already unloaded during interpreter shutdown"'
         else:
             record.message = json.dumps(record.message)
         if (size := len(record.message.encode('utf-8'))) > 10000:
