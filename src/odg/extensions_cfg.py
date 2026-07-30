@@ -831,6 +831,10 @@ class SlaViolationProfilerConfig(ExtensionCfgMixins):
     service: Services = Services.SLA_VIOLATION_PROFILER
     delivery_service_url: str
     components: list[Component]
+    github_repository: str | None = None
+    branch: str = 'master'
+    filename: str = 'report.md'
+    auto_merge: bool = False
 
 
 @dataclasses.dataclass(kw_only=True)

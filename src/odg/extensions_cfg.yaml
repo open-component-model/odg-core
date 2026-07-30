@@ -119,3 +119,4 @@ sla_violation_profiler:
       time_range:
         days_from: -365
         days_to: 0
+  github_repository: my-github-repository # <str> optional
