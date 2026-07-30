@@ -750,9 +750,11 @@ extensions_cfg:
     # removing its configuration
     enabled: true
     # @param extensions_cfg.sla_violation_profiler.delivery_service_url url to access the
-    # delivery-service (cluster internal url is sufficient)
+    # delivery-service; note: this url will be embedded in the published report, so an externally
+    # accessible url should be used here (a cluster-internal url would not be reachable by readers
+    # of the report)
     # e.g.
-    # delivery_service_url: http://delivery-service.<namespace>.svc.cluster.local:8080
+    # delivery_service_url: https://delivery-service.example.com
     delivery_service_url: ""
     # @param extensions_cfg.sla_violation_profiler.components list of OCM components to scan for
     # SLA violations
@@ -778,18 +780,20 @@ extensions_cfg:
           days_to: 0
     # @param extensions_cfg.sla_violation_profiler.github_repository name of the GitHub repository
     # where the SLA violation report should be published as a pull request; if not set the report
-    # is only stored in the delivery-service database (optional)
+    # is generated as a markdown file inside the pod only and not published anywhere (optional)
     # e.g.
     # github_repository: github.com/<org-name>/<repository-name>
     github_repository: null
     # @param extensions_cfg.sla_violation_profiler.branch the name of the branch to publish the
-    # report to
+    # report to (only relevant if github_repository is set)
     branch: master
     # @param extensions_cfg.sla_violation_profiler.filename the relative path in the target
-    # repository to the file containing the SLA violation report
+    # repository to the file containing the SLA violation report (only relevant if
+    # github_repository is set)
     filename: report.md
     # @param extensions_cfg.sla_violation_profiler.auto_merge whether or not to automatically merge
-    # the pull request which updates the generated report
+    # the pull request which updates the generated report (only relevant if github_repository is
+    # set)
     auto_merge: false
 
   # @param extensions_cfg.sbom_generator worker which generates SBoM documents for OCM artefacts and
