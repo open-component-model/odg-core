@@ -253,8 +253,8 @@ def next_older_month(date: datetime.datetime) -> datetime.datetime:
 
 
 def can_process(dependency_update: components.ComponentVector):
-    old_main_source = ocm.util.main_source(dependency_update.start, no_source_ok=True)
-    new_main_source = ocm.util.main_source(dependency_update.end, no_source_ok=True)
+    old_main_source = ocm.util.main_source(dependency_update.start)
+    new_main_source = ocm.util.main_source(dependency_update.end)
 
     if not old_main_source or not new_main_source:
         return False
@@ -351,11 +351,9 @@ def categorize_by_changed_component(
 
             left_src = ocm.util.main_source(
                 left_component,
-                no_source_ok=True,
             )
             right_src = ocm.util.main_source(
                 right_component,
-                no_source_ok=True,
             )
 
             if not left_src or not right_src:
