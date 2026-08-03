@@ -253,8 +253,11 @@ def next_older_month(date: datetime.datetime) -> datetime.datetime:
 
 
 def can_process(dependency_update: components.ComponentVector):
-    old_main_source = ocm.util.main_source(dependency_update.start)
-    new_main_source = ocm.util.main_source(dependency_update.end)
+    old_main_source = ocm.util.main_source(dependency_update.start, no_source_ok=True)
+    new_main_source = ocm.util.main_source(dependency_update.end, no_source_ok=True)
+
+    if not old_main_source or not new_main_source:
+        return False
 
     if not isinstance(old_main_source.access, ocm.GithubAccess) or not isinstance(
         new_main_source.access,
