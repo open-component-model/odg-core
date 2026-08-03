@@ -351,9 +351,11 @@ def categorize_by_changed_component(
 
             left_src = ocm.util.main_source(
                 left_component,
+                no_source_ok=True,
             )
             right_src = ocm.util.main_source(
                 right_component,
+                no_source_ok=True,
             )
 
             if not left_src or not right_src:
