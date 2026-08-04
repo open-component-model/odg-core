@@ -743,6 +743,59 @@ extensions_cfg:
     # - warning: skip processing and log a warning message (default)
     on_unsupported: warning
 
+  # @param extensions_cfg.sla_violation_profiler cronjob which scans OCM components for SLA
+  # violations and optionally publishes a report to a GitHub repository
+  sla_violation_profiler:
+    # @param extensions_cfg.sla_violation_profiler.enabled allows disabling of extension without
+    # removing its configuration
+    enabled: true
+    # @param extensions_cfg.sla_violation_profiler.delivery_service_url url to access the
+    # delivery-service; note: this url will be embedded in the published report, so an externally
+    # accessible url should be used here (a cluster-internal url would not be reachable by readers
+    # of the report)
+    # e.g.
+    # delivery_service_url: https://delivery-service.example.com
+    delivery_service_url: ""
+    # @param extensions_cfg.sla_violation_profiler.components list of OCM components to scan for
+    # SLA violations
+    components:
+        # @param extensions_cfg.sla_violation_profiler.components[].component_name name of the OCM
+        # component
+        # e.g.
+        # component_name: ocm.software/open-delivery-gear
+      - component_name: ""
+        # @param extensions_cfg.sla_violation_profiler.components[].ocm_repo_url may be used to
+        # overwrite the default lookup via ocm_repo_mappings
+        ocm_repo_url: null
+        # @param extensions_cfg.sla_violation_profiler.components[].version version of the component
+        # to scan. Use "greatest" to always scan the latest version
+        version: greatest
+        # @param extensions_cfg.sla_violation_profiler.components[].max_versions_limit maximum number
+        # of versions to evaluate
+        max_versions_limit: 1
+        # @param extensions_cfg.sla_violation_profiler.components[].time_range time interval used to
+        # retrieve the component versions to evaluate
+        time_range:
+          days_from: -365
+          days_to: 0
+    # @param extensions_cfg.sla_violation_profiler.github_repository name of the GitHub repository
+    # where the SLA violation report should be published as a pull request; if not set the report
+    # is generated as a markdown file inside the pod only and not published anywhere (optional)
+    # e.g.
+    # github_repository: github.com/<org-name>/<repository-name>
+    github_repository: null
+    # @param extensions_cfg.sla_violation_profiler.branch the name of the branch to publish the
+    # report to (only relevant if github_repository is set)
+    branch: master
+    # @param extensions_cfg.sla_violation_profiler.filename the relative path in the target
+    # repository to the file containing the SLA violation report (only relevant if
+    # github_repository is set)
+    filename: report.md
+    # @param extensions_cfg.sla_violation_profiler.auto_merge whether or not to automatically merge
+    # the pull request which updates the generated report (only relevant if github_repository is
+    # set)
+    auto_merge: false
+
   # @param extensions_cfg.sbom_generator worker which generates SBoM documents for OCM artefacts and
   # stores them in ODG database. Downloadable via API or ODG-UI
   sbom_generator:
