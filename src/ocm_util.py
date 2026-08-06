@@ -9,6 +9,7 @@ import oci.client
 import oci.model
 import ocm
 import ocm.iter
+import ocm.oci
 import tarutil
 
 import odg.model
@@ -49,7 +50,15 @@ def local_blob_access_as_blob_descriptor(
         )
 
         if isinstance(manifest, oci.model.OciImageManifestList):
-            raise ValueError('component-descriptor manifest must not be a manifest list')
+            component_descriptor_manifest_digest = ocm.oci.find_component_descriptor_manifest_digest(
+                index_manifest=manifest,
+            )
+
+            manifest = oci_client.manifest(
+                image_reference=oci.model.OciImageReference(image_reference).with_tag(
+                    tag=component_descriptor_manifest_digest,
+                ),
+            )
 
         for layer in manifest.layers:
             if layer.digest == digest:
@@ -172,6 +181,8 @@ def iter_content_for_resource_node(
     access = resource_node.resource.access
 
     if access.type is ocm.AccessType.OCI_REGISTRY:
+        access: ocm.OciAccess
+
         return image_layers_as_tarfile_generator(
             image_reference=access.imageReference,
             oci_client=oci_client,
@@ -180,6 +191,8 @@ def iter_content_for_resource_node(
         )
 
     elif access.type is ocm.AccessType.S3:
+        access: ocm.S3Access | ocm.LegacyS3Access
+
         aws_secret = secret_mgmt.aws.find_cfg(
             secret_factory=secret_factory,
             secret_name=aws_secret_name,
@@ -196,11 +209,29 @@ def iter_content_for_resource_node(
         )
 
     elif access.type is ocm.AccessType.LOCAL_BLOB:
+        access: ocm.LocalBlobAccess
+
         ocm_repo = resource_node.component.current_ocm_repo
         image_reference = ocm_repo.component_version_oci_ref(
             name=resource_node.component.name,
             version=resource_node.component.version,
         )
+
+        if access.mediaType in (
+            oci.model.OCI_IMAGE_INDEX_MIME,
+            oci.model.OCI_MANIFEST_SCHEMA_V2_MIME,
+            oci.model.DOCKER_MANIFEST_LIST_MIME,
+            oci.model.DOCKER_MANIFEST_SCHEMA_V2_MIME,
+        ):
+            digest = access.localReference.lower()
+            image_reference = oci.model.OciImageReference(image_reference).with_tag(digest)
+
+            return image_layers_as_tarfile_generator(
+                image_reference=image_reference,
+                oci_client=oci_client,
+                include_config_blob=False,
+                fallback_to_first_subimage_if_index=True,
+            )
 
         return tarutil.concat_blobs_as_tarstream(
             blobs=[
@@ -217,7 +248,7 @@ def iter_content_for_resource_node(
 
 
 def image_layers_as_tarfile_generator(
-    image_reference: str,
+    image_reference: str | oci.model.OciImageReference,
     oci_client: oci.client.Client,
     chunk_size=tarfile.RECORDSIZE,
     include_config_blob=True,

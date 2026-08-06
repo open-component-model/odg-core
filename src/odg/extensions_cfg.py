@@ -1199,8 +1199,12 @@ class OsId(BacklogItemMixins):
         artefact_type: str | None = None,
     ) -> bool:
         supported_artefact_kinds = (odg.model.ArtefactKind.RESOURCE,)
-        supported_access_types = (ocm.AccessType.OCI_REGISTRY,)
+        supported_access_types = (
+            ocm.AccessType.LOCAL_BLOB,
+            ocm.AccessType.OCI_REGISTRY,
+        )
         supported_artefact_types_by_access_type = {
+            ocm.AccessType.LOCAL_BLOB: (ocm.ArtefactType.OCI_IMAGE,),
             ocm.AccessType.OCI_REGISTRY: (ocm.ArtefactType.OCI_IMAGE,),
         }
 

@@ -5,6 +5,7 @@ import subprocess
 import tarfile
 
 import oci.client
+import oci.model
 import ocm
 
 import dockerutil
@@ -55,11 +56,17 @@ def generate_raw_sbom_for_artefact(
     component: ocm.Component,
     access: ocm.Access,
     secret_factory: secret_mgmt.SecretFactory,
-    oci_client: oci.client.Client,
+    oci_client: oci.client.Client | None = None,
     file_path: str | None = None,
     aws_secret_name: str | None = None,
     sbom_output_format: SyftSbomFormat = SyftSbomFormat.CYCLONEDX,
 ) -> str:
+    if (
+        access.type is ocm.AccessType.LOCAL_BLOB
+        and not oci_client
+    ):
+        raise ValueError(f'oci_client must not be empty for {access.type=}')
+
     if (
         access.type
         in (
@@ -126,17 +133,32 @@ def generate_raw_sbom_for_artefact(
         )
 
     elif access.type is ocm.AccessType.LOCAL_BLOB:
-        access: ocm.LocalBlobAccess | ocm.LocalBlobGlobalAccess
+        access: ocm.LocalBlobAccess
+
+        image_reference = component.current_ocm_repo.component_version_oci_ref(
+            name=component.name,
+            version=component.version,
+        )
+        digest = access.localReference.lower()
+
+        if access.mediaType in (
+            oci.model.OCI_IMAGE_INDEX_MIME,
+            oci.model.OCI_MANIFEST_SCHEMA_V2_MIME,
+            oci.model.DOCKER_MANIFEST_LIST_MIME,
+            oci.model.DOCKER_MANIFEST_SCHEMA_V2_MIME,
+        ):
+            image_reference = oci.model.OciImageReference(image_reference).with_tag(digest)
+
+            return generate_raw_sbom_for_artefact(
+                component=component,
+                access=ocm.OciAccess(imageReference=str(image_reference)),
+                secret_factory=secret_factory,
+                sbom_output_format=sbom_output_format,
+            )
 
         if access.globalAccess:
             image_reference = access.globalAccess.ref
             digest = access.globalAccess.digest
-        else:
-            image_reference = component.current_ocm_repo.component_version_oci_ref(
-                name=component.name,
-                version=component.version,
-            )
-            digest = access.localReference
 
         blob = oci_client.blob(
             image_reference=image_reference,

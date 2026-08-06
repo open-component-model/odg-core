@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 
 import oci.client
+import oci.model
 import ocm
 
 import syft
@@ -91,9 +92,36 @@ def find_cbom_or_create(
         with open(sbom_path, 'w') as file:
             file.write(sbom_raw)
 
+        image_reference = None
+
         if access.type is ocm.AccessType.OCI_REGISTRY:
+            access: ocm.OciAccess
+
+            image_reference = access.imageReference
+
+        elif access.type is ocm.AccessType.LOCAL_BLOB and access.mediaType in (
+            oci.model.OCI_IMAGE_INDEX_MIME,
+            oci.model.OCI_MANIFEST_SCHEMA_V2_MIME,
+            oci.model.DOCKER_MANIFEST_LIST_MIME,
+            oci.model.DOCKER_MANIFEST_SCHEMA_V2_MIME,
+        ):
+            access: ocm.LocalBlobAccess | ocm.OciBlobAccess
+
+            image_reference = component.current_ocm_repo.component_version_oci_ref(
+                name=component.name,
+                version=component.version,
+            )
+
+            if access.type is ocm.AccessType.LOCAL_BLOB:
+                digest = access.localReference.lower()
+            else:
+                digest = access.digest.lower()
+
+            image_reference = oci.model.OciImageReference(image_reference).with_tag(digest)
+
+        if image_reference:
             cbom = create_cbom(
-                image=access.imageReference,
+                image=image_reference,
                 sbom_path=sbom_path,
             )
 
