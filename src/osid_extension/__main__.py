@@ -126,7 +126,7 @@ def base_image_osid(
 def create_artefact_metadata(
     artefact: odg.model.ComponentArtefactId,
     osid_finding_config: odg.findings.Finding,
-    osid: odg.model.OperatingSystemId | None,
+    osid: odg.model.OperatingSystemId,
     eol_client: eol.EolClient,
     relation: ocm.ResourceRelation,
     time_now: datetime.datetime | None = None,
@@ -252,7 +252,7 @@ def process_artefact(
             )
         return
 
-    osid: odg.model.OperatingSystemId | None = base_image_osid(
+    osid: odg.model.OperatingSystemId = base_image_osid(
         oci_client=oci_client,
         resource=resource_node.resource,
     )
