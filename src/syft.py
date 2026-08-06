@@ -11,6 +11,7 @@ import ocm
 import dockerutil
 import secret_mgmt.aws
 import secret_mgmt.oci_registry
+import util
 
 
 logger = logging.getLogger(__name__)
@@ -98,7 +99,13 @@ def generate_raw_sbom_for_artefact(
         )
 
     elif access.type is ocm.AccessType.S3:
-        access: ocm.S3Access
+        access: ocm.S3Access | ocm.LegacyS3Access
+
+        if hasattr(access, 'mediaType') and access.mediaType:
+            if not util.media_type_supports(access.mediaType, 'tar'):
+                raise ValueError(f"Don't know how to handle {access.mediaType=} for s3 access")
+        else:
+            logger.warning(f'No mediaType found in {access=}, will assume it is a tar archive')
 
         aws_secret = secret_mgmt.aws.find_cfg(
             secret_factory=secret_factory,
