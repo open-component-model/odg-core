@@ -74,6 +74,27 @@ def local_blob_access_as_blob_descriptor(
     )
 
 
+def oci_blob_access_as_blob_descriptor(
+    access: ocm.OciBlobAccess,
+    oci_client: oci.client.Client,
+    image_reference: str,
+) -> ioutil.BlobDescriptor:
+    digest = access.digest.lower()
+    size = access.size
+
+    blob = oci_client.blob(
+        image_reference=image_reference,
+        digest=digest,
+        stream=True,
+    )
+
+    return ioutil.BlobDescriptor(
+        content=blob.iter_content(chunk_size=4096),
+        size=size,
+        name=f'{digest}.tar',
+    )
+
+
 async def find_artefact_node_async(
     component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById,
     artefact: odg.model.ComponentArtefactId,
@@ -236,6 +257,41 @@ def iter_content_for_resource_node(
         return tarutil.concat_blobs_as_tarstream(
             blobs=[
                 local_blob_access_as_blob_descriptor(
+                    access=access,
+                    oci_client=oci_client,
+                    image_reference=image_reference,
+                ),
+            ],
+        )
+
+    elif access.type is ocm.AccessType.OCI_BLOB:
+        access: ocm.OciBlobAccess
+
+        ocm_repo = resource_node.component.current_ocm_repo
+        image_reference = ocm_repo.component_version_oci_ref(
+            name=resource_node.component.name,
+            version=resource_node.component.version,
+        )
+
+        if access.mediaType in (
+            oci.model.OCI_IMAGE_INDEX_MIME,
+            oci.model.OCI_MANIFEST_SCHEMA_V2_MIME,
+            oci.model.DOCKER_MANIFEST_LIST_MIME,
+            oci.model.DOCKER_MANIFEST_SCHEMA_V2_MIME,
+        ):
+            digest = access.digest.lower()
+            image_reference = oci.model.OciImageReference(image_reference).with_tag(digest)
+
+            return image_layers_as_tarfile_generator(
+                image_reference=image_reference,
+                oci_client=oci_client,
+                include_config_blob=False,
+                fallback_to_first_subimage_if_index=True,
+            )
+
+        return tarutil.concat_blobs_as_tarstream(
+            blobs=[
+                oci_blob_access_as_blob_descriptor(
                     access=access,
                     oci_client=oci_client,
                     image_reference=image_reference,

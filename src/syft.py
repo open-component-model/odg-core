@@ -63,7 +63,11 @@ def generate_raw_sbom_for_artefact(
     sbom_output_format: SyftSbomFormat = SyftSbomFormat.CYCLONEDX,
 ) -> str:
     if (
-        access.type is ocm.AccessType.LOCAL_BLOB
+        access.type
+        in (
+            ocm.AccessType.LOCAL_BLOB,
+            ocm.AccessType.OCI_BLOB,
+        )
         and not oci_client
     ):
         raise ValueError(f'oci_client must not be empty for {access.type=}')
@@ -72,6 +76,7 @@ def generate_raw_sbom_for_artefact(
         access.type
         in (
             ocm.AccessType.LOCAL_BLOB,
+            ocm.AccessType.OCI_BLOB,
             ocm.AccessType.S3,
         )
         and not file_path
@@ -166,6 +171,45 @@ def generate_raw_sbom_for_artefact(
         if access.globalAccess:
             image_reference = access.globalAccess.ref
             digest = access.globalAccess.digest
+
+        blob = oci_client.blob(
+            image_reference=image_reference,
+            digest=digest,
+            stream=True,
+        )
+
+        with open(file_path, 'wb') as file:
+            for chunk in blob.iter_content(chunk_size=4096):
+                file.write(chunk)
+
+        return run_syft(
+            source=file_path,
+            output_format=sbom_output_format,
+        )
+
+    elif access.type is ocm.AccessType.OCI_BLOB:
+        access: ocm.OciBlobAccess
+
+        image_reference = component.current_ocm_repo.component_version_oci_ref(
+            name=component.name,
+            version=component.version,
+        )
+        digest = access.digest.lower()
+
+        if access.mediaType in (
+            oci.model.OCI_IMAGE_INDEX_MIME,
+            oci.model.OCI_MANIFEST_SCHEMA_V2_MIME,
+            oci.model.DOCKER_MANIFEST_LIST_MIME,
+            oci.model.DOCKER_MANIFEST_SCHEMA_V2_MIME,
+        ):
+            image_reference = oci.model.OciImageReference(image_reference).with_tag(digest)
+
+            return generate_raw_sbom_for_artefact(
+                component=component,
+                access=ocm.OciAccess(imageReference=str(image_reference)),
+                secret_factory=secret_factory,
+                sbom_output_format=sbom_output_format,
+            )
 
         blob = oci_client.blob(
             image_reference=image_reference,

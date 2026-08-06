@@ -318,8 +318,9 @@ class BDBAConfig(BacklogItemMixins):
     ) -> bool:
         supported_artefact_kinds = (odg.model.ArtefactKind.RESOURCE,)
         supported_access_types = (
-            ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.LOCAL_BLOB,
+            ocm.AccessType.OCI_BLOB,
+            ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.S3,
         )
 
@@ -418,8 +419,9 @@ class BlackDuckConfig(BacklogItemMixins):
     ) -> bool:
         supported_artefact_kinds = (odg.model.ArtefactKind.RESOURCE,)
         supported_access_types = (
-            ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.LOCAL_BLOB,
+            ocm.AccessType.OCI_BLOB,
+            ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.S3,
         )
         supported_artefact_types = (
@@ -605,8 +607,9 @@ class ClamAVConfig(BacklogItemMixins):
     ) -> bool:
         supported_artefact_kinds = (odg.model.ArtefactKind.RESOURCE,)
         supported_access_types = (
-            ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.LOCAL_BLOB,
+            ocm.AccessType.OCI_BLOB,
+            ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.S3,
         )
 
@@ -761,8 +764,9 @@ class CryptoConfig(BacklogItemMixins):
     ) -> bool:
         supported_artefact_kinds = (odg.model.ArtefactKind.RESOURCE,)
         supported_access_types = (
-            ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.LOCAL_BLOB,
+            ocm.AccessType.OCI_BLOB,
+            ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.S3,
         )
         supported_artefact_types = (
@@ -1236,8 +1240,9 @@ class SBOMGeneratorConfig(BacklogItemMixins):
     ) -> bool:
         supported_artefact_kinds = (odg.model.ArtefactKind.RESOURCE,)
         supported_access_types = (
-            ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.LOCAL_BLOB,
+            ocm.AccessType.OCI_BLOB,
+            ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.S3,
         )
         supported_artefact_types = (
