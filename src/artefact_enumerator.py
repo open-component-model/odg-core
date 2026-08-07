@@ -290,7 +290,9 @@ def _process_compliance_snapshot_of_artefact(
         and extensions_cfg.blackduck.enabled
         and extensions_cfg.blackduck.is_supported(artefact_kind=artefact.artefact_kind)
     ):
-        compliance_snapshot, uncommitted_backlog_item = _create_backlog_item(
+        compliance_snapshot, uncommitted_backlog_item = _create_backlog_item_for_extension(
+            finding_cfgs=finding_cfgs,
+            finding_types=(odg.model.Datatype.IP_FINDING,),
             artefact=artefact,
             compliance_snapshot=compliance_snapshot,
             service=odg.extensions_cfg.Services.BLACKDUCK,
