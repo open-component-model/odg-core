@@ -193,6 +193,73 @@ def find_artefact_node(
         )
 
 
+def _iter_content_for_s3(
+    access: ocm.S3Access | ocm.LegacyS3Access,
+    secret_factory: secret_mgmt.SecretFactory,
+    aws_secret_name: str | None = None,
+) -> collections.abc.Iterator[bytes]:
+    aws_secret = secret_mgmt.aws.find_cfg(
+        secret_factory=secret_factory,
+        secret_name=aws_secret_name,
+    )
+    s3_client = aws_secret.session.client('s3')
+
+    return tarutil.concat_blobs_as_tarstream(
+        blobs=[
+            cnudie.access.s3_access_as_blob_descriptor(
+                s3_client=s3_client,
+                s3_access=access,
+            ),
+        ],
+    )
+
+
+def _iter_content_for_blob(
+    access: ocm.LocalBlobAccess | ocm.OciBlobAccess,
+    component: ocm.Component,
+    oci_client: oci.client.Client,
+) -> collections.abc.Iterator[bytes]:
+    image_reference = component.current_ocm_repo.component_version_oci_ref(
+        name=component.name,
+        version=component.version,
+    )
+
+    if access.type is ocm.AccessType.LOCAL_BLOB:
+        digest = access.localReference.lower()
+    else:
+        digest = access.digest.lower()
+
+    if access.mediaType in (
+        oci.model.OCI_IMAGE_INDEX_MIME,
+        oci.model.OCI_MANIFEST_SCHEMA_V2_MIME,
+        oci.model.DOCKER_MANIFEST_LIST_MIME,
+        oci.model.DOCKER_MANIFEST_SCHEMA_V2_MIME,
+    ):
+        image_reference = oci.model.OciImageReference(image_reference).with_tag(digest)
+
+        return image_layers_as_tarfile_generator(
+            image_reference=image_reference,
+            oci_client=oci_client,
+            include_config_blob=False,
+            fallback_to_first_subimage_if_index=True,
+        )
+
+    if access.type is ocm.AccessType.LOCAL_BLOB:
+        blob_descriptor = local_blob_access_as_blob_descriptor(
+            access=access,
+            oci_client=oci_client,
+            image_reference=image_reference,
+        )
+    else:
+        blob_descriptor = oci_blob_access_as_blob_descriptor(
+            access=access,
+            oci_client=oci_client,
+            image_reference=image_reference,
+        )
+
+    return tarutil.concat_blobs_as_tarstream(blobs=[blob_descriptor])
+
+
 def iter_content_for_resource_node(
     resource_node: ocm.iter.ResourceNode,
     oci_client: oci.client.Client,
@@ -212,91 +279,20 @@ def iter_content_for_resource_node(
         )
 
     elif access.type is ocm.AccessType.S3:
-        access: ocm.S3Access | ocm.LegacyS3Access
-
-        aws_secret = secret_mgmt.aws.find_cfg(
+        return _iter_content_for_s3(
+            access=access,
             secret_factory=secret_factory,
-            secret_name=aws_secret_name,
-        )
-        s3_client = aws_secret.session.client('s3')
-
-        return tarutil.concat_blobs_as_tarstream(
-            blobs=[
-                cnudie.access.s3_access_as_blob_descriptor(
-                    s3_client=s3_client,
-                    s3_access=access,
-                ),
-            ],
+            aws_secret_name=aws_secret_name,
         )
 
-    elif access.type is ocm.AccessType.LOCAL_BLOB:
-        access: ocm.LocalBlobAccess
-
-        ocm_repo = resource_node.component.current_ocm_repo
-        image_reference = ocm_repo.component_version_oci_ref(
-            name=resource_node.component.name,
-            version=resource_node.component.version,
-        )
-
-        if access.mediaType in (
-            oci.model.OCI_IMAGE_INDEX_MIME,
-            oci.model.OCI_MANIFEST_SCHEMA_V2_MIME,
-            oci.model.DOCKER_MANIFEST_LIST_MIME,
-            oci.model.DOCKER_MANIFEST_SCHEMA_V2_MIME,
-        ):
-            digest = access.localReference.lower()
-            image_reference = oci.model.OciImageReference(image_reference).with_tag(digest)
-
-            return image_layers_as_tarfile_generator(
-                image_reference=image_reference,
-                oci_client=oci_client,
-                include_config_blob=False,
-                fallback_to_first_subimage_if_index=True,
-            )
-
-        return tarutil.concat_blobs_as_tarstream(
-            blobs=[
-                local_blob_access_as_blob_descriptor(
-                    access=access,
-                    oci_client=oci_client,
-                    image_reference=image_reference,
-                ),
-            ],
-        )
-
-    elif access.type is ocm.AccessType.OCI_BLOB:
-        access: ocm.OciBlobAccess
-
-        ocm_repo = resource_node.component.current_ocm_repo
-        image_reference = ocm_repo.component_version_oci_ref(
-            name=resource_node.component.name,
-            version=resource_node.component.version,
-        )
-
-        if access.mediaType in (
-            oci.model.OCI_IMAGE_INDEX_MIME,
-            oci.model.OCI_MANIFEST_SCHEMA_V2_MIME,
-            oci.model.DOCKER_MANIFEST_LIST_MIME,
-            oci.model.DOCKER_MANIFEST_SCHEMA_V2_MIME,
-        ):
-            digest = access.digest.lower()
-            image_reference = oci.model.OciImageReference(image_reference).with_tag(digest)
-
-            return image_layers_as_tarfile_generator(
-                image_reference=image_reference,
-                oci_client=oci_client,
-                include_config_blob=False,
-                fallback_to_first_subimage_if_index=True,
-            )
-
-        return tarutil.concat_blobs_as_tarstream(
-            blobs=[
-                oci_blob_access_as_blob_descriptor(
-                    access=access,
-                    oci_client=oci_client,
-                    image_reference=image_reference,
-                ),
-            ],
+    elif access.type in (
+        ocm.AccessType.LOCAL_BLOB,
+        ocm.AccessType.OCI_BLOB,
+    ):
+        return _iter_content_for_blob(
+            access=access,
+            component=resource_node.component,
+            oci_client=oci_client,
         )
 
     else:
