@@ -80,13 +80,21 @@ extensions_cfg:
         # versions that should be tracked
         max_versions_limit: 1
     # @param extensions_cfg.artefact_enumerator.artefact_filters an optional filter to limit
-    # automatic backlog item creation for certain artefacts in general. If only "include" filters are
-    # configured, all other artefacts will be ignored. If only "exclude" filters are configured, all
-    # other artefacts will be considered. If a combination of "include" and "exclude" filters are
-    # configured, all included artefacts which are not specifically excluded as well will be
-    # considered.
-    # note: all properties, except `artefact_kind` and `artefact_extra_id`, will be compared as
-    # regexes
+    # automatic backlog item creation for certain artefacts in general
+    # options:
+    # - only "include" filters -> all other artefacts will be ignored
+    # - only "exclude" filters -> all other artefacts will be considered
+    # - both "include" and "exclude" filters together -> included artefacts - excluded artefacts
+    # - no filters -> all artefacts will be considered (default)
+    # note: all properties, except `artefact_kind` and `artefact_extra_id`, will be compared as regexes
+    # example (all artefacts named "odg.*" except those of type "sbom"):
+    # artefact_filters:
+    #   - name: no-sboms
+    #     semantics: exclude
+    #     artefact_type: sbom
+    #   - name: only-artefacts-starting-with-odg
+    #     semantics: include
+    #     artefact_name: odg.*
     artefact_filters:
         # @param extensions_cfg.artefact_enumerator.artefact_filters[].name only used for
         # informational purposes, such as logging
@@ -1463,12 +1471,21 @@ findings:
         selector: null
 
     # @param findings[].filter can be used to stop detection of the specified findings for certain
-    # components/artfacts. If only "include" filters are configured, all other components will be
-    # ignored. If only "exclude" filters are configured, all other components will be considered. If
-    # a combination of "include" and "exclude" filters are configured, all included components which
-    # are not specifically excluded as well will be considered.
-    # note: all properties, except `artefact_kind` and `artefact_extra_id`, will be compared as
-    # regexes
+    # components/artfacts
+    # options:
+    # - only "include" filters -> all other artefacts will be ignored
+    # - only "exclude" filters -> all other artefacts will be considered
+    # - both "include" and "exclude" filters together -> included artefacts - excluded artefacts
+    # - no filters -> all artefacts will be considered (default)
+    # note: all properties, except `artefact_kind` and `artefact_extra_id`, will be compared as regexes
+    # example (all artefacts named "odg.*" except those of type "sbom"):
+    # artefact_filters:
+    #   - name: no-sboms
+    #     semantics: exclude
+    #     artefact_type: sbom
+    #   - name: only-artefacts-starting-with-odg
+    #     semantics: include
+    #     artefact_name: odg.*
     filter:
         # @param findings[].filter[].name only used for informational purposes, such as logging
       - name: null
