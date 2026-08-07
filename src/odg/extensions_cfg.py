@@ -221,6 +221,8 @@ class ArtefactEnumeratorConfig(ExtensionCfgMixins):
     :param str delivery_service_url
     :param list[Component] components:
         Components which are classified as "active" and for which compliance snapshots are created.
+    :param list[ComponentArtefactFilter] artefact_filters:
+        An optional filter to limit automatic backlog item creation for certain artefacts in general
     :param int compliance_snapshot_grace_period:
         Time after which inactive compliance snapshots are deleted from the delivery-db. During this
         period, the inactive snapshots are used to possibly close outdated GitHub issues (i.e. the
@@ -233,6 +235,9 @@ class ArtefactEnumeratorConfig(ExtensionCfgMixins):
     service: Services = Services.ARTEFACT_ENUMERATOR
     delivery_service_url: str
     components: list[Component]
+    artefact_filters: list[odg.filter.ComponentArtefactFilter] = dataclasses.field(
+        default_factory=list,
+    )
     compliance_snapshot_grace_period: int = 60 * 60 * 24  # 24h
     schedule: str = '*/5 * * * *'  # every 5 minutes
     successful_jobs_history_limit: int = 1
