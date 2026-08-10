@@ -7,6 +7,7 @@ import sys
 import dacite
 
 import ocm
+import ocm.iter
 
 import odg.cvss
 
@@ -111,3 +112,15 @@ def deserialise_label(
             cast=[tuple, enum.Enum],
         ),
     )
+
+
+def find_source_scan_policy(
+    snode: ocm.iter.SourceNode,
+) -> ScanPolicy | None:
+    if label := snode.source.find_label(name=SourceScanLabel.name):
+        return deserialise_label(label).value.policy
+
+    if label := snode.component.find_label(name=SourceScanLabel.name):
+        return deserialise_label(label).value.policy
+
+    return None
