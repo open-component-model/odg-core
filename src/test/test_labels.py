@@ -115,9 +115,12 @@ def test_deserialise_cve_categorisation_label():
     assert isinstance(result, odg.labels.CveCategorisationLabel)
     categorisation = result.value
     assert isinstance(categorisation, odg.cvss.CveCategorisation)
+    assert categorisation.network_exposure is odg.cvss.NetworkExposure.PUBLIC
     assert categorisation.authentication_enforced is True
-    assert categorisation.availability_requirement is odg.cvss.CVENoneLowHigh.LOW
+    assert categorisation.user_interaction is odg.cvss.InteractingUserCategory.GARDENER_OPERATOR
     assert categorisation.confidentiality_requirement is odg.cvss.CVENoneLowHigh.HIGH
+    assert categorisation.integrity_requirement is odg.cvss.CVENoneLowHigh.HIGH
+    assert categorisation.availability_requirement is odg.cvss.CVENoneLowHigh.LOW
     assert categorisation.comment == 'internet-facing service'
 
 

@@ -766,23 +766,6 @@ class GreatestComponentVersions(aiohttp.web.View):
         )
 
 
-def _ensure_cicd_source_label(sources: list[ocm.Source]) -> None:
-    if not len(sources) > 0:
-        return
-    label_present = False
-    for source in sources:
-        if 'cloud.gardener/cicd/source' in [label.name for label in source.labels]:
-            label_present = True
-            break
-    if not label_present:
-        sources[0].labels.append(
-            ocm.Label(
-                name='cloud.gardener/cicd/source',
-                value={'repository-classification': 'main'},
-            ),
-        )
-
-
 async def resolve_component_dependencies(
     component_name: str,
     component_version: str,
@@ -811,8 +794,6 @@ async def resolve_component_dependencies(
             node_filter=ocm.iter.Filter.components,
             ocm_repo=ocm_repository_lookup,
         ):
-            _ensure_cicd_source_label(component_node.component.sources)
-
             yield component_node
     except dacite.exceptions.MissingValueError as e:
         raise aiohttp.web.HTTPFailedDependency(text=str(e))
