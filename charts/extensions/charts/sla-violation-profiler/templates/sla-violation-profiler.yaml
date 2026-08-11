@@ -52,6 +52,10 @@ spec:
             - name: ocm-repo-mappings
               mountPath: /ocm_repo_mappings
               readOnly: true
+            {{- with (.Values.cronjob).resources }}
+            resources:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
           volumes:
             - name: github
               secret:

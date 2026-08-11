@@ -283,7 +283,11 @@ def init_logging_thread(
 
 class JSONFormatter(logging.Formatter):
     def formatMessage(self, record) -> str:
-        record.message = json.dumps(record.message)
+        # Check if json module was already cleared during interpreter shutdown
+        if json is None:
+            record.message = '"json module already unloaded during interpreter shutdown"'
+        else:
+            record.message = json.dumps(record.message)
         if (size := len(record.message.encode('utf-8'))) > 10000:
             record.message = f'"Request entity body is too large: {size} bytes"'
         return super().formatMessage(record)

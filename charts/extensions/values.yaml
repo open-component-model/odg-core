@@ -6,54 +6,163 @@ global:
     tag: null
 
 access-manager:
+  cronjob:
+    resources: {}
   enabled: false
 artefact-enumerator:
+  cronjob:
+    resources:
+      requests:
+        memory: 500Mi
+        cpu: 500m
+      limits:
+        memory: 1000Mi
+        cpu: 1000m
   enabled: false
 backlog-controller:
+  deployment:
+    resources:
+      requests:
+        memory: 100Mi
+        cpu: 30m
+      limits:
+        memory: 300Mi
+        cpu: 300m
   enabled: false
 bdba:
   deployment:
     annotations: []
+    resources:
+      requests:
+        memory: 300Mi
+        cpu: 250m
+      limits:
+        memory: 600Mi
+        cpu: 500m
   enabled: false
 cache-manager:
+  cronjob:
+    resources: {}
   enabled: false
 clamav:
   deployment:
     annotations: []
+    resources:
+      requests:
+        memory: 2Gi
+        cpu: 500m
+      limits:
+        memory: 8Gi
+        cpu: 2000m
   enabled: false
+  freshclam:
+    resources:
+      requests:
+        memory: 500Mi
+        cpu: 1000m
+      limits:
+        memory: 1Gi
+        cpu: 1500m
 codeql:
   deployment:
     annotations: []
+    resources:
+      requests:
+        memory: 100Mi
+        cpu: 250m
+      limits:
+        memory: 300Mi
+        cpu: 500m
   enabled: false
 crypto:
   deployment:
     annotations: []
+    resources:
+      requests:
+        memory: 1000Mi
+        cpu: 400m
+      limits:
+        memory: 2000Mi
+        cpu: 800m
   enabled: false
 delivery-db-backup:
+  cronjob:
+    resources: {}
   enabled: false
 ghas:
+  cronjob:
+    resources: {}
   enabled: false
 issue-replicator:
   deployment:
     annotations: []
+    resources:
+      requests:
+        memory: 1000Mi
+        cpu: 500m
+      limits:
+        memory: 2000Mi
+        cpu: 1000m
   enabled: false
 odg-operator:
+  deployment:
+    resources:
+      requests:
+        memory: 128Mi
+        cpu: 32m
+      limits:
+        memory: 1024Mi
+        cpu: 256m
   enabled: false
   extensionDefinitions: null
   namespaceOverride: null
 osid:
   deployment:
     annotations: []
+    resources:
+      requests:
+        memory: 100Mi
+        cpu: 100m
+      limits:
+        memory: 300Mi
+        cpu: 200m
   enabled: false
 responsibles:
   deployment:
     annotations: []
+    resources:
+      requests:
+        memory: 250Mi
+        cpu: 250m
+      limits:
+        memory: 500Mi
+        cpu: 500m
   enabled: false
 sast:
   deployment:
     annotations: []
+    resources:
+      requests:
+        memory: 100Mi
+        cpu: 250m
+      limits:
+        memory: 300Mi
+        cpu: 500m
+  enabled: false
+sbom-generator:
+  deployment:
+    annotations: []
+    resources:
+      requests:
+        memory: 250Mi
+        cpu: 250m
+      limits:
+        memory: 1200Mi
+        cpu: 500m
   enabled: false
 sla-violation-profiler:
+  cronjob:
+    resources: {}
   enabled: false
   schedule: null
   target_namespace: null
@@ -61,7 +170,3 @@ sla-violation-profiler:
   successful_jobs_history_limit: null
   failed_jobs_history_limit: null
   backoff_limit: null
-sbom-generator:
-  deployment:
-    annotations: []
-  enabled: false

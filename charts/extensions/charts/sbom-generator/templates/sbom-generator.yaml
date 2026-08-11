@@ -76,13 +76,10 @@ spec:
                 command:
                   - sleep
                   - "60"
+          {{- with (.Values.deployment).resources }}
           resources:
-            requests:
-              memory: 250Mi
-              cpu: 250m
-            limits:
-              memory: 1200Mi
-              cpu: 500m
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       volumes:
         - name: aws
           secret:

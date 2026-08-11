@@ -256,11 +256,18 @@ class DeliveryServiceClient:
             'api_url': self.auth_credentials.api_url,
         }
 
-        res = self._session.get(
-            url=self._routes.auth(),
-            params=params,
-            timeout=(4, 31),
-        )
+        # do not log query parameters upon connection failures
+        urllib3_logger = logging.getLogger('urllib3.connectionpool')
+        was_disabled = urllib3_logger.disabled
+        urllib3_logger.disabled = True
+        try:
+            res = self._session.get(
+                url=self._routes.auth(),
+                params=params,
+                timeout=(4, 31),
+            )
+        finally:
+            urllib3_logger.disabled = was_disabled
 
         if not res.ok:
             logger.warning(

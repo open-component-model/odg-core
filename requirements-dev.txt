@@ -8,3 +8,5 @@ numpy
 pytest<9.1 # pin for now due to regression
 pytest-asyncio
 scipy
+ruff
+bandit

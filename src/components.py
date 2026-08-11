@@ -24,6 +24,7 @@ import ocm
 import ocm.iter
 import ocm.iter_async
 import ocm.oci
+import ocm.util
 
 import compliance_summary as cs
 import consts
@@ -431,7 +432,7 @@ class ComponentResponsibles(aiohttp.web.View):
             db_session=self.request.get(consts.REQUEST_DB_SESSION),
         )
         component = component_descriptor.component
-        main_source = cnudie.util.main_source(component_descriptor.component)
+        main_source = ocm.util.main_source(component_descriptor.component)
         artifact_name = util.param(params, 'artifact_name')
 
         def _responsibles_label(
@@ -906,9 +907,8 @@ class UpgradePRs(aiohttp.web.View):
                 ocm_repository_lookup=lookups.extended_ocm_repository_lookup(ocm_repo),
             )
             component = component_descriptor.component
-            source = cnudie.util.main_source(
+            source = ocm.util.main_source(
                 component=component,
-                absent_ok=True,
             )
 
             repo_url = source.access.repoUrl if source else component_name

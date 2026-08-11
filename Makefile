@@ -103,9 +103,10 @@ build-docker:
 		echo "Error: dist directory not found. Run 'make build-core' first."; \
 		exit 1; \
 	fi
-	@docker build \
+	@docker-buildx build \
 		--build-arg ODG_CORE_LIBS_VERSION=$(ODG_CORE_LIBS_VERSION) \
 		--build-context dist=./dist \
+		--platform linux/amd64,linux/arm64 \
 		-t odg-core:$(ODG_CORE_LIBS_VERSION) \
 		-f Dockerfile \
 		.
@@ -136,7 +137,7 @@ run:
 # Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
-	@rm -rf dist build *.egg-info
+	@rm -rf dist build src/*.egg-info
 	@find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	@find . -type f -name "*.pyc" -delete 2>/dev/null || true
 	@echo "Clean complete"
