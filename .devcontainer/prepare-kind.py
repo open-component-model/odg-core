@@ -94,6 +94,7 @@ def write_secret(kubeconfig: dict, cluster_name: str) -> None:
     with open(SECRET_PATH, 'w') as f:
         content = yaml.dump(secret, default_flow_style=False, allow_unicode=True)
         f.write(content.replace('127.0.0.1', 'host.docker.internal'))
+    SECRET_PATH.chmod(0o600)
     print(f'Written: {SECRET_PATH.relative_to(REPO_ROOT)}')
 
 

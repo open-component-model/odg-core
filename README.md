@@ -58,22 +58,28 @@ Please refer to [this guide](https://open-component-model.github.io/open-deliver
 
 ### Dev Container
 
-You can also develop ODG in a Dev Container, providing the following functions:
+You can also develop ODG in a [Dev Container](https://code.visualstudio.com/docs/devcontainers/containers). Install the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) and choose **Reopen in Container** in VS Code.
+
+The Dev Container provides:
 
 * Run & debug:
   * To run the core service, run `Debug: core service`
   * To run an extension, run `Debug: extension` and select the extension
 * Pytest integration
-* PostgreSQL browser
+* PostgreSQL browser (password: `MyPassword`, see `.devcontainer/compose.yml`)
 * Auto-format & lint on save
 
-To work with a KIND cluster:
+To work with a KinD cluster:
 
-1. Create the KIND cluster on the host: `kind create cluster --config .devcontainer/kind-config.yml`, which includes `host.docker.internal` as SAN
-1. Start the Dev Container (e.g. in [VSCode](https://code.visualstudio.com/docs/devcontainers/containers))
-1. Open a terminal session. The kubeconfig is copied on every shell startup, with `127.0.0.1` replaced by `host.docker.internal`
-1. Run `.devcontainer/prepare-kind.py` in the Dev Container to import ODG CRDs and create the matching `src/secrets/kubernetes/devcontainers-cluster.yaml` secret
+1. Create the KinD cluster on the host: `kind create cluster --config .devcontainer/kind-config.yml`, which includes `host.docker.internal` as SAN
+1. Open the Dev Container (**Reopen in Container** in VS Code)
+1. Open a terminal session. The kubeconfig is refreshed on every shell startup, with `127.0.0.1` replaced by `host.docker.internal`
+1. Run `.devcontainer/prepare-kind.py` in the Dev Container to apply ODG CRDs and create `src/secrets/kubernetes/devcontainers-cluster.yaml`
 1. Update your local [configuration and secrets](https://open-component-model.github.io/open-delivery-gear/contents/how-to/00-hybrid-dev-setup.html#configuration-and-secrets)
+
+To use a kubeconfig at a path different to `~/.kube/config`, specify `KUBECONFIG` in `.devcontainer/.env` before opening the container. If you use `$KUBECONFIG` with multiple files, flatten first: `kubectl config view --raw --flatten > ~/.kube/config`.
+
+To clean up the KinD cluster: `kind delete clusters odg-devcontainer-cluster`
 
 ## Documentation
 

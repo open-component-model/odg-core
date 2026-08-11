@@ -4,7 +4,7 @@
 	"name": "ODG Core",
 	"dockerComposeFile": "compose.yml",
 	"service": "app",
-	"workspaceFolder": "/workspaces/odg-core/",
+	"workspaceFolder": "/workspaces/odg-core",
 
 	"postCreateCommand": "bash .devcontainer/post-create.sh",
 
@@ -42,7 +42,7 @@
 						"user": "postgres",
 						"password": "MyPassword",
 						"authenticationType": "SqlLogin",
-						"sslmode": "prefer"
+						"sslmode": "disable"
 					}
 				]
 			}
