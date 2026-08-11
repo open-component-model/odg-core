@@ -24,7 +24,6 @@ import ocm
 import ocm.iter
 import ocm.iter_async
 import ocm.oci
-import ocm.util
 
 import compliance_summary as cs
 import consts
@@ -432,51 +431,16 @@ class ComponentResponsibles(aiohttp.web.View):
             db_session=self.request.get(consts.REQUEST_DB_SESSION),
         )
         component = component_descriptor.component
-        main_source = ocm.util.main_source(component_descriptor.component)
+        main_source = cnudie.util.main_source(component_descriptor.component)
         artifact_name = util.param(params, 'artifact_name')
 
-        def _responsibles_label(
-            component: ocm.Component,
-            artifact_name: str | None = None,
-            owners_label: str = 'cloud.gardener.cnudie/responsibles',
-        ) -> responsibles.labels.ResponsiblesLabel | None:
-            """
-            Returns the most specific ResponsiblesLabel for the given component and artifact name,
-            or `None` if no label is found.
-
-            If `artifact_name` is given, a fitting artifact with an owner label is looked up and
-            the attached label is returned. Otherwise, a fallback to component-level owner-label
-            happens.
-            """
-            if artifact_name:
-                matching_artifacts = [
-                    a for a in component.resources + component.sources if a.name == artifact_name
-                ]
-                if not matching_artifacts:
-                    raise aiohttp.web.HTTPNotFound(
-                        text=f'{component.name}:{component.version} has no {artifact_name=}',
-                    )
-
-                for artifact in matching_artifacts:
-                    artifact: ocm.Artifact
-                    # hack: hard-code to using first matching artifact with label for now
-                    if responsibles_label := artifact.find_label(name=owners_label):
-                        return responsibles.labels.ResponsiblesLabel.from_dict(
-                            data_dict=dataclasses.asdict(responsibles_label),
-                        )
-
-            if responsibles_label := component.find_label(name=owners_label):
-                return responsibles.labels.ResponsiblesLabel.from_dict(
-                    data_dict=dataclasses.asdict(responsibles_label),
-                )
-
-            return None
-
         try:
-            responsibles_label = _responsibles_label(
+            responsibles_label = responsibles.labels.find_responsibles_label(
                 component=component,
                 artifact_name=artifact_name,
             )
+        except ValueError as e:
+            raise aiohttp.web.HTTPNotFound(text=str(e))
         except (
             dacite.exceptions.UnionMatchError,
             dacite.exceptions.WrongTypeError,
@@ -766,6 +730,23 @@ class GreatestComponentVersions(aiohttp.web.View):
         )
 
 
+def _ensure_cicd_source_label(sources: list[ocm.Source]) -> None:
+    if not len(sources) > 0:
+        return
+    label_present = False
+    for source in sources:
+        if 'cloud.gardener/cicd/source' in [label.name for label in source.labels]:
+            label_present = True
+            break
+    if not label_present:
+        sources[0].labels.append(
+            ocm.Label(
+                name='cloud.gardener/cicd/source',
+                value={'repository-classification': 'main'},
+            ),
+        )
+
+
 async def resolve_component_dependencies(
     component_name: str,
     component_version: str,
@@ -794,24 +775,7 @@ async def resolve_component_dependencies(
             node_filter=ocm.iter.Filter.components,
             ocm_repo=ocm_repository_lookup,
         ):
-            # add repo classification label if not present in component labels
-            label_present = False
-            # if no sources present we cannot add the source
-            if not len(component_node.component.sources) > 0:
-                yield component_node
-                continue
-
-            for source in component_node.component.sources:
-                if 'cloud.gardener/cicd/source' in [label.name for label in source.labels]:
-                    label_present = True
-                    break
-            if not label_present:
-                component_node.component.sources[0].labels.append(
-                    ocm.Label(
-                        name='cloud.gardener/cicd/source',
-                        value={'repository-classification': 'main'},
-                    ),
-                )
+            _ensure_cicd_source_label(component_node.component.sources)
 
             yield component_node
     except dacite.exceptions.MissingValueError as e:
@@ -907,8 +871,9 @@ class UpgradePRs(aiohttp.web.View):
                 ocm_repository_lookup=lookups.extended_ocm_repository_lookup(ocm_repo),
             )
             component = component_descriptor.component
-            source = ocm.util.main_source(
+            source = cnudie.util.main_source(
                 component=component,
+                absent_ok=True,
             )
 
             repo_url = source.access.repoUrl if source else component_name

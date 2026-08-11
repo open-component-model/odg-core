@@ -61,7 +61,7 @@ class ResponsiblesLabel(ocm.Label):
         | GitHubUserResponsible
         | PersonalNameResponsible
     ]
-    name: str = 'cloud.gardener.cnudie/responsibles'
+    name: str = 'odg.ocm.software/responsibles'
 
     @staticmethod
     def from_dict(data_dict: dict):
@@ -75,3 +75,39 @@ class ResponsiblesLabel(ocm.Label):
                 strict=True,
             ),
         )
+
+def find_responsibles_label(
+    component: ocm.Component,
+    artifact_name: str | None = None,
+) -> 'ResponsiblesLabel | None':
+    '''
+    Returns the most specific ResponsiblesLabel for the given component and artifact name,
+    or None if no label is found.
+
+    Raises ValueError if artifact_name is given but no matching artifact exists.
+    '''
+    label_names = [ResponsiblesLabel.name, "cloud.gardener.cnudie/responsibles"]
+
+    if artifact_name:
+        matching_artifacts = [
+            a for a in component.resources + component.sources if a.name == artifact_name
+        ]
+        if not matching_artifacts:
+            raise ValueError(
+                f'{component.name}:{component.version} has no artifact {artifact_name!r}',
+            )
+
+        for artifact in matching_artifacts:
+            for name in label_names:
+                if raw := artifact.find_label(name=name):
+                    return ResponsiblesLabel.from_dict(
+                        data_dict=dataclasses.asdict(raw),
+                    )
+
+    for name in label_names:
+        if raw := component.find_label(name=name):
+            return ResponsiblesLabel.from_dict(
+                data_dict=dataclasses.asdict(raw),
+            )
+
+    return None

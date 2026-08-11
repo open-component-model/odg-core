@@ -189,13 +189,15 @@ def scoped_component_artefact_id(
 def find_cve_categorisation(
     artefact_node: ocm.iter.Node | ocm.iter.ArtefactNode,
 ) -> odg.cvss.CveCategorisation | None:
-    label_name = odg.labels.CveCategorisationLabel.name
+    for name in odg.labels.get_label_names_with_aliases(odg.labels.RiskProfileLabel):
+        if label := artefact_node.artefact.find_label(name):
+            return odg.labels.deserialise_label(label).value
 
-    if not (categorisation_label := artefact_node.artefact.find_label(label_name)):
-        if not (categorisation_label := artefact_node.component.find_label(label_name)):
-            return None
+    for name in odg.labels.get_label_names_with_aliases(odg.labels.RiskProfileLabel):
+        if label := artefact_node.component.find_label(name):
+            return odg.labels.deserialise_label(label).value
 
-    return odg.labels.deserialise_label(categorisation_label).value
+    return None
 
 
 def matching_rescore_rules(

@@ -35,12 +35,12 @@ def has_local_linter(
     resources: list[ocm.Resource],
 ) -> bool:
     for resource in resources:
-        if not (label := resource.find_label(name=odg.labels.PurposeLabel.name)):
-            continue
-
-        label_content = odg.labels.deserialise_label(label)
-        if AnalysisLabel.SAST.value in label_content.value:
-            return True
+        for name in odg.labels.get_label_names_with_aliases(odg.labels.PurposeLabel):
+            if label := resource.find_label(name=name):
+                label_content = odg.labels.deserialise_label(label)
+                if AnalysisLabel.SAST.value in label_content.value:
+                    return True
+                break
 
     return False
 
@@ -48,17 +48,7 @@ def has_local_linter(
 def find_scan_policy(
     snode: ocm.iter.SourceNode,
 ) -> odg.labels.ScanPolicy | None:
-    if label := snode.source.find_label(name=odg.labels.SourceScanLabel.name):
-        label_content = odg.labels.deserialise_label(label)
-        return label_content.value.policy
-
-    # Fallback to component-level label
-    if label := snode.component.find_label(name=odg.labels.SourceScanLabel.name):
-        label_content = odg.labels.deserialise_label(label)
-        return label_content.value.policy
-
-    # No label found
-    return None
+    return odg.labels.find_source_scan_policy(snode)
 
 
 def create_missing_linter_finding(

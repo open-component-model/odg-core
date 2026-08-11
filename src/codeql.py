@@ -289,15 +289,7 @@ def _make_finding(
 def _find_scan_policy(
     snode: ocm.iter.SourceNode,
 ) -> odg.labels.ScanPolicy | None:
-    if label := snode.source.find_label(name=odg.labels.SourceScanLabel.name):
-        label_content = odg.labels.deserialise_label(label)
-        return label_content.value.policy
-
-    if label := snode.component.find_label(name=odg.labels.SourceScanLabel.name):
-        label_content = odg.labels.deserialise_label(label)
-        return label_content.value.policy
-
-    return None
+    return odg.labels.find_source_scan_policy(snode)
 
 
 def scan(

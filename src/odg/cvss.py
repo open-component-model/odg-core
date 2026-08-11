@@ -125,8 +125,15 @@ class NetworkExposure(enum.Enum):
 
 
 class InteractingUserCategory(enum.Enum):
-    GARDENER_OPERATOR = 'gardener-operator'
+    OPERATOR = 'operator'
     END_USER = 'end-user'
+
+    @classmethod
+    def _missing_(cls, value):
+        # gardener-operator was the legacy value for OPERATOR
+        if value == 'gardener-operator':
+            return cls.OPERATOR
+        return None
 
 
 class CVENoneLowHigh(enum.Enum):
