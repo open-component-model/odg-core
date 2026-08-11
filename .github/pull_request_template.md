@@ -5,8 +5,8 @@ Fixes #
 
 **Special notes for your reviewer**:
 
-[ ] Unit Tests created for new code or existing Unit Tests updated (if applicable)
-[ ] Enduser Documentation updated (if applicable)
+- [ ] Unit tests created for new code or existing unit tests updated (if applicable)
+- [ ] End-user documentation updated (if applicable)
 
 **Release note**:
 <!--  Write your release note:
