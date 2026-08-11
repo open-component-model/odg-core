@@ -77,7 +77,7 @@ To work with a KinD cluster:
 1. Run `.devcontainer/prepare-kind.py` in the Dev Container to apply ODG CRDs and create `src/secrets/kubernetes/devcontainers-cluster.yaml`
 1. Update your local [configuration and secrets](https://open-component-model.github.io/open-delivery-gear/contents/how-to/00-hybrid-dev-setup.html#configuration-and-secrets)
 
-To use a kubeconfig at a path different to `~/.kube/config`, specify `KUBECONFIG` in `.devcontainer/.env` before opening the container. If you use `$KUBECONFIG` with multiple files, flatten first: `kubectl config view --raw --flatten > ~/.kube/config`.
+If you use Kubeconfig with multiple files, flatten first: `kubectl config view --raw --flatten > ~/.kube/config`.
 
 To clean up the KinD cluster: `kind delete clusters odg-devcontainer-cluster`
 

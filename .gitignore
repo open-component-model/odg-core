@@ -8,4 +8,3 @@ logs*
 .venv
 kubeconfig
 secrets/
-.devcontainer/.env
