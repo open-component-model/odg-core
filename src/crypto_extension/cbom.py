@@ -121,7 +121,7 @@ def find_cbom_or_create(
             else:
                 digest = access.digest.lower()
 
-            image_reference = oci.model.OciImageReference(image_reference).with_tag(digest)
+            image_reference = str(oci.model.OciImageReference(image_reference).with_tag(digest))
 
         if image_reference:
             cbom = create_cbom(
