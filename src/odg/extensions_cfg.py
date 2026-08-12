@@ -449,7 +449,10 @@ class BlackDuckConfig(BacklogItemMixins):
                     f'{access_type=} is not supported for BD scans, {supported_access_types=}',
                 )
 
-        if artefact_type and artefact_type not in supported_artefact_types:
+        if artefact_type and not any(
+            artefact_type.startswith(supported_artefact_type)
+            for supported_artefact_type in supported_artefact_types
+        ):
             is_supported = False
             if self.on_unsupported is WarningVerbosities.WARNING:
                 logger.warning(
@@ -795,7 +798,10 @@ class CryptoConfig(BacklogItemMixins):
                     f'{access_type=} is not supported for crypto scans, {supported_access_types=}',
                 )
 
-        if artefact_type and artefact_type not in supported_artefact_types:
+        if artefact_type and not any(
+            artefact_type.startswith(supported_artefact_type)
+            for supported_artefact_type in supported_artefact_types
+        ):
             is_supported = False
             if self.on_unsupported is WarningVerbosities.WARNING:
                 logger.warning(
@@ -1272,7 +1278,10 @@ class SBOMGeneratorConfig(BacklogItemMixins):
                     f'{supported_access_types=}',
                 )
 
-        if artefact_type and artefact_type not in supported_artefact_types:
+        if artefact_type and not any(
+            artefact_type.startswith(supported_artefact_type)
+            for supported_artefact_type in supported_artefact_types
+        ):
             is_supported = False
             if self.on_unsupported is WarningVerbosities.WARNING:
                 logger.warning(
