@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 
 import oci.client
+import oci.model
 import ocm
 
 import syft
@@ -71,6 +72,7 @@ def find_cbom_or_create(
     with tempfile.TemporaryDirectory(dir=own_dir) as tmp_dir:
         filename_for_access_type = {
             ocm.AccessType.LOCAL_BLOB: 'local_blob',
+            ocm.AccessType.OCI_BLOB: 'oci_blob',
             ocm.AccessType.S3: 's3',
         }
 
@@ -91,9 +93,39 @@ def find_cbom_or_create(
         with open(sbom_path, 'w') as file:
             file.write(sbom_raw)
 
+        image_reference = None
+
         if access.type is ocm.AccessType.OCI_REGISTRY:
+            access: ocm.OciAccess
+
+            image_reference = access.imageReference
+
+        elif access.type in (
+            ocm.AccessType.LOCAL_BLOB,
+            ocm.AccessType.OCI_BLOB,
+        ) and access.mediaType in (
+            oci.model.OCI_IMAGE_INDEX_MIME,
+            oci.model.OCI_MANIFEST_SCHEMA_V2_MIME,
+            oci.model.DOCKER_MANIFEST_LIST_MIME,
+            oci.model.DOCKER_MANIFEST_SCHEMA_V2_MIME,
+        ):
+            access: ocm.LocalBlobAccess | ocm.OciBlobAccess
+
+            image_reference = component.current_ocm_repo.component_version_oci_ref(
+                name=component.name,
+                version=component.version,
+            )
+
+            if access.type is ocm.AccessType.LOCAL_BLOB:
+                digest = access.localReference.lower()
+            else:
+                digest = access.digest.lower()
+
+            image_reference = str(oci.model.OciImageReference(image_reference).with_tag(digest))
+
+        if image_reference:
             cbom = create_cbom(
-                image=access.imageReference,
+                image=image_reference,
                 sbom_path=sbom_path,
             )
 

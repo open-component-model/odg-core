@@ -318,8 +318,9 @@ class BDBAConfig(BacklogItemMixins):
     ) -> bool:
         supported_artefact_kinds = (odg.model.ArtefactKind.RESOURCE,)
         supported_access_types = (
-            ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.LOCAL_BLOB,
+            ocm.AccessType.OCI_BLOB,
+            ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.S3,
         )
 
@@ -414,19 +415,23 @@ class BlackDuckConfig(BacklogItemMixins):
         self,
         artefact_kind: odg.model.ArtefactKind | None = None,
         access_type: ocm.AccessType | None = None,
-        artefact_type: str | None = None,
+        artefact_type: ocm.ArtefactType | None = None,
     ) -> bool:
         supported_artefact_kinds = (odg.model.ArtefactKind.RESOURCE,)
         supported_access_types = (
-            ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.LOCAL_BLOB,
+            ocm.AccessType.OCI_BLOB,
+            ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.S3,
         )
-        supported_artefact_types_by_access_type = {
-            ocm.AccessType.OCI_REGISTRY: ('ociImage', 'ociArtifact'),
-            ocm.AccessType.LOCAL_BLOB: ('directoryTree', 'executable'),
-            ocm.AccessType.S3: ('application/tar', 'application/x-tar'),
-        }
+        supported_artefact_types = (
+            ocm.ArtefactType.DIRECTORY_TREE,
+            ocm.ArtefactType.EXECUTABLE,
+            ocm.ArtefactType.OCI_ARTEFACT,
+            ocm.ArtefactType.OCI_IMAGE,
+            'application/tar',
+            'application/x-tar',
+        )
 
         is_supported = True
 
@@ -444,21 +449,16 @@ class BlackDuckConfig(BacklogItemMixins):
                     f'{access_type=} is not supported for BD scans, {supported_access_types=}',
                 )
 
-        if (
-            artefact_type
-            and access_type
-            and (artefact_types := supported_artefact_types_by_access_type.get(access_type))
+        if artefact_type and not any(
+            artefact_type.startswith(supported_artefact_type)
+            for supported_artefact_type in supported_artefact_types
         ):
-            if not any(
-                artefact_type.startswith(supported_artefact_type)
-                for supported_artefact_type in artefact_types
-            ):
-                is_supported = False
-                if self.on_unsupported is WarningVerbosities.WARNING:
-                    logger.warning(
-                        f'{artefact_type=} is not supported for BD scans with {access_type=}, '
-                        f'{supported_artefact_types_by_access_type=}',
-                    )
+            is_supported = False
+            if self.on_unsupported is WarningVerbosities.WARNING:
+                logger.warning(
+                    f'{artefact_type=} is not supported for BD scans scans, '
+                    f'{supported_artefact_types=}',
+                )
 
         return is_supported
 
@@ -607,17 +607,14 @@ class ClamAVConfig(BacklogItemMixins):
         self,
         artefact_kind: odg.model.ArtefactKind | None = None,
         access_type: ocm.AccessType | None = None,
-        artefact_type: str | None = None,
     ) -> bool:
         supported_artefact_kinds = (odg.model.ArtefactKind.RESOURCE,)
         supported_access_types = (
-            ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.LOCAL_BLOB,
+            ocm.AccessType.OCI_BLOB,
+            ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.S3,
         )
-        supported_artefact_types_by_access_type = {
-            ocm.AccessType.S3: ('application/tar', 'application/x-tar'),
-        }
 
         is_supported = True
 
@@ -635,22 +632,6 @@ class ClamAVConfig(BacklogItemMixins):
                 logger.warning(
                     f'{access_type=} is not supported for ClamAV scans, {supported_access_types=}',
                 )
-
-        if (
-            artefact_type
-            and access_type
-            and (artefact_types := supported_artefact_types_by_access_type.get(access_type))
-        ):
-            if not any(
-                artefact_type.startswith(supported_artefact_type)
-                for supported_artefact_type in artefact_types
-            ):
-                is_supported = False
-                if self.on_unsupported is WarningVerbosities.WARNING:
-                    logger.warning(
-                        f'{artefact_type=} is not supported for ClamAV scans with {access_type=}, '
-                        f'{supported_artefact_types_by_access_type=}',
-                    )
 
         return is_supported
 
@@ -782,18 +763,23 @@ class CryptoConfig(BacklogItemMixins):
         self,
         artefact_kind: odg.model.ArtefactKind | None = None,
         access_type: ocm.AccessType | None = None,
-        artefact_type: str | None = None,
+        artefact_type: ocm.ArtefactType | None = None,
     ) -> bool:
         supported_artefact_kinds = (odg.model.ArtefactKind.RESOURCE,)
         supported_access_types = (
-            ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.LOCAL_BLOB,
+            ocm.AccessType.OCI_BLOB,
+            ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.S3,
         )
-        supported_artefact_types_by_access_type = {
-            ocm.AccessType.OCI_REGISTRY: ('ociImage', 'ociArtifact'),
-            ocm.AccessType.S3: ('application/tar', 'application/x-tar'),
-        }
+        supported_artefact_types = (
+            ocm.ArtefactType.DIRECTORY_TREE,
+            ocm.ArtefactType.EXECUTABLE,
+            ocm.ArtefactType.OCI_ARTEFACT,
+            ocm.ArtefactType.OCI_IMAGE,
+            'application/tar',
+            'application/x-tar',
+        )
 
         is_supported = True
 
@@ -812,21 +798,16 @@ class CryptoConfig(BacklogItemMixins):
                     f'{access_type=} is not supported for crypto scans, {supported_access_types=}',
                 )
 
-        if (
-            artefact_type
-            and access_type
-            and (artefact_types := supported_artefact_types_by_access_type.get(access_type))
+        if artefact_type and not any(
+            artefact_type.startswith(supported_artefact_type)
+            for supported_artefact_type in supported_artefact_types
         ):
-            if not any(
-                artefact_type.startswith(supported_artefact_type)
-                for supported_artefact_type in artefact_types
-            ):
-                is_supported = False
-                if self.on_unsupported is WarningVerbosities.WARNING:
-                    logger.warning(
-                        f'{artefact_type=} is not supported for crypto scans with {access_type=}, '
-                        f'{supported_artefact_types_by_access_type=}',
-                    )
+            is_supported = False
+            if self.on_unsupported is WarningVerbosities.WARNING:
+                logger.warning(
+                    f'{artefact_type=} is not supported for crypto scans, '
+                    f'{supported_artefact_types=}',
+                )
 
         return is_supported
 
@@ -1196,13 +1177,14 @@ class OsId(BacklogItemMixins):
         self,
         artefact_kind: odg.model.ArtefactKind | None = None,
         access_type: ocm.AccessType | None = None,
-        artefact_type: str | None = None,
+        artefact_type: ocm.ArtefactType | None = None,
     ) -> bool:
         supported_artefact_kinds = (odg.model.ArtefactKind.RESOURCE,)
-        supported_access_types = (ocm.AccessType.OCI_REGISTRY,)
-        supported_artefact_types_by_access_type = {
-            ocm.AccessType.OCI_REGISTRY: (ocm.ArtefactType.OCI_IMAGE,),
-        }
+        supported_access_types = (
+            ocm.AccessType.LOCAL_BLOB,
+            ocm.AccessType.OCI_REGISTRY,
+        )
+        supported_artefact_types = (ocm.ArtefactType.OCI_IMAGE,)
 
         is_supported = True
 
@@ -1220,21 +1202,12 @@ class OsId(BacklogItemMixins):
                 )
             is_supported = False
 
-        if (
-            artefact_type
-            and access_type
-            and (artefact_types := supported_artefact_types_by_access_type.get(access_type))
-        ):
-            if not any(
-                artefact_type.startswith(supported_artefact_type)
-                for supported_artefact_type in artefact_types
-            ):
-                if self.on_unsupported is WarningVerbosities.WARNING:
-                    logger.warning(
-                        f'{artefact_type=} is not supported for OS_ID scans with {access_type=}, '
-                        f'{supported_artefact_types_by_access_type=}',
-                    )
-                is_supported = False
+        if artefact_type and artefact_type not in supported_artefact_types:
+            if self.on_unsupported is WarningVerbosities.WARNING:
+                logger.warning(
+                    f'{artefact_type=} is not supported for OS_ID scans, {supported_artefact_types=}',  # noqa: E501
+                )
+            is_supported = False
 
         return is_supported
 
@@ -1269,19 +1242,23 @@ class SBOMGeneratorConfig(BacklogItemMixins):
         self,
         artefact_kind: odg.model.ArtefactKind | None = None,
         access_type: ocm.AccessType | None = None,
-        artefact_type: str | None = None,
+        artefact_type: ocm.ArtefactType | None = None,
     ) -> bool:
         supported_artefact_kinds = (odg.model.ArtefactKind.RESOURCE,)
         supported_access_types = (
-            ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.LOCAL_BLOB,
+            ocm.AccessType.OCI_BLOB,
+            ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.S3,
         )
-        supported_artefact_types_by_access_type = {
-            ocm.AccessType.OCI_REGISTRY: ('ociImage', 'ociArtifact'),
-            ocm.AccessType.LOCAL_BLOB: ('directoryTree', 'executable'),
-            ocm.AccessType.S3: ('application/tar', 'application/x-tar'),
-        }
+        supported_artefact_types = (
+            ocm.ArtefactType.DIRECTORY_TREE,
+            ocm.ArtefactType.EXECUTABLE,
+            ocm.ArtefactType.OCI_ARTEFACT,
+            ocm.ArtefactType.OCI_IMAGE,
+            'application/tar',
+            'application/x-tar',
+        )
 
         is_supported = True
 
@@ -1301,21 +1278,16 @@ class SBOMGeneratorConfig(BacklogItemMixins):
                     f'{supported_access_types=}',
                 )
 
-        if (
-            artefact_type
-            and access_type
-            and (artefact_types := supported_artefact_types_by_access_type.get(access_type))
+        if artefact_type and not any(
+            artefact_type.startswith(supported_artefact_type)
+            for supported_artefact_type in supported_artefact_types
         ):
-            if not any(
-                artefact_type.startswith(supported_artefact_type)
-                for supported_artefact_type in artefact_types
-            ):
-                is_supported = False
-                if self.on_unsupported is WarningVerbosities.WARNING:
-                    logger.warning(
-                        f'{artefact_type=} is not supported for SBOM Generation with '
-                        f'{access_type=}, {supported_artefact_types_by_access_type=}',
-                    )
+            is_supported = False
+            if self.on_unsupported is WarningVerbosities.WARNING:
+                logger.warning(
+                    f'{artefact_type=} is not supported for SBOM Generation, '
+                    f'{supported_artefact_types=}',
+                )
 
         return is_supported
 

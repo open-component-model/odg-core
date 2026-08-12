@@ -89,9 +89,25 @@ def determine_os_status(
 
 def base_image_osid(
     oci_client: oci.client.Client,
+    component: ocm.Component,
     resource: ocm.Resource,
 ) -> odg.model.OperatingSystemId:
-    image_reference = resource.access.imageReference
+    access = resource.access
+
+    if access.type is ocm.AccessType.LOCAL_BLOB:
+        image_reference = component.current_ocm_repo.component_version_oci_ref(
+            name=component.name,
+            version=component.version,
+        )
+        digest = access.localReference.lower()
+
+        image_reference = oci.model.OciImageReference(image_reference).with_tag(digest)
+
+    elif access.type is ocm.AccessType.OCI_REGISTRY:
+        image_reference = access.imageReference
+
+    else:
+        raise RuntimeError(f'Unsupported access type: {access.type}')
 
     manifest = oci_client.manifest(
         image_reference=image_reference,
@@ -126,7 +142,7 @@ def base_image_osid(
 def create_artefact_metadata(
     artefact: odg.model.ComponentArtefactId,
     osid_finding_config: odg.findings.Finding,
-    osid: odg.model.OperatingSystemId | None,
+    osid: odg.model.OperatingSystemId,
     eol_client: eol.EolClient,
     relation: ocm.ResourceRelation,
     time_now: datetime.datetime | None = None,
@@ -252,8 +268,9 @@ def process_artefact(
             )
         return
 
-    osid: odg.model.OperatingSystemId | None = base_image_osid(
+    osid: odg.model.OperatingSystemId = base_image_osid(
         oci_client=oci_client,
+        component=resource_node.component,
         resource=resource_node.resource,
     )
 

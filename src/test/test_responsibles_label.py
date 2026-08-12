@@ -22,16 +22,18 @@ def _make_component(
 
 
 def test_responsibles_label_from_dict_github_user():
-    label = responsibles.labels.ResponsiblesLabel.from_dict({
-        'name': 'odg.ocm.software/responsibles',
-        'value': [
-            {
-                'type': 'githubUser',
-                'username': 'octocat',
-                'github_hostname': 'github.com',
-            },
-        ],
-    })
+    label = responsibles.labels.ResponsiblesLabel.from_dict(
+        {
+            'name': 'odg.ocm.software/responsibles',
+            'value': [
+                {
+                    'type': 'githubUser',
+                    'username': 'octocat',
+                    'github_hostname': 'github.com',
+                },
+            ],
+        },
+    )
     assert label.name == 'odg.ocm.software/responsibles'
     assert len(label.value) == 1
     responsible = label.value[0]
@@ -42,15 +44,17 @@ def test_responsibles_label_from_dict_github_user():
 
 
 def test_responsibles_label_from_dict_github_team():
-    label = responsibles.labels.ResponsiblesLabel.from_dict({
-        'name': 'odg.ocm.software/responsibles',
-        'value': [
-            {
-                'type': 'githubTeam',
-                'teamname': 'org/maintainers',
-            },
-        ],
-    })
+    label = responsibles.labels.ResponsiblesLabel.from_dict(
+        {
+            'name': 'odg.ocm.software/responsibles',
+            'value': [
+                {
+                    'type': 'githubTeam',
+                    'teamname': 'org/maintainers',
+                },
+            ],
+        },
+    )
     assert label.name == 'odg.ocm.software/responsibles'
     assert len(label.value) == 1
     responsible = label.value[0]
@@ -60,15 +64,17 @@ def test_responsibles_label_from_dict_github_team():
 
 
 def test_responsibles_label_from_dict_email():
-    label = responsibles.labels.ResponsiblesLabel.from_dict({
-        'name': 'odg.ocm.software/responsibles',
-        'value': [
-            {
-                'type': 'emailAddress',
-                'email': 'dev@example.com',
-            },
-        ],
-    })
+    label = responsibles.labels.ResponsiblesLabel.from_dict(
+        {
+            'name': 'odg.ocm.software/responsibles',
+            'value': [
+                {
+                    'type': 'emailAddress',
+                    'email': 'dev@example.com',
+                },
+            ],
+        },
+    )
     assert label.name == 'odg.ocm.software/responsibles'
     responsible = label.value[0]
     assert isinstance(responsible, responsibles.labels.EmailResponsible)
@@ -77,14 +83,16 @@ def test_responsibles_label_from_dict_email():
 
 
 def test_responsibles_label_from_dict_multiple_responsibles():
-    label = responsibles.labels.ResponsiblesLabel.from_dict({
-        'name': 'odg.ocm.software/responsibles',
-        'value': [
-            {'type': 'githubUser', 'username': 'alice'},
-            {'type': 'githubTeam', 'teamname': 'org/reviewers'},
-            {'type': 'emailAddress', 'email': 'dev@example.com'},
-        ],
-    })
+    label = responsibles.labels.ResponsiblesLabel.from_dict(
+        {
+            'name': 'odg.ocm.software/responsibles',
+            'value': [
+                {'type': 'githubUser', 'username': 'alice'},
+                {'type': 'githubTeam', 'teamname': 'org/reviewers'},
+                {'type': 'emailAddress', 'email': 'dev@example.com'},
+            ],
+        },
+    )
     assert len(label.value) == 3
     types = [r.type for r in label.value]
     assert responsibles.labels.ResponsibleType.GITHUB_USER in types
@@ -181,3 +189,4 @@ def test_find_responsibles_label_artifact_not_found_raises():
             component=component,
             artifact_name='nonexistent',
         )
+

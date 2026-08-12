@@ -3,7 +3,6 @@ import dataclasses
 import datetime
 import dataclasses_json
 import http
-import io
 import logging
 import tarfile
 import zlib
@@ -12,7 +11,6 @@ import aiohttp.web
 import dacite.exceptions
 import sqlalchemy as sa
 import sqlalchemy.ext.asyncio as sqlasync
-import yaml
 
 import cnudie.retrieve
 import cnudie.retrieve_async
@@ -24,6 +22,7 @@ import ocm
 import ocm.iter
 import ocm.iter_async
 import ocm.oci
+import ocm.util
 
 import compliance_summary as cs
 import consts
@@ -32,6 +31,7 @@ import deliverydb.model as dm
 import deliverydb.util as du
 import features
 import lookups
+import ocm_util
 import odg.model
 import responsibles
 import responsibles.labels
@@ -141,15 +141,23 @@ async def _component_descriptor(
     else:
         ocm_repository_lookup = lookups.extended_ocm_repository_lookup(ocm_repo)
 
-    ocm_repos = list(ocm_repository_lookup(component_name))
-
     if raw or ignore_cache:
         # in both cases fetch directly from oci-registry
+        ocm_repos = list(ocm_repository_lookup(component_name))
+        oci_client = lookups.semver_sanitising_oci_client_async()
+
         try:
-            raw = await cnudie.retrieve_async.raw_component_descriptor_from_oci(
+            if raw:
+                return await ocm_util.raw_component_descriptor_from_oci_async(
+                    component_id=component_id,
+                    ocm_repos=ocm_repos,
+                    oci_client=oci_client,
+                )
+
+            return await cnudie.retrieve_async.component_descriptor_from_oci(
                 component_id=component_id,
                 ocm_repos=ocm_repos,
-                oci_client=lookups.semver_sanitising_oci_client_async(),
+                oci_client=oci_client,
             )
 
         except om.OciImageNotFoundException:
@@ -160,28 +168,6 @@ async def _component_descriptor(
                     f'"{component_id.version}" not found in {ocm_repo=}'
                 ),
             )
-
-        # wrap in fobj
-        blob_fobj = io.BytesIO(raw)
-
-        with tarfile.open(fileobj=blob_fobj, mode='r') as tf:
-            component_descriptor_info = tf.getmember(ocm.oci.component_descriptor_fname)
-            component_descriptor_bytes = tf.extractfile(component_descriptor_info).read()
-
-        if raw:
-            component_descriptor = component_descriptor_bytes.decode()
-
-        else:
-            try:
-                component_descriptor = ocm.ComponentDescriptor.from_dict(
-                    yaml.safe_load(component_descriptor_bytes),
-                )
-            except dacite.exceptions.MissingValueError as e:
-                raise aiohttp.web.HTTPFailedDependency(
-                    reason=str(e),
-                )
-
-        return component_descriptor
 
     try:
         descriptor = await util.retrieve_component_descriptor(
@@ -433,6 +419,8 @@ class ComponentResponsibles(aiohttp.web.View):
         component = component_descriptor.component
         main_source = cnudie.util.main_source(component_descriptor.component)
         artifact_name = util.param(params, 'artifact_name')
+
+
 
         try:
             responsibles_label = responsibles.labels.find_responsibles_label(
@@ -776,6 +764,7 @@ async def resolve_component_dependencies(
             ocm_repo=ocm_repository_lookup,
         ):
             _ensure_cicd_source_label(component_node.component.sources)
+
 
             yield component_node
     except dacite.exceptions.MissingValueError as e:

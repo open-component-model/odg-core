@@ -8,7 +8,6 @@ import logging
 import ci.log
 import cnudie.retrieve
 import ocm
-import ocm.iter
 
 import k8s.util
 import k8s.logging
@@ -44,11 +43,6 @@ def has_local_linter(
 
     return False
 
-
-def find_scan_policy(
-    snode: ocm.iter.SourceNode,
-) -> odg.labels.ScanPolicy | None:
-    return odg.labels.find_source_scan_policy(snode)
 
 
 def create_missing_linter_finding(
@@ -180,7 +174,7 @@ def iter_artefact_metadata(
         discovery_date=creation_timestamp.date(),
     )
 
-    if find_scan_policy(source_node) is odg.labels.ScanPolicy.SKIP:
+    if odg.labels.find_source_scan_policy(source_node) is odg.labels.ScanPolicy.SKIP:
         logger.info(
             f'Skip label found for source {source_node.source.name}. No SAST Linting required ...',
         )

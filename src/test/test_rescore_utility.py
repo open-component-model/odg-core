@@ -141,3 +141,4 @@ def test_find_cve_categorisation_new_artefact_beats_legacy_component():
     node = _make_artefact_node(artefact_labels=[artefact_label], component_labels=[component_label])
     result = rescore.utility.find_cve_categorisation(node)
     assert result.authentication_enforced is False
+

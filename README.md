@@ -56,6 +56,31 @@ You can use Kubernetes-in-Docker (KinD) to deploy such a setup locally.
 
 Please refer to [this guide](https://open-component-model.github.io/open-delivery-gear/contents/how-to/01-local-setup.html) to deploy ODG to KinD.
 
+### Dev Container
+
+You can also develop ODG in a [Dev Container](https://code.visualstudio.com/docs/devcontainers/containers). Install the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) and choose **Reopen in Container** in VS Code.
+
+The Dev Container provides:
+
+* Run & debug:
+  * To run the core service, run `Debug: core service`
+  * To run an extension, run `Debug: extension` and select the extension
+* Pytest integration
+* PostgreSQL browser (password: `MyPassword`, see `.devcontainer/compose.yml`)
+* Auto-format & lint on save
+
+To work with a KinD cluster:
+
+1. Create the KinD cluster on the host: `kind create cluster --config .devcontainer/kind-config.yml`, which includes `host.docker.internal` as SAN
+1. Open the Dev Container (**Reopen in Container** in VS Code)
+1. Open a terminal session. The kubeconfig is refreshed on every shell startup, with `127.0.0.1` replaced by `host.docker.internal`
+1. Run `.devcontainer/prepare-kind.py` in the Dev Container to apply ODG CRDs and create `src/secrets/kubernetes/devcontainers-cluster.yaml`
+1. Update your local [configuration and secrets](https://open-component-model.github.io/open-delivery-gear/contents/how-to/00-hybrid-dev-setup.html#configuration-and-secrets)
+
+If you use Kubeconfig with multiple files, flatten first: `kubectl config view --raw --flatten > ~/.kube/config`.
+
+To clean up the KinD cluster: `kind delete clusters odg-devcontainer-cluster`
+
 ## Documentation
 
 The documentation is hosted [here](https://open-component-model.github.io/open-delivery-gear/index.html).

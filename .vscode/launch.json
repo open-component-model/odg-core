@@ -1,0 +1,44 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug: core service",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/app.py",
+      "args": [
+        "--delivery-db-url", "postgresql+psycopg://postgres:MyPassword@db:5432/postgres"
+      ],
+      "env": { "PYTHONPATH": "${workspaceFolder}/src" },
+      "cwd": "${workspaceFolder}/src",
+      "justMyCode": false
+    },
+    {
+      "name": "Debug: extension",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "${input:extension}",
+      "env": { "PYTHONPATH": "${workspaceFolder}/src" },
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false
+    }
+  ],
+  "inputs": [
+    {
+      "id": "extension",
+      "type": "pickString",
+      "description": "Which extension?",
+      "options": [
+        "artefact_enumerator",
+        "bdba_extension",
+        "crypto_extension",
+        "freshclam",
+        "issue_replicator",
+        "malware",
+        "odg_operator",
+        "osid_extension",
+        "responsibles_extension"
+      ]
+    }
+  ]
+}

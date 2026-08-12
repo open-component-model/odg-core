@@ -361,3 +361,14 @@ def version_sorting_key(
         version = versionutil.parse_to_semver(fallback_version)
 
     return version
+
+
+def media_type_supports(
+    media_type: str,
+    type: str,
+) -> bool:
+    media_type: str = media_type.split(';', 1)[0].lower()
+
+    subtype = media_type.split('/', 1)[-1].replace('+', '.').replace('-', '.')
+
+    return type in subtype.split('.')

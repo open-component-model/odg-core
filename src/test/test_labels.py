@@ -1,3 +1,5 @@
+import unittest.mock
+
 import pytest
 
 import ocm
@@ -388,3 +390,4 @@ def test_find_source_scan_policy_new_source_beats_legacy_component():
     )
     node = _make_source_node(source_labels=[source_label], component_labels=[component_label])
     assert odg.labels.find_source_scan_policy(node) is odg.labels.ScanPolicy.SKIP
+
