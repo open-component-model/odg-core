@@ -6,10 +6,7 @@ import pprint
 
 import tabulate
 
-import cnudie.access
-import ocm
 import ocm.iter
-import tarutil
 
 import bdba.client
 import bdba.model as bm
@@ -98,12 +95,6 @@ def scan(
     oci_client = lookups.semver_sanitising_oci_client(
         secret_factory=secret_factory,
     )
-    if aws_cfg_name:
-        aws_cfg = secret_factory.aws(aws_cfg_name)
-        s3_client = aws_cfg.session.client('s3')
-    else:
-        s3_client = None
-        logger.warning('failed to initialise s3-client')
 
     if not bdba_api_url:
         bdba_api_url = bdba_cfg.api_url
@@ -151,45 +142,12 @@ def scan(
                 group_id=bdba_group_id,
             )
 
-            access = resource_node.resource.access
-
-            if access.type is ocm.AccessType.OCI_REGISTRY:
-                content_iterator = ocm_util.image_layers_as_tarfile_generator(
-                    image_reference=access.imageReference,
-                    oci_client=oci_client,
-                    include_config_blob=False,
-                    fallback_to_first_subimage_if_index=True,
-                )
-
-            elif access.type is ocm.AccessType.S3:
-                content_iterator = tarutil.concat_blobs_as_tarstream(
-                    blobs=[
-                        cnudie.access.s3_access_as_blob_descriptor(
-                            s3_client=s3_client,
-                            s3_access=access,
-                        ),
-                    ],
-                )
-
-            elif access.type is ocm.AccessType.LOCAL_BLOB:
-                ocm_repo = resource_node.component.current_ocm_repo
-                image_reference = ocm_repo.component_version_oci_ref(
-                    name=resource_node.component.name,
-                    version=resource_node.component.version,
-                )
-
-                content_iterator = tarutil.concat_blobs_as_tarstream(
-                    blobs=[
-                        ocm_util.local_blob_access_as_blob_descriptor(
-                            access=access,
-                            oci_client=oci_client,
-                            image_reference=image_reference,
-                        ),
-                    ],
-                )
-
-            else:
-                raise NotImplementedError(access)
+            content_iterator = ocm_util.iter_content_for_resource_node(
+                resource_node=resource_node,
+                oci_client=oci_client,
+                secret_factory=secret_factory,
+                aws_secret_name=aws_cfg_name,
+            )
 
             yield from processor.process(
                 resource_node=resource_node,

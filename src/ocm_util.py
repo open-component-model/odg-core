@@ -1,14 +1,19 @@
 import collections.abc
+import io
 import logging
 import tarfile
+
+import dacite
 
 import cnudie.access
 import cnudie.retrieve_async
 import ioutil
 import oci.client
+import oci.client_async
 import oci.model
 import ocm
 import ocm.iter
+import ocm.oci
 import tarutil
 
 import odg.model
@@ -49,7 +54,15 @@ def local_blob_access_as_blob_descriptor(
         )
 
         if isinstance(manifest, oci.model.OciImageManifestList):
-            raise ValueError('component-descriptor manifest must not be a manifest list')
+            component_descriptor_manifest_digest = ocm.oci.find_component_descriptor_manifest_digest(
+                index_manifest=manifest,
+            )
+
+            manifest = oci_client.manifest(
+                image_reference=oci.model.OciImageReference(image_reference).with_tag(
+                    tag=component_descriptor_manifest_digest,
+                ),
+            )
 
         for layer in manifest.layers:
             if layer.digest == digest:
@@ -62,6 +75,27 @@ def local_blob_access_as_blob_descriptor(
         content=blob.iter_content(chunk_size=4096),
         size=size,
         name=access.referenceName,
+    )
+
+
+def oci_blob_access_as_blob_descriptor(
+    access: ocm.OciBlobAccess,
+    oci_client: oci.client.Client,
+    image_reference: str,
+) -> ioutil.BlobDescriptor:
+    digest = access.digest.lower()
+    size = access.size
+
+    blob = oci_client.blob(
+        image_reference=image_reference,
+        digest=digest,
+        stream=True,
+    )
+
+    return ioutil.BlobDescriptor(
+        content=blob.iter_content(chunk_size=4096),
+        size=size,
+        name=f'{digest}.tar',
     )
 
 
@@ -163,6 +197,73 @@ def find_artefact_node(
         )
 
 
+def _iter_content_for_s3(
+    access: ocm.S3Access | ocm.LegacyS3Access,
+    secret_factory: secret_mgmt.SecretFactory,
+    aws_secret_name: str | None = None,
+) -> collections.abc.Iterator[bytes]:
+    aws_secret = secret_mgmt.aws.find_cfg(
+        secret_factory=secret_factory,
+        secret_name=aws_secret_name,
+    )
+    s3_client = aws_secret.session.client('s3')
+
+    return tarutil.concat_blobs_as_tarstream(
+        blobs=[
+            cnudie.access.s3_access_as_blob_descriptor(
+                s3_client=s3_client,
+                s3_access=access,
+            ),
+        ],
+    )
+
+
+def _iter_content_for_blob(
+    access: ocm.LocalBlobAccess | ocm.OciBlobAccess,
+    component: ocm.Component,
+    oci_client: oci.client.Client,
+) -> collections.abc.Iterator[bytes]:
+    image_reference = component.current_ocm_repo.component_version_oci_ref(
+        name=component.name,
+        version=component.version,
+    )
+
+    if access.type is ocm.AccessType.LOCAL_BLOB:
+        digest = access.localReference.lower()
+    else:
+        digest = access.digest.lower()
+
+    if access.mediaType in (
+        oci.model.OCI_IMAGE_INDEX_MIME,
+        oci.model.OCI_MANIFEST_SCHEMA_V2_MIME,
+        oci.model.DOCKER_MANIFEST_LIST_MIME,
+        oci.model.DOCKER_MANIFEST_SCHEMA_V2_MIME,
+    ):
+        image_reference = oci.model.OciImageReference(image_reference).with_tag(digest)
+
+        return image_layers_as_tarfile_generator(
+            image_reference=image_reference,
+            oci_client=oci_client,
+            include_config_blob=False,
+            fallback_to_first_subimage_if_index=True,
+        )
+
+    if access.type is ocm.AccessType.LOCAL_BLOB:
+        blob_descriptor = local_blob_access_as_blob_descriptor(
+            access=access,
+            oci_client=oci_client,
+            image_reference=image_reference,
+        )
+    else:
+        blob_descriptor = oci_blob_access_as_blob_descriptor(
+            access=access,
+            oci_client=oci_client,
+            image_reference=image_reference,
+        )
+
+    return tarutil.concat_blobs_as_tarstream(blobs=[blob_descriptor])
+
+
 def iter_content_for_resource_node(
     resource_node: ocm.iter.ResourceNode,
     oci_client: oci.client.Client,
@@ -172,6 +273,8 @@ def iter_content_for_resource_node(
     access = resource_node.resource.access
 
     if access.type is ocm.AccessType.OCI_REGISTRY:
+        access: ocm.OciAccess
+
         return image_layers_as_tarfile_generator(
             image_reference=access.imageReference,
             oci_client=oci_client,
@@ -180,36 +283,20 @@ def iter_content_for_resource_node(
         )
 
     elif access.type is ocm.AccessType.S3:
-        aws_secret = secret_mgmt.aws.find_cfg(
+        return _iter_content_for_s3(
+            access=access,
             secret_factory=secret_factory,
-            secret_name=aws_secret_name,
-        )
-        s3_client = aws_secret.session.client('s3')
-
-        return tarutil.concat_blobs_as_tarstream(
-            blobs=[
-                cnudie.access.s3_access_as_blob_descriptor(
-                    s3_client=s3_client,
-                    s3_access=access,
-                ),
-            ],
+            aws_secret_name=aws_secret_name,
         )
 
-    elif access.type is ocm.AccessType.LOCAL_BLOB:
-        ocm_repo = resource_node.component.current_ocm_repo
-        image_reference = ocm_repo.component_version_oci_ref(
-            name=resource_node.component.name,
-            version=resource_node.component.version,
-        )
-
-        return tarutil.concat_blobs_as_tarstream(
-            blobs=[
-                local_blob_access_as_blob_descriptor(
-                    access=access,
-                    oci_client=oci_client,
-                    image_reference=image_reference,
-                ),
-            ],
+    elif access.type in (
+        ocm.AccessType.LOCAL_BLOB,
+        ocm.AccessType.OCI_BLOB,
+    ):
+        return _iter_content_for_blob(
+            access=access,
+            component=resource_node.component,
+            oci_client=oci_client,
         )
 
     else:
@@ -217,7 +304,7 @@ def iter_content_for_resource_node(
 
 
 def image_layers_as_tarfile_generator(
-    image_reference: str,
+    image_reference: str | oci.model.OciImageReference,
     oci_client: oci.client.Client,
     chunk_size=tarfile.RECORDSIZE,
     include_config_blob=True,
@@ -281,3 +368,86 @@ def image_layers_as_tarfile_generator(
             for blob_ref in blob_refs
         ),
     )
+
+
+async def raw_component_descriptor_from_oci_async(
+    component_id: ocm.ComponentIdentity,
+    ocm_repos: collections.abc.Iterable[ocm.OciOcmRepository | str],
+    oci_client: oci.client_async.Client,
+    absent_ok: bool = False,
+) -> str | None:
+    for ocm_repo in ocm_repos:
+        if isinstance(ocm_repo, str):
+            ocm_repo = ocm.OciOcmRepository(
+                baseUrl=ocm_repo,
+            )
+
+        if not isinstance(ocm_repo, ocm.OciOcmRepository):
+            raise NotImplementedError(ocm_repo)
+
+        target_ref = ocm_repo.component_version_oci_ref(component_id)
+
+        manifest = await oci_client.manifest(
+            image_reference=target_ref,
+            absent_ok=True,
+            accept=f'{oci.model.OCI_MANIFEST_SCHEMA_V2_MIME}, {oci.model.OCI_IMAGE_INDEX_MIME}',
+        )
+
+        if not manifest:
+            continue
+
+        if manifest.mediaType == oci.model.OCI_IMAGE_INDEX_MIME:
+            digest = ocm.oci.find_component_descriptor_manifest_digest(manifest)
+
+            manifest = await oci_client.manifest(
+                image_reference=oci.model.OciImageReference(target_ref).with_tag(digest),
+                accept=oci.model.OCI_MANIFEST_SCHEMA_V2_MIME,
+            )
+
+        break
+    else:
+        if absent_ok:
+            return None
+        raise oci.model.OciImageNotFoundException
+
+    try:
+        cfg_blob = await oci_client.blob(
+            image_reference=target_ref,
+            digest=manifest.config.digest,
+        )
+        cfg_dict = await cfg_blob.json(content_type='application/octet-stream')
+        cfg = dacite.from_dict(
+            data_class=ocm.oci.ComponentDescriptorOciCfg,
+            data=cfg_dict,
+        )
+        layer_digest = cfg.componentDescriptorLayer.digest
+        layer_mimetype = cfg.componentDescriptorLayer.mediaType
+    except Exception as e:
+        logger.warning(
+            f'Failed to parse or retrieve component-descriptor-cfg: {e=}. '
+            'falling back to single-layer',
+        )
+
+        # by contract, there must be exactly one layer (tar w/ component-descriptor)
+        if (layers_count := len(manifest.layers)) != 1:
+            logger.warning(f'XXX unexpected amount of {layers_count=}')
+
+        layer_digest = manifest.layers[0].digest
+        layer_mimetype = manifest.layers[0].mediaType
+
+    blob = await oci_client.blob(
+        image_reference=target_ref,
+        digest=layer_digest,
+    )
+    component_descriptor_blob = await blob.content.read()
+
+    if '+tar' in layer_mimetype:
+        try:
+            with tarfile.open(fileobj=io.BytesIO(component_descriptor_blob), mode='r') as tf:
+                component_descriptor_info = tf.getmember(ocm.oci.component_descriptor_fname)
+                component_descriptor_blob = tf.extractfile(component_descriptor_info).read()
+        except tarfile.ReadError as tre:
+            tre.add_note(f'{component_id=}')
+            raise tre
+
+    return component_descriptor_blob.decode()
