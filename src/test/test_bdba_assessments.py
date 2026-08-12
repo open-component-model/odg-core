@@ -29,7 +29,7 @@ def _make_component_and_resource(
     return component, resource
 
 
-def _call(component, resource):
+def _collect_package_version_overwrites(component, resource):
     delivery_service_client = unittest.mock.Mock()
     delivery_service_client  # not under test — mock away
 
@@ -55,7 +55,7 @@ def test_iter_package_version_overwrites_from_resource():
         resource_label=label,
         component_label=None,
     )
-    results = _call(component, resource)
+    results = _collect_package_version_overwrites(component, resource)
     assert len(results) == 1
     assert results[0].package_name == 'openssl'
     assert results[0].package_version_to == '3.0.1'
@@ -70,7 +70,7 @@ def test_iter_package_version_overwrites_from_component_fallback():
         resource_label=None,
         component_label=label,
     )
-    results = _call(component, resource)
+    results = _collect_package_version_overwrites(component, resource)
     assert len(results) == 1
     assert results[0].package_name == 'zlib'
     assert results[0].package_version_to == '1.2.11'
@@ -89,7 +89,7 @@ def test_iter_package_version_overwrites_resource_takes_precedence():
         resource_label=resource_label,
         component_label=component_label,
     )
-    results = _call(component, resource)
+    results = _collect_package_version_overwrites(component, resource)
     assert len(results) == 1
     assert results[0].package_name == 'openssl'
 
@@ -99,5 +99,5 @@ def test_iter_package_version_overwrites_no_label():
         resource_label=None,
         component_label=None,
     )
-    results = _call(component, resource)
+    results = _collect_package_version_overwrites(component, resource)
     assert results == []
