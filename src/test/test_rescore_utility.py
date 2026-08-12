@@ -1,7 +1,6 @@
 import ocm
 import ocm.iter
 
-import odg.labels
 import rescore.utility
 
 
@@ -46,6 +45,7 @@ def _make_artefact_node(
 # ---------------------------------------------------------------------------
 # find_cve_categorisation — new label name
 # ---------------------------------------------------------------------------
+
 
 def test_find_cve_categorisation_from_artefact():
     label = ocm.Label(
@@ -92,6 +92,7 @@ def test_find_cve_categorisation_not_found():
 # ---------------------------------------------------------------------------
 # find_cve_categorisation — legacy label name (backwards compat)
 # ---------------------------------------------------------------------------
+
 
 def test_find_cve_categorisation_from_artefact_legacy():
     label = ocm.Label(
@@ -141,4 +142,3 @@ def test_find_cve_categorisation_new_artefact_beats_legacy_component():
     node = _make_artefact_node(artefact_labels=[artefact_label], component_labels=[component_label])
     result = rescore.utility.find_cve_categorisation(node)
     assert result.authentication_enforced is False
-

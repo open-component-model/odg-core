@@ -1,5 +1,3 @@
-import unittest.mock
-
 import ocm
 
 import bdba_utils.model

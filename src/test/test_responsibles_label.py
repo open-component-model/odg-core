@@ -101,10 +101,12 @@ def test_responsibles_label_from_dict_multiple_responsibles():
 
 
 def test_responsibles_label_legacy_name():
-    label = responsibles.labels.ResponsiblesLabel.from_dict({
-        'name': 'cloud.gardener.cnudie/responsibles',
-        'value': [{'type': 'githubUser', 'username': 'alice'}],
-    })
+    label = responsibles.labels.ResponsiblesLabel.from_dict(
+        {
+            'name': 'cloud.gardener.cnudie/responsibles',
+            'value': [{'type': 'githubUser', 'username': 'alice'}],
+        },
+    )
     assert label.name == 'cloud.gardener.cnudie/responsibles'
     responsible = label.value[0]
     assert isinstance(responsible, responsibles.labels.GitHubUserResponsible)
@@ -115,6 +117,7 @@ def test_responsibles_label_legacy_name():
 # ---------------------------------------------------------------------------
 # find_responsibles_label
 # ---------------------------------------------------------------------------
+
 
 def test_find_responsibles_label():
     label = ocm.Label(
@@ -152,7 +155,11 @@ def test_find_responsibles_label_artifact():
         value=[{'type': 'githubUser', 'username': 'alice'}],
     )
     resource = ocm.Resource(
-        name='test-resource', version='1.0.0', type='ociImage', access=None, labels=[label],
+        name='test-resource',
+        version='1.0.0',
+        type='ociImage',
+        access=None,
+        labels=[label],
     )
     component = _make_component(resources=[resource])
     result = responsibles.labels.find_responsibles_label(
@@ -170,7 +177,11 @@ def test_find_responsibles_label_artifact_legacy_name():
         value=[{'type': 'githubUser', 'username': 'alice'}],
     )
     resource = ocm.Resource(
-        name='test-resource', version='1.0.0', type='ociImage', access=None, labels=[label],
+        name='test-resource',
+        version='1.0.0',
+        type='ociImage',
+        access=None,
+        labels=[label],
     )
     component = _make_component(resources=[resource])
     result = responsibles.labels.find_responsibles_label(
@@ -189,4 +200,3 @@ def test_find_responsibles_label_artifact_not_found_raises():
             component=component,
             artifact_name='nonexistent',
         )
-

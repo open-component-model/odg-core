@@ -6,6 +6,7 @@ import ocm
 
 import odg.labels
 
+
 @dataclasses.dataclass
 class ScanRequest:
     """

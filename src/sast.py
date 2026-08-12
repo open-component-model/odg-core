@@ -44,7 +44,6 @@ def has_local_linter(
     return False
 
 
-
 def create_missing_linter_finding(
     artefact: odg.model.ComponentArtefactId,
     sub_type: odg.model.SastSubType,

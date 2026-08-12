@@ -1,5 +1,3 @@
-
-
 import ocm
 
 import sast
@@ -54,6 +52,7 @@ def test_has_local_linter_second_resource_matches():
 # legacy: gardener.cloud/purposes
 # ---------------------------------------------------------------------------
 
+
 def test_has_local_linter_resource_with_sast_purpose_legacy_name():
     label = ocm.Label(name='gardener.cloud/purposes', value=['sast', 'lint'])
     resource = _make_resource(label=label)
@@ -64,4 +63,3 @@ def test_has_local_linter_resource_without_sast_purpose_legacy_name():
     label = ocm.Label(name='gardener.cloud/purposes', value=['lint'])
     resource = _make_resource(label=label)
     assert sast.has_local_linter([resource]) is False
-

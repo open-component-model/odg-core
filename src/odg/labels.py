@@ -102,10 +102,7 @@ _LABEL_NAME_ALIASES = {
 
 @functools.cache
 def get_label_names_with_aliases(label_type: type[Label]) -> list[str]:
-    return [label_type.name] + [
-        k for k, v in _LABEL_NAME_ALIASES.items()
-        if v == label_type.name
-    ]
+    return [label_type.name] + [k for k, v in _LABEL_NAME_ALIASES.items() if v == label_type.name]
 
 
 def deserialise_label(

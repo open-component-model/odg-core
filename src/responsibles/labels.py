@@ -76,17 +76,18 @@ class ResponsiblesLabel(ocm.Label):
             ),
         )
 
+
 def find_responsibles_label(
     component: ocm.Component,
     artifact_name: str | None = None,
 ) -> 'ResponsiblesLabel | None':
-    '''
+    """
     Returns the most specific ResponsiblesLabel for the given component and artifact name,
     or None if no label is found.
 
     Raises ValueError if artifact_name is given but no matching artifact exists.
-    '''
-    label_names = [ResponsiblesLabel.name, "cloud.gardener.cnudie/responsibles"]  # legacy alias
+    """
+    label_names = [ResponsiblesLabel.name, 'cloud.gardener.cnudie/responsibles']  # legacy alias
 
     if artifact_name:
         matching_artifacts = [

@@ -285,7 +285,6 @@ def _make_finding(
     )
 
 
-
 def scan(
     artefact: odg.model.ComponentArtefactId,
     extension_cfg: odg.extensions_cfg.CodeqlConfig,

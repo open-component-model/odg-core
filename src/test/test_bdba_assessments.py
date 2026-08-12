@@ -3,7 +3,6 @@ import unittest.mock
 import ocm
 
 import bdba_utils.assessments
-import odg.model
 
 
 def _make_component_and_resource(
@@ -34,13 +33,17 @@ def _call(component, resource):
     delivery_service_client = unittest.mock.Mock()
     delivery_service_client  # not under test — mock away
 
-    with unittest.mock.patch('odg.model.component_artefact_id_from_ocm'), \
-         unittest.mock.patch('odg.util.iter_scanner_writebacks', return_value=iter([])):
-        return list(bdba_utils.assessments.iter_package_version_overwrites(
-            component=component,
-            resource=resource,
-            delivery_service_client=delivery_service_client,
-        ))
+    with (
+        unittest.mock.patch('odg.model.component_artefact_id_from_ocm'),
+        unittest.mock.patch('odg.util.iter_scanner_writebacks', return_value=iter([])),
+    ):
+        return list(
+            bdba_utils.assessments.iter_package_version_overwrites(
+                component=component,
+                resource=resource,
+                delivery_service_client=delivery_service_client,
+            ),
+        )
 
 
 def test_iter_package_version_overwrites_from_resource():

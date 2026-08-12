@@ -21,8 +21,6 @@ import oci.model as om
 import ocm
 import ocm.iter
 import ocm.iter_async
-import ocm.oci
-import ocm.util
 
 import compliance_summary as cs
 import consts
@@ -420,8 +418,6 @@ class ComponentResponsibles(aiohttp.web.View):
         main_source = cnudie.util.main_source(component_descriptor.component)
         artifact_name = util.param(params, 'artifact_name')
 
-
-
         try:
             responsibles_label = responsibles.labels.find_responsibles_label(
                 component=component,
@@ -764,7 +760,6 @@ async def resolve_component_dependencies(
             ocm_repo=ocm_repository_lookup,
         ):
             _ensure_cicd_source_label(component_node.component.sources)
-
 
             yield component_node
     except dacite.exceptions.MissingValueError as e:

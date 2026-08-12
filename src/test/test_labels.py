@@ -1,5 +1,3 @@
-import unittest.mock
-
 import pytest
 
 import ocm
@@ -17,6 +15,7 @@ def _make_label(name: str, value) -> ocm.Label:
 # get_label_names_with_aliases
 # ---------------------------------------------------------------------------
 
+
 def test_get_label_names_with_aliases():
     names = odg.labels.get_label_names_with_aliases(odg.labels.BinaryScanPolicyLabel)
     assert 'odg.ocm.software/binary-scan-policy' in names
@@ -26,6 +25,7 @@ def test_get_label_names_with_aliases():
 # ---------------------------------------------------------------------------
 # BinaryScanPolicyLabel
 # ---------------------------------------------------------------------------
+
 
 def test_binary_scan_policy_label_scan():
     label = _make_label(
@@ -54,6 +54,7 @@ def test_binary_scan_policy_label_skip_with_comment():
 # BinaryScanPolicyLabel — legacy name (backwards compat)
 # ---------------------------------------------------------------------------
 
+
 def test_binary_scan_policy_label_legacy_name_scan():
     label = _make_label(
         name='cloud.gardener.cnudie/dso/scanning-hints/binary_id/v1',
@@ -61,7 +62,7 @@ def test_binary_scan_policy_label_legacy_name_scan():
     )
     result = odg.labels.deserialise_label(label)
     assert isinstance(result, odg.labels.BinaryScanPolicyLabel)
-    assert result.name is "cloud.gardener.cnudie/dso/scanning-hints/binary_id/v1"
+    assert result.name == 'cloud.gardener.cnudie/dso/scanning-hints/binary_id/v1'
     assert result.value.policy is odg.labels.ScanPolicy.SCAN
     assert result.value.comment is None
 
@@ -73,7 +74,7 @@ def test_binary_scan_policy_label_legacy_name_skip_with_comment():
     )
     result = odg.labels.deserialise_label(label)
     assert isinstance(result, odg.labels.BinaryScanPolicyLabel)
-    assert result.name is "cloud.gardener.cnudie/dso/scanning-hints/binary_id/v1"
+    assert result.name == 'cloud.gardener.cnudie/dso/scanning-hints/binary_id/v1'
     assert result.value.policy is odg.labels.ScanPolicy.SKIP
     assert result.value.comment == 'do not scan'
 
@@ -99,6 +100,7 @@ def test_binary_scan_policy_label_legacy_name_with_path_config():
 # ---------------------------------------------------------------------------
 # SourceScanPolicyLabel
 # ---------------------------------------------------------------------------
+
 
 def test_source_scan_policy_label_scan():
     label = _make_label(
@@ -127,6 +129,7 @@ def test_source_scan_policy_label_skip_with_comment():
 # SourceScanPolicyLabel — legacy name (backwards compat)
 # ---------------------------------------------------------------------------
 
+
 def test_source_scan_policy_label_legacy_name_scan():
     label = _make_label(
         name='cloud.gardener.cnudie/dso/scanning-hints/source_analysis/v1',
@@ -134,7 +137,7 @@ def test_source_scan_policy_label_legacy_name_scan():
     )
     result = odg.labels.deserialise_label(label)
     assert isinstance(result, odg.labels.SourceScanPolicyLabel)
-    assert result.name is "cloud.gardener.cnudie/dso/scanning-hints/source_analysis/v1"
+    assert result.name == 'cloud.gardener.cnudie/dso/scanning-hints/source_analysis/v1'
     assert result.value.policy is odg.labels.ScanPolicy.SCAN
 
 
@@ -152,13 +155,14 @@ def test_source_scan_policy_label_legacy_name_with_path_config():
     )
     result = odg.labels.deserialise_label(label)
     assert isinstance(result, odg.labels.SourceScanPolicyLabel)
-    assert result.name is "cloud.gardener.cnudie/dso/scanning-hints/source_analysis/v1"
+    assert result.name == 'cloud.gardener.cnudie/dso/scanning-hints/source_analysis/v1'
     assert result.value.policy is odg.labels.ScanPolicy.SCAN
 
 
 # ---------------------------------------------------------------------------
 # PurposeLabel
 # ---------------------------------------------------------------------------
+
 
 def test_deserialise_purpose_label():
     label = _make_label(
@@ -167,7 +171,7 @@ def test_deserialise_purpose_label():
     )
     result = odg.labels.deserialise_label(label)
     assert isinstance(result, odg.labels.PurposeLabel)
-    assert result.name is 'odg.ocm.software/purposes'
+    assert result.name == 'odg.ocm.software/purposes'
     assert isinstance(result.value, tuple)
     assert 'lint' in result.value
     assert 'sast' in result.value
@@ -180,7 +184,7 @@ def test_deserialise_purpose_label_legacy_name():
     )
     result = odg.labels.deserialise_label(label)
     assert isinstance(result, odg.labels.PurposeLabel)
-    assert result.name is 'gardener.cloud/purposes'
+    assert result.name == 'gardener.cloud/purposes'
     assert 'lint' in result.value
     assert 'pybandit' in result.value
 
@@ -188,6 +192,7 @@ def test_deserialise_purpose_label_legacy_name():
 # ---------------------------------------------------------------------------
 # PackageVersionHintLabel
 # ---------------------------------------------------------------------------
+
 
 def test_deserialise_package_version_hint_label():
     label = _make_label(
@@ -210,6 +215,7 @@ def test_deserialise_package_version_hint_label():
 # ---------------------------------------------------------------------------
 # RiskProfileLabel
 # ---------------------------------------------------------------------------
+
 
 def test_deserialise_risk_profile_label():
     label = _make_label(
@@ -256,6 +262,7 @@ def test_deserialise_risk_profile_label_legacy_user_interaction():
 # RiskProfileLabel — legacy label name (backwards compat)
 # ---------------------------------------------------------------------------
 
+
 def test_deserialise_cve_categorisation_label():
     label = _make_label(
         name='gardener.cloud/cve-categorisation',
@@ -271,7 +278,7 @@ def test_deserialise_cve_categorisation_label():
     )
     result = odg.labels.deserialise_label(label)
     assert isinstance(result, odg.labels.RiskProfileLabel)
-    assert result.name is "gardener.cloud/cve-categorisation"
+    assert result.name == 'gardener.cloud/cve-categorisation'
     categorisation = result.value
     assert isinstance(categorisation, odg.cvss.CveCategorisation)
     assert categorisation.authentication_enforced is True
@@ -284,6 +291,7 @@ def test_deserialise_cve_categorisation_label():
 # ---------------------------------------------------------------------------
 # Unknown label
 # ---------------------------------------------------------------------------
+
 
 def test_deserialise_unknown_label_raises():
     label = _make_label(name='unknown.label/does-not-exist', value={})
@@ -304,6 +312,7 @@ def test_deserialise_accepts_dict():
 # ---------------------------------------------------------------------------
 # find_source_scan_policy
 # ---------------------------------------------------------------------------
+
 
 def _make_source_node(
     source_labels: list[ocm.Label] = (),
@@ -354,6 +363,7 @@ def test_find_source_scan_policy_not_found():
 # find_source_scan_policy — legacy name (backwards compat)
 # ---------------------------------------------------------------------------
 
+
 def test_find_source_scan_policy_from_source_legacy():
     label = ocm.Label(
         name='cloud.gardener.cnudie/dso/scanning-hints/source_analysis/v1',
@@ -390,4 +400,3 @@ def test_find_source_scan_policy_new_source_beats_legacy_component():
     )
     node = _make_source_node(source_labels=[source_label], component_labels=[component_label])
     assert odg.labels.find_source_scan_policy(node) is odg.labels.ScanPolicy.SKIP
-
