@@ -997,6 +997,22 @@ class CustomRescoring:
         )
 
 
+class SlaViolationTraceEventType(enum.StrEnum):
+    FINDING_DISCOVERED = 'finding-discovered'
+    RESCORING = 'rescoring'
+    VIOLATION_RESCORING_AFTER_DEADLINE = 'violation-rescoring-after-deadline'
+    VIOLATION_RELEASE_AFTER_DEADLINE = 'violation-release-after-deadline'
+
+
+@dataclasses.dataclass
+class SlaViolationTraceEntry:
+    event_type: SlaViolationTraceEventType
+    date: datetime.datetime
+    severity: str
+    deadline: datetime.datetime | None = None
+    comment: str | None = None
+
+
 @dataclasses.dataclass
 class SlaViolation:
     finding: (
@@ -1016,6 +1032,7 @@ class SlaViolation:
     referenced_type: str
     severity: str
     artefact: ComponentArtefactId
+    trace: list[SlaViolationTraceEntry] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass

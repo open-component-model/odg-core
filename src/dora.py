@@ -13,22 +13,21 @@ import urllib.parse
 
 import aiohttp.web
 import cachetools.keys
-import dateutil.parser
-import github3
-import sqlalchemy.ext.asyncio as sqlasync
-
 import cnudie.retrieve_async
 import cnudie.util
+import dateutil.parser
+import github3
 import ocm
 import ocm.iter
 import ocm.iter_async
+import ocm.util
+import sqlalchemy.ext.asyncio as sqlasync
 import version as versionutil
 
 import caching
 import components
 import consts
 import util
-
 
 logger = logging.getLogger(__name__)
 changes_by_dependencies_cache = dict()
@@ -254,8 +253,11 @@ def next_older_month(date: datetime.datetime) -> datetime.datetime:
 
 
 def can_process(dependency_update: components.ComponentVector):
-    old_main_source = cnudie.util.main_source(dependency_update.start)
-    new_main_source = cnudie.util.main_source(dependency_update.end)
+    old_main_source = ocm.util.main_source(dependency_update.start)
+    new_main_source = ocm.util.main_source(dependency_update.end)
+
+    if not old_main_source or not new_main_source:
+        return False
 
     if not isinstance(old_main_source.access, ocm.GithubAccess) or not isinstance(
         new_main_source.access,
@@ -347,13 +349,11 @@ def categorize_by_changed_component(
             left_component = dependency_update.start
             right_component = dependency_update.end
 
-            left_src = cnudie.util.main_source(
+            left_src = ocm.util.main_source(
                 left_component,
-                absent_ok=True,
             )
-            right_src = cnudie.util.main_source(
+            right_src = ocm.util.main_source(
                 right_component,
-                absent_ok=True,
             )
 
             if not left_src or not right_src:
@@ -677,8 +677,9 @@ def create_response_object(
             component_dependency_changes_with_commits,
             time_span_days,
         )
-        repo_url = cnudie.util.main_source(
+        repo_url = ocm.util.main_source(
             component_dependency_changes_with_commits[0].dependency_component_vector.start,
+            no_source_ok=False,
         ).access.repoUrl
 
         dependencies_response[dependency_name] = DoraDependencyResponse(

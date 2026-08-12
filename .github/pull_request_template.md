@@ -5,6 +5,9 @@ Fixes #
 
 **Special notes for your reviewer**:
 
+- [ ] Unit tests created for new code or existing unit tests updated (if applicable)
+- [ ] End-user documentation updated (if applicable)
+
 **Release note**:
 <!--  Write your release note:
 1. Enter your release note in the below block.
