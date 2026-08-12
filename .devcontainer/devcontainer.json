@@ -1,0 +1,51 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/python
+{
+	"name": "ODG Core",
+	"dockerComposeFile": "compose.yml",
+	"service": "app",
+	"workspaceFolder": "/workspaces/odg-core",
+
+	"postCreateCommand": "bash .devcontainer/post-create.sh",
+
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-python.python",
+				"ms-python.pylance",
+				"ms-python.debugpy",
+				"ms-ossdata.vscode-pgsql",
+				"charliermarsh.ruff",
+//				"anthropic.claude-code",
+				"nwgh.bandit",
+				"ms-kubernetes-tools.vscode-kubernetes-tools"
+			],
+			"settings": {
+				"[python]": {
+					"editor.formatOnSave": true,
+					"editor.defaultFormatter": "charliermarsh.ruff",
+					"editor.codeActionsOnSave": {
+						"source.fixAll.ruff": "always",
+						"source.organizeImports.ruff": "always"
+					}
+				},
+				"python.testing.pytestArgs": ["src"],
+				"python.testing.unittestEnabled": false,
+				"python.testing.pytestEnabled": true,
+				"python.testing.autoTestDiscoverOnSaveEnabled": true,
+				"pgsql.connections": [
+					{
+						"name": "odg-dev",
+						"host": "db",
+						"port": 5432,
+						"database": "postgres",
+						"user": "postgres",
+						"password": "MyPassword",
+						"authenticationType": "SqlLogin",
+						"sslmode": "disable"
+					}
+				]
+			}
+		}
+	}
+}

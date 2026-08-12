@@ -1,0 +1,42 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    volumes:
+      - ../:/workspaces/odg-core/:cached
+#      - $HOME/.claude:/home/vscode/.claude:cached
+#      - $HOME/.claude.json:/home/vscode/.claude.json:cached
+      - ${KUBECONFIG:-$HOME/.kube/config}:/home/vscode/.kube/config-orig:cached,ro
+    command: sleep infinity
+    environment:
+      # For ODG service
+      SECRET_FACTORY_PATH: /workspaces/odg-core/src/secrets
+      K8S_CFG_NAME: devcontainers-cluster
+      K8S_TARGET_NAMESPACE: default
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: MyPassword
+      DB_NAME: postgres
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: MyPassword
+      POSTGRES_DB: postgres
+    volumes:
+      - odg-devcontainers-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  odg-devcontainers-postgres-data:

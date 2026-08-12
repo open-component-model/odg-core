@@ -1,5 +1,7 @@
+.DS_Store
 __pycache__/
-.vscode
+.vscode/*
+!.vscode/launch.json
 .cache
 cache/
 logs*
