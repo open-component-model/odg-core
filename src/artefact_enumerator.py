@@ -15,6 +15,7 @@ import k8s.runtime_artefacts
 import k8s.util
 import lookups
 import odg.extensions_cfg
+import odg.filter
 import odg.findings
 import odg.model
 import odg.util
@@ -289,7 +290,9 @@ def _process_compliance_snapshot_of_artefact(
         and extensions_cfg.blackduck.enabled
         and extensions_cfg.blackduck.is_supported(artefact_kind=artefact.artefact_kind)
     ):
-        compliance_snapshot, uncommitted_backlog_item = _create_backlog_item(
+        compliance_snapshot, uncommitted_backlog_item = _create_backlog_item_for_extension(
+            finding_cfgs=finding_cfgs,
+            finding_types=(odg.model.Datatype.IP_FINDING,),
             artefact=artefact,
             compliance_snapshot=compliance_snapshot,
             service=odg.extensions_cfg.Services.BLACKDUCK,
@@ -515,12 +518,18 @@ def enumerate_artefacts(
     now = datetime.datetime.now()
     today = datetime.date.today()
 
+    artefact_filter = odg.filter.ComponentArtefactRuleSet(
+        rules=extensions_cfg.artefact_enumerator.artefact_filters,
+    )
+
     ocm_artefacts = set(
-        _iter_ocm_artefacts(
+        artefact
+        for artefact in _iter_ocm_artefacts(
             components=extensions_cfg.artefact_enumerator.components,
             delivery_service_client=delivery_service_client,
             component_descriptor_lookup=component_descriptor_lookup,
-        ),
+        )
+        if artefact_filter.allows(artefact)
     )
     logger.info(f'{len(ocm_artefacts)=}')
 
@@ -530,6 +539,7 @@ def enumerate_artefacts(
             namespace=namespace,
             kubernetes_api=kubernetes_api,
         )
+        if artefact_filter.allows(runtime_artefact.artefact)
     }
     logger.info(f'{len(runtime_artefacts)=}')
 
