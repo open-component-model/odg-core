@@ -372,9 +372,9 @@ class ComponentResponsibles(aiohttp.web.View):
           schema:
             type: string
           description:
-            If given and specific responsibles are configured for the given artefact, (using label
-            `cloud.gardener.cnudie/responsibles`), then those take precedence over component-wide
-            responsibles.
+            If given and specific responsibles are configured for the given artefact (using label
+            `odg.ocm.software/responsibles`; the legacy label `cloud.gardener.cnudie/responsibles`
+            is still supported), then those take precedence over component-wide responsibles.
         - in: query
           name: ocm_repo_url
           required: false

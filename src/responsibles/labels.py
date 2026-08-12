@@ -86,7 +86,7 @@ def find_responsibles_label(
 
     Raises ValueError if artifact_name is given but no matching artifact exists.
     '''
-    label_names = [ResponsiblesLabel.name, "cloud.gardener.cnudie/responsibles"]
+    label_names = [ResponsiblesLabel.name, "cloud.gardener.cnudie/responsibles"]  # legacy alias
 
     if artifact_name:
         matching_artifacts = [
