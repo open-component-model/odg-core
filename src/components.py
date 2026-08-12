@@ -1,26 +1,25 @@
 import collections.abc
 import dataclasses
 import datetime
-import dataclasses_json
 import http
 import logging
 import tarfile
 import zlib
 
 import aiohttp.web
-import dacite.exceptions
-import sqlalchemy as sa
-import sqlalchemy.ext.asyncio as sqlasync
-
 import cnudie.retrieve
 import cnudie.retrieve_async
 import cnudie.util
+import dacite.exceptions
+import dataclasses_json
 import github.pullrequest
 import oci.client_async
 import oci.model as om
 import ocm
 import ocm.iter
 import ocm.iter_async
+import sqlalchemy as sa
+import sqlalchemy.ext.asyncio as sqlasync
 
 import compliance_summary as cs
 import consts
@@ -35,7 +34,6 @@ import responsibles
 import responsibles.labels
 import util
 import yp
-
 
 logger = logging.getLogger(__name__)
 
@@ -415,7 +413,7 @@ class ComponentResponsibles(aiohttp.web.View):
             db_session=self.request.get(consts.REQUEST_DB_SESSION),
         )
         component = component_descriptor.component
-        main_source = cnudie.util.main_source(component_descriptor.component)
+        main_source = ocm.util.main_source(component_descriptor.component)
         artifact_name = util.param(params, 'artifact_name')
 
         try:
@@ -714,23 +712,6 @@ class GreatestComponentVersions(aiohttp.web.View):
         )
 
 
-def _ensure_cicd_source_label(sources: list[ocm.Source]) -> None:
-    if not len(sources) > 0:
-        return
-    label_present = False
-    for source in sources:
-        if 'cloud.gardener/cicd/source' in [label.name for label in source.labels]:
-            label_present = True
-            break
-    if not label_present:
-        sources[0].labels.append(
-            ocm.Label(
-                name='cloud.gardener/cicd/source',
-                value={'repository-classification': 'main'},
-            ),
-        )
-
-
 async def resolve_component_dependencies(
     component_name: str,
     component_version: str,
@@ -759,8 +740,6 @@ async def resolve_component_dependencies(
             node_filter=ocm.iter.Filter.components,
             ocm_repo=ocm_repository_lookup,
         ):
-            _ensure_cicd_source_label(component_node.component.sources)
-
             yield component_node
     except dacite.exceptions.MissingValueError as e:
         raise aiohttp.web.HTTPFailedDependency(text=str(e))
@@ -855,9 +834,8 @@ class UpgradePRs(aiohttp.web.View):
                 ocm_repository_lookup=lookups.extended_ocm_repository_lookup(ocm_repo),
             )
             component = component_descriptor.component
-            source = cnudie.util.main_source(
+            source = ocm.util.main_source(
                 component=component,
-                absent_ok=True,
             )
 
             repo_url = source.access.repoUrl if source else component_name
