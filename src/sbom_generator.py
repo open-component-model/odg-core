@@ -216,6 +216,14 @@ def generate_sbom_for_artefact(
     """
     logger.info(f'Generating SBOM for artefact: {artefact}')
 
+    if not extension_cfg.is_supported(artefact_kind=artefact.artefact_kind):
+        if extension_cfg.on_unsupported is odg.extensions_cfg.WarningVerbosities.FAIL:
+            raise TypeError(
+                f'{artefact.artefact_kind} is not supported by the SBOM Generator extension, maybe '
+                'the filter configurations have to be adjusted to filter out this artefact kind',
+            )
+        return
+
     resource_node = k8s.util.get_ocm_node(
         component_descriptor_lookup=component_descriptor_lookup,
         artefact=artefact,
