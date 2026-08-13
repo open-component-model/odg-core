@@ -40,9 +40,8 @@ RUN --mount=type=bind,source=/dist,target=/dist \
 && curl https://aia.pki.co.sap.com/aia/SAPNetCA_G2_2.crt -o \
     /usr/local/share/ca-certificates/SAPNetCA_G2_2.crt \
 && update-ca-certificates \
-&& mkdir -p $HOME/.config/pip \
-&& echo -e "[global]\nbreak-system-packages = true" >> $HOME/.config/pip/pip.conf \
-&& pip3 install --upgrade --no-cache-dir --find-links ./dist odg-core-libs==${ODG_CORE_LIBS_VERSION} \
+&& pip3 install --break-system-packages uv==0.12.3 \
+&& uv pip install --system --break-system-packages --no-cache --find-links ./dist odg-core-libs==${ODG_CORE_LIBS_VERSION} \
 && apk del --no-cache \
     libc-dev \
     libffi-dev \

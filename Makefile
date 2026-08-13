@@ -46,7 +46,7 @@ setup:
 	unlink "$${keypath}.pub"; \
 	{ \
 		printf 'algorithm: RS256\n'; \
-		printf 'id: %s\n' "$$(python3 -c 'import uuid; print(uuid.uuid4())')"; \
+		printf 'id: %s\n' "$$(uv run python3 -c 'import uuid; print(uuid.uuid4())')"; \
 		printf 'private_key: |\n'; \
 		echo "$${private_key}" | sed 's/^/  /'; \
 		printf 'public_key: |\n'; \
@@ -74,10 +74,10 @@ build-clients:
 	@echo "Building client packages..."
 	@mkdir -p dist
 	@echo "Building bdba-client package..."
-	@python3 setup.bdba-client.py bdist_wheel --dist-dir dist
+	@uv run python3 setup.bdba-client.py bdist_wheel --dist-dir dist
 	@rm -rf build
 	@echo "Building odg-client package..."
-	@python3 setup.odg-client.py bdist_wheel --dist-dir dist
+	@uv run python3 setup.odg-client.py bdist_wheel --dist-dir dist
 	@rm -rf build
 	@echo "Client packages built:"
 	@ls -1 dist/
@@ -86,7 +86,7 @@ build-clients:
 build-core:
 	@echo "Building core package..."
 	@mkdir -p dist
-	@python3 setup.py bdist_wheel --dist-dir dist
+	@uv run setup.py bdist_wheel --dist-dir dist
 	@rm -rf build
 	@echo "Core package built:"
 	@ls -1 dist/

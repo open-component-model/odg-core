@@ -72,8 +72,9 @@ jobs:
           version_file=${{ steps.version.outputs.version-file }}
 
           echo "$to_version" > "$version_file"
+          uv version --project "packages/${{ inputs.client }}-client" "$to_version"
 
-          git add "$version_file"
+          git add "$version_file" "packages/${{ inputs.client }}-client/pyproject.toml"
           git commit -m "Upgrade ${{ inputs.client }} client" -m "from ${from_version} to ${to_version}"
           git push
 

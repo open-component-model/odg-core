@@ -13,7 +13,4 @@ RUN apt-get update \
 
 RUN mkdir -p /home/vscode/.kube && chown vscode /home/vscode/.kube
 
-RUN pip3 install uv
-
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync
+RUN pip3 install uv==0.12.3
