@@ -103,7 +103,7 @@ def deserialise_label(
         }
 
     if not (t := _label_to_type().get(label['name'])):
-        raise ValueError(f"unknown {label['name']=}")
+        raise ValueError(f'unknown {label['name']=}')
 
     return dacite.from_dict(
         data_class=t,
