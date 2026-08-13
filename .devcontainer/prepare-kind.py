@@ -67,7 +67,7 @@ def apply_crds(cluster_name: str) -> None:
 
     for crd_file in crd_files:
         print(f'Applying CRD: {crd_file.relative_to(REPO_ROOT)}')
-        subprocess.run(
+        subprocess.run(  # nosec B607 -- kubectl is a well-known tool resolved via PATH
             ['kubectl', '--context', cluster_name, 'apply', '-f', str(crd_file)],
             check=True,
         )

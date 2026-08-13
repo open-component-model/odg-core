@@ -55,6 +55,7 @@ def generate_sbom_with_syft(
     with tempfile.TemporaryDirectory(dir=own_dir) as tmp_dir:
         filename_for_access_type = {
             ocm.AccessType.LOCAL_BLOB: 'local_blob',
+            ocm.AccessType.OCI_BLOB: 'oci_blob',
             ocm.AccessType.OCI_REGISTRY: None,
             ocm.AccessType.S3: 's3',
         }
@@ -65,7 +66,7 @@ def generate_sbom_with_syft(
 
         sbom_raw = syft.generate_raw_sbom_for_artefact(
             component=resource_node.component,
-            access=resource_node.resource.access,
+            access=access,
             secret_factory=secret_factory,
             oci_client=oci_client,
             file_path=file_path,
