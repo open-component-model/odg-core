@@ -1,4 +1,3 @@
-import collections.abc
 import os
 
 import semver
@@ -7,13 +6,6 @@ import setuptools.discovery
 
 
 own_dir = os.path.abspath(os.path.dirname(__file__))
-BDBA_CLIENT_VERSION_FILE = os.path.join(own_dir, 'BDBA_CLIENT_VERSION')
-ODG_CLIENT_VERSION_FILE = os.path.join(own_dir, 'ODG_CLIENT_VERSION')
-
-
-def read_version(file: str) -> str:
-    with open(file) as f:
-        return f.read().strip()
 
 
 def finalize_version() -> str:
@@ -21,25 +13,12 @@ def finalize_version() -> str:
         return semver.finalize_version(f.read().strip())
 
 
-def requirements() -> collections.abc.Iterable[str]:
-    yield f'bdba-client=={read_version(BDBA_CLIENT_VERSION_FILE)}'
-    yield f'odg-client=={read_version(ODG_CLIENT_VERSION_FILE)}'
-
-    with open(os.path.join(own_dir, 'requirements.txt')) as f:
-        for line in f.readlines():
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-
-            yield line
-
-
-def modules() -> collections.abc.Iterable[str]:
+def modules() -> list[str]:
     return setuptools.discovery.ModuleFinder.find('src')
 
 
-def packages() -> collections.abc.Iterable[str]:
-    return (
+def packages() -> list[str]:
+    return [
         package
         for package in setuptools.discovery.PackageFinder.find('src')
         if package
@@ -48,7 +27,7 @@ def packages() -> collections.abc.Iterable[str]:
             'delivery',  # already part of `odg-client`
             'odg_client',  # already part of `odg-client`
         )
-    )
+    ]
 
 
 def package_data() -> dict[str, list[str]]:
@@ -65,13 +44,9 @@ def package_data() -> dict[str, list[str]]:
 
 
 setuptools.setup(
-    name='odg-core-libs',
     version=os.environ.get('ODG_CORE_LIBS_VERSION', finalize_version()),
     package_dir={'': 'src'},
-    py_modules=list(modules()),
-    packages=list(packages()),
+    py_modules=modules(),
+    packages=packages(),
     package_data=package_data(),
-    install_requires=list(requirements()),
-    description='Mandatory system internals for the Open Delivery Gear',
-    url='https://github.com/open-component-model/open-delivery-gear',
 )

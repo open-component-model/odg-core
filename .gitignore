@@ -8,3 +8,7 @@ logs*
 .venv
 kubeconfig
 secrets/
+build/
+dist/
+*.egg-info/
+*.bak

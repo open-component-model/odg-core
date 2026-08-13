@@ -21,12 +21,8 @@ jobs:
           github-auth-token-permissions: |
             contents: write
           init-git-identity: true
-      - name: Install setuptools and semver
-        shell: bash
-        run: |
-          pip3 install \
-            setuptools \
-            semver
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
       - name: Create Distribution Package
         shell: bash
         run: |
@@ -39,7 +35,7 @@ jobs:
           path="setup.${{ inputs.client }}-client.py"
 
           echo "Building distribution package from ${path} to ${pkg_dir}"
-          python3 ${path} \
+          uv run python3 ${path} \
             bdist_wheel \
             --dist-dir ${pkg_dir}
 

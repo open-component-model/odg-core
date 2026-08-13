@@ -35,7 +35,7 @@ help:
 # Setup development environment
 setup:
 	@echo "Installing development dependencies..."
-	@pip3 install --break-system-packages -r requirements-dev.txt
+	@uv sync
 	@echo "Generating RSA key pair as signing configuration..."
 	@keypath=$$(mktemp); \
 	unlink "$${keypath}"; \
