@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "odg-core-libs"
 description = "Mandatory system internals for the Open Delivery Gear"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dynamic = ["version"]
 dependencies = [
     "bdba-client",
@@ -60,7 +60,7 @@ dev = [
 ]
 
 [tool.bandit]
-exclude_dirs = ['test']
+exclude_dirs = ['test', '.venv']
 skips = [
   'B104', # we intendedly bind to `0.0.0.0` in productive environments only
   'B105', # we do not hardcode passwords
