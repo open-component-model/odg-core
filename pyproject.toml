@@ -1,3 +1,69 @@
+[build-system]
+  requires = ["hatchling"]
+  build-backend = "hatchling.build"
+
+  [project]
+  name = "odg-core-libs"
+  version = "0.1363.0"
+  description = "Mandatory system internals for the Open Delivery Gear"
+  requires-python = ">=3.11"
+  dependencies = [
+      "bdba-client",
+      "odg-client",
+      "aiohttp",
+      "aiohttp-swagger3",
+      "awesomeversion",
+      "boto3",
+      "brotli",
+      "cachetools",
+      "cyclonedx-python-lib",
+      "dacite",
+      "dataclasses-json",
+      "gardener-cicd-libs",
+      "github3.py",
+      "htmllistparse",
+      "jsonpath-ng",
+      "jsonschema",
+      "kubernetes",
+      "prometheus_client",
+      "psycopg[binary]",
+      "pyjwt",
+      "requests",
+      "sqlalchemy>1.4.0",
+      "starlette",
+      "urllib3",
+      "uvicorn",
+      "watchdog",
+      "python-dateutil",
+  ]
+
+[tool.uv.workspace]
+  members = ["packages/bdba-client", "packages/odg-client"]
+
+[tool.uv.sources]
+  bdba-client = { workspace = true }
+  odg-client = { workspace = true }
+
+[dependency-groups]
+  dev = [
+      "aiohttp-devtools",
+      "aiosqlite",
+      "greenlet",
+      "numpy",
+      "pytest<9.1",
+      "pytest-asyncio",
+      "scipy",
+      "ruff",
+      "bandit",
+  ]
+
+[tool.hatch.build.targets.wheel]
+  packages = ["src"]
+  exclude = ["src/bdba", "src/delivery", "src/odg_client"]
+
+[tool.hatch.build.targets.wheel.sources]
+  src = ""
+
 [tool.bandit]
 exclude_dirs = ['test']
 skips = [

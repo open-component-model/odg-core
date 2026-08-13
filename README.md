@@ -32,6 +32,8 @@ The ODG-Core Python HTTP web server can be started locally as a standalone appli
 First, you need to prepare your local environment.
 The Makefile implements convenient commands for setup, but makes certain assumptions (e.g. it **does not** use virtual environments). If you have a strong opinion on how to set up your local development environment, please review the Makefile in detail.
 
+Install `uv` e.g `brew install uv`.
+
 If you are fine with installing the Python packages globally, please run:
 
 ```shell

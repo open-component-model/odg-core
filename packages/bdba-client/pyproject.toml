@@ -1,0 +1,17 @@
+[build-system]
+  requires = ["hatchling"]
+  build-backend = "hatchling.build"
+
+  [project]
+  name = "bdba-client"
+  version = "0.15.0"
+  requires-python = ">=3.11"
+  dependencies = [
+      "cachecontrol",
+      "dacite",
+      "python-dateutil",
+      "requests",
+  ]
+
+  [tool.hatch.build.targets.wheel]
+  packages = ["../../src/bdba"]
