@@ -4,7 +4,7 @@ set -eu
 
 repo_root="$(dirname "${BASH_SOURCE[0]}")/.."
 
-if uv run pytest "${repo_root}" "${@-}"; then
+if uv run pytest "${repo_root}" ${@+"$@"}; then
   echo 'Unittest executions succeeded'
   exit 0
 else

@@ -87,7 +87,7 @@ build-clients:
 build-core:
 	@echo "Building core package..."
 	@mkdir -p dist
-	@uv run setup.py bdist_wheel --dist-dir dist
+	@uv run python3 setup.py bdist_wheel --dist-dir dist
 	@rm -rf build
 	@echo "Core package built:"
 	@ls -1 dist/
