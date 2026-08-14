@@ -140,7 +140,7 @@ run:
 	@echo "Starting development server..."
 	@echo "Database: postgresql+psycopg://$(DB_USER):****@$(DB_HOST):$(DB_PORT)/$(DB_NAME)"
 	@echo "Server port: $(SERVER_PORT)"
-	@PYTHONPATH=$(CURDIR)/src:$$PYTHONPATH adev runserver \
+	@PYTHONPATH=$(CURDIR)/src:$$PYTHONPATH uv run adev runserver \
 		--port $(SERVER_PORT) \
 		$(CURDIR)/src \
 		-- \
