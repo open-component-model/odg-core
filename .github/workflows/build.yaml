@@ -119,7 +119,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "${{ needs.prepare.outputs.version }}" | .ci/write-version
+          echo "${{ needs.prepare.outputs.version }}" | uv run .ci/write-version
 
           mkdir blobs.d
           tar czf blobs.d/extension_definitions.tar.gz extension-definitions.yaml

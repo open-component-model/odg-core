@@ -37,7 +37,7 @@ jobs:
           git checkout "${odg_core_version}.0"
 
           next_version="${odg_core_version}.1-dev"
-          echo "$next_version" | .ci/write-version
+          echo "$next_version" | uv run .ci/write-version
           git commit --all -m "next version: ${next_version}"
 
           git push origin "@:refs/heads/hotfix-$odg_core_version"
