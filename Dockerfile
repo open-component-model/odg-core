@@ -16,7 +16,7 @@ COPY --from=cbomkit-theia-builder /cbomkit-theia/cbomkit-theia /usr/bin/cbomkit-
 
 ARG ODG_CORE_LIBS_VERSION
 
-RUN --mount=type=bind,source=/dist,target=/dist \
+RUN --mount=type=bind,from=dist,source=.,target=/dist \
     apk add --no-cache \
     bash \
     ca-certificates \

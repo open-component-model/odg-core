@@ -74,11 +74,11 @@ build-clients:
 	@echo "Building client packages..."
 	@mkdir -p dist
 	@echo "Building bdba-client package..."
-	@uv run python3 setup.bdba-client.py bdist_wheel --dist-dir dist
-	@rm -rf build
+	@cd src && uv run python3 ../setup.bdba-client.py bdist_wheel --dist-dir ../dist
+	@rm -rf src/build
 	@echo "Building odg-client package..."
-	@uv run python3 setup.odg-client.py bdist_wheel --dist-dir dist
-	@rm -rf build
+	@cd src && uv run python3 ../setup.odg-client.py bdist_wheel --dist-dir ../dist
+	@rm -rf src/build
 	@echo "Client packages built:"
 	@ls -1 dist/
 
