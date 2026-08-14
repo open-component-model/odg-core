@@ -7,6 +7,7 @@ import pprint
 import tabulate
 
 import ocm.iter
+import tarutil
 
 import bdba.client
 import bdba.model as bm
@@ -142,11 +143,14 @@ def scan(
                 group_id=bdba_group_id,
             )
 
-            content_iterator = ocm_util.iter_content_for_resource_node(
-                resource_node=resource_node,
-                oci_client=oci_client,
-                secret_factory=secret_factory,
-                aws_secret_name=aws_cfg_name,
+            content_iterator = tarutil.concat_blobs_as_tarstream(
+                blobs=ocm_util.iter_blob_descriptors(
+                    component=resource_node.component,
+                    access=resource_node.resource.access,
+                    oci_client=oci_client,
+                    secret_factory=secret_factory,
+                    aws_secret_name=aws_cfg_name,
+                ),
             )
 
             yield from processor.process(
