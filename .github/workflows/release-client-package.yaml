@@ -42,7 +42,7 @@ jobs:
           echo "Built package:"
           ls "${pkg_dir}"
       - name: Upload Distribution Package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: distribution-package
           path: dist/
@@ -87,7 +87,7 @@ jobs:
       id-token: write
     steps:
       - name: Retrieve Distribution Package
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8.0.1
         with:
           name: distribution-package
           path: dist
