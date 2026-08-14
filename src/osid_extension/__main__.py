@@ -3,14 +3,12 @@ import dataclasses
 import datetime
 import functools
 import logging
-import tarfile
 
 import awesomeversion.exceptions
 
 import ci.log
 import oci.client
 import ocm
-import tarutil
 
 import cnudie.retrieve
 import eol
@@ -27,7 +25,6 @@ import osid_extension.scan as osidscan
 import osid_extension.util as osidutil
 import paths
 import secret_mgmt
-import util
 
 
 logger = logging.getLogger(__name__)
@@ -106,20 +103,14 @@ def base_image_osid(
     )
 
     for blob_descriptor in blob_descriptors_iterator:
-        if (media_type := blob_descriptor.media_type) and not util.media_type_supports(
-            media_type=media_type,
-            type='tar',
+        if not ocm_util.is_tar_archive(
+            blob_descriptor=blob_descriptor,
+            resource=resource,
         ):
-            raise ValueError(f"Don't know how to handle {media_type=}, expected tar archive")
+            logger.warning(f'Only tar archives are supported, detected: {blob_descriptor}')
 
-        elif not util.media_type_supports(resource.type, 'tar'):
-            logger.warning(
-                f'No media type found for {resource.access}, will assume it is a tar archive',
-            )
-
-        with tarfile.open(fileobj=tarutil.FilelikeProxy(blob_descriptor.content), mode='r|*') as tar:
-            if os_info := osidscan.determine_osinfo(tar):
-                last_os_info: odg.model.OperatingSystemId = os_info
+        if os_info := osidscan.determine_osinfo(blob_descriptor.content):
+            last_os_info: odg.model.OperatingSystemId = os_info
 
     return last_os_info
 

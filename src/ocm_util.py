@@ -2,6 +2,7 @@ import collections.abc
 import dataclasses
 import io
 import logging
+import os
 import tarfile
 
 import dacite
@@ -13,10 +14,12 @@ import oci.model
 import ocm
 import ocm.iter
 import ocm.oci
+import tarutil
 
 import odg.model
 import secret_mgmt
 import secret_mgmt.aws
+import util
 
 
 logger = logging.getLogger(__name__)
@@ -267,6 +270,78 @@ def iter_blob_descriptors(
 
     else:
         raise RuntimeError(f'Unsupported access type: {access.type}')
+
+
+def is_tar_archive(
+    blob_descriptor: BlobDescriptor,
+    resource: ocm.Resource,
+) -> bool:
+    """
+    Returns True if the blob should be treated as a tar archive, based on the media type of the blob
+    descriptor (preferred) or the resource type (fallback).
+    """
+    if (media_type := blob_descriptor.media_type) and not util.media_type_supports(
+        media_type=media_type,
+        type='tar',
+    ):
+        return False
+
+    if not media_type and not util.media_type_supports(resource.type, 'tar'):
+        return False
+
+    return True
+
+
+def iter_tar_archive_contents(
+    data: collections.abc.Iterator[bytes],
+    tar_filter: collections.abc.Callable[[tarfile.TarInfo], tarfile.TarInfo | None] | None = None,
+) -> collections.abc.Generator[tuple[str, io.BytesIO], None, None]:
+    """
+    Yields (name, fileobj) for each regular file in the tar archive read from `data`.
+
+    `data` is consumed as a streaming iterator — it does not need to be seekable. Non-regular
+    entries (directories, symlinks, hardlinks) are skipped. The optional `tar_filter` callback
+    receives a TarInfo and should return it to include the entry or None to skip it.
+
+    The yielded fileobj is only valid until the next iteration. Callers must fully read it
+    before advancing the loop.
+    """
+    with tarfile.open(fileobj=tarutil.FilelikeProxy(data), mode='r|*') as tar_file:
+        tar_file: tarfile.TarFile
+
+        for tar_info in tar_file:
+            if not tar_info.isfile():
+                continue  # always filter out non regular files
+
+            if tar_filter and not tar_filter(tar_info):
+                continue
+
+            yield tar_info.name, tar_file.extractfile(tar_info)
+
+
+def extract_tar_archive_contents(
+    data: collections.abc.Iterator[bytes],
+    file_path: str,
+    tar_filter: collections.abc.Callable[[tarfile.TarInfo], tarfile.TarInfo | None] | None = None,
+    chunk_size: int = 65536,
+):
+    root = os.path.realpath(file_path)
+    os.makedirs(root, exist_ok=True)
+
+    for fname, file in iter_tar_archive_contents(
+        data=data,
+        tar_filter=tar_filter,
+    ):
+        dest = os.path.realpath(os.path.join(root, fname))
+
+        if os.path.commonpath((root, dest)) != root:
+            logger.warning(f'skipping tar member outside of destination: {fname=}')
+            continue
+
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        with open(dest, 'wb') as f:
+            while chunk := file.read(chunk_size):
+                f.write(chunk)
 
 
 async def find_artefact_node_async(

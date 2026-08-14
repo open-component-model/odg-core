@@ -67,25 +67,23 @@ def generate_raw_sbom_for_artefact(
         aws_secret_name=aws_secret_name,
     )
 
-    for blob_descriptor in blob_descriptors_iterator:
-        if (
-            (media_type := blob_descriptor.media_type)
-            and util.media_type_supports(media_type, 'tar')
-        ) or (not media_type and util.media_type_supports(resource.type, 'tar')):
-            # ensure directory exists even for empty tar archive
-            os.makedirs(file_path, exist_ok=True)
+    root = os.path.realpath(file_path)
+    os.makedirs(root, exist_ok=True)
 
-            with tarfile.open(
-                fileobj=tarutil.FilelikeProxy(blob_descriptor.content),
-                mode='r|*',
-            ) as tar:
-                tar.extractall(
-                    path=file_path,
-                    filter=tarutil.tar_filter,
-                )
+    for idx, blob_descriptor in enumerate(blob_descriptors_iterator):
+        if ocm_util.is_tar_archive(
+            blob_descriptor=blob_descriptor,
+            resource=resource,
+        ):
+            ocm_util.extract_tar_archive_contents(
+                data=blob_descriptor.content,
+                file_path=file_path,
+                tar_filter=tarutil.tar_filter,
+            )
 
         else:
-            with open(file_path, 'wb') as file:
+            blob_name = os.path.basename(blob_descriptor.digest or blob_descriptor.name or str(idx))
+            with open(os.path.join(file_path, blob_name), 'wb') as file:
                 for chunk in blob_descriptor.content:
                     file.write(chunk)
 
