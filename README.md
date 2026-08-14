@@ -29,23 +29,34 @@ The ODG-Core Python HTTP web server can be started locally as a standalone appli
 
 #### Dependencies and Setup
 
-First, you need to prepare your local environment.
-The Makefile implements convenient commands for setup, but makes certain assumptions (e.g. it **does not** use virtual environments). If you have a strong opinion on how to set up your local development environment, please review the Makefile in detail.
-
-Install `uv` e.g `brew install uv`.
-
-If you are fine with installing the Python packages globally, please run:
+First, you need to prepare your local environment. Install `uv` (e.g. `brew install uv`), then run:
 
 ```shell
 make setup
 ```
 
+This creates a project-local `.venv` with all dependencies pinned from `uv.lock`. Afterwards you can either prefix commands with `uv run` (e.g. `uv run pytest`) or activate the venv manually.
+
+Common Makefile targets:
+
+| Target | Description |
+| --- | --- |
+| `make setup` | Create/update `.venv` from lock file |
+| `make run-db` | Start a local PostgreSQL instance |
+| `make run` | Start the development server |
+| `make test` | Run the test suite |
+| `make lint` | Run ruff and bandit |
+| `make format` | Check code formatting |
+| `make build-core` | Build the `odg-core-libs` wheel |
+| `make build-clients` | Build `bdba-client` and `odg-client` wheels |
+| `make build-docker-local` | Build the OCI image for your local architecture |
+| `make build-docker` | Build the OCI image for all supported architectures |
+| `make clean` | Remove build artifacts |
+
 #### Running the Web Server
 
 The Makefile features a convenient command to run the ODG-Core web server in a lightweight fashion. This naturally has limitations, as most features will be turned off.
 If you want to run specific features, please review the Makefile and build your custom `run` command.
-
-To run ODG-Core in a simple configuration, please use:
 
 ```shell
 make run
