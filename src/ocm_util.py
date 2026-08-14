@@ -1,13 +1,13 @@
 import collections.abc
+import dataclasses
 import io
 import logging
+import os
 import tarfile
 
 import dacite
 
-import cnudie.access
 import cnudie.retrieve_async
-import ioutil
 import oci.client
 import oci.client_async
 import oci.model
@@ -19,16 +19,71 @@ import tarutil
 import odg.model
 import secret_mgmt
 import secret_mgmt.aws
+import util
 
 
 logger = logging.getLogger(__name__)
 
 
-def local_blob_access_as_blob_descriptor(
+@dataclasses.dataclass
+class BlobDescriptor:
+    content: collections.abc.Generator[bytes, None, None]
+    size: int
+    digest: str | None = None
+    media_type: str | None = None
+    name: str | None = None
+
+
+def _iter_blob_descriptors_for_manifest(
+    image_reference: str | oci.model.OciImageReference,
+    oci_client: oci.client.Client,
+    chunk_size=tarfile.RECORDSIZE,
+    include_config_blob=True,
+    fallback_to_first_subimage_if_index=False,
+) -> collections.abc.Generator[BlobDescriptor, None, None]:
+    manifest = oci_client.manifest(
+        image_reference=image_reference,
+        accept=oci.model.MimeTypes.prefer_multiarch,
+    )
+
+    image_reference = oci.model.OciImageReference.to_image_ref(image_reference)
+
+    if fallback_to_first_subimage_if_index and isinstance(manifest, oci.model.OciImageManifestList):
+        logger.warning(
+            f'image-index handling not fully implemented - will only scan first image, '
+            f'{image_reference=}, {manifest.mediaType=}',
+        )
+        manifest_ref = manifest.manifests[0]
+        manifest = oci_client.manifest(
+            image_reference=f'{image_reference.ref_without_tag}@{manifest_ref.digest}',
+        )
+
+    blob_refs = manifest.blobs() if include_config_blob else manifest.layers
+
+    if not include_config_blob:
+        logger.debug('skipping config blob')
+
+    for blob_ref in blob_refs:
+        content = oci_client.blob(
+            image_reference=image_reference,
+            digest=blob_ref.digest,
+            stream=True,
+        ).iter_content(chunk_size=chunk_size)
+
+        yield BlobDescriptor(
+            content=content,
+            size=blob_ref.size,
+            digest=blob_ref.digest,
+            media_type=blob_ref.mediaType,
+            name=f'{blob_ref.digest}.tar',
+        )
+
+
+def _iter_blob_descriptors_for_local_blob(
     access: ocm.LocalBlobAccess,
     oci_client: oci.client.Client,
     image_reference: str = None,
-) -> ioutil.BlobDescriptor:
+) -> collections.abc.Generator[BlobDescriptor, None, None]:
     if access.globalAccess:
         image_reference = access.globalAccess.ref
         digest = access.globalAccess.digest
@@ -71,18 +126,20 @@ def local_blob_access_as_blob_descriptor(
         else:
             raise ValueError('`size` must not be empty to stream local blob')
 
-    return ioutil.BlobDescriptor(
+    yield BlobDescriptor(
         content=blob.iter_content(chunk_size=4096),
         size=size,
+        digest=digest,
+        media_type=access.mediaType,
         name=access.referenceName,
     )
 
 
-def oci_blob_access_as_blob_descriptor(
+def _iter_blob_descriptors_for_oci_blob(
     access: ocm.OciBlobAccess,
     oci_client: oci.client.Client,
     image_reference: str,
-) -> ioutil.BlobDescriptor:
+) -> collections.abc.Generator[BlobDescriptor, None, None]:
     digest = access.digest.lower()
     size = access.size
 
@@ -92,11 +149,202 @@ def oci_blob_access_as_blob_descriptor(
         stream=True,
     )
 
-    return ioutil.BlobDescriptor(
+    yield BlobDescriptor(
         content=blob.iter_content(chunk_size=4096),
         size=size,
+        digest=digest,
+        media_type=access.mediaType,
         name=f'{digest}.tar',
     )
+
+
+def _iter_blob_descriptors_for_blob(
+    access: ocm.LocalBlobAccess | ocm.OciBlobAccess,
+    component: ocm.Component,
+    oci_client: oci.client.Client,
+) -> collections.abc.Generator[BlobDescriptor, None, None]:
+    image_reference = component.current_ocm_repo.component_version_oci_ref(
+        name=component.name,
+        version=component.version,
+    )
+
+    if access.type is ocm.AccessType.LOCAL_BLOB:
+        digest = access.localReference.lower()
+    else:
+        digest = access.digest.lower()
+
+    if access.mediaType in (
+        oci.model.OCI_IMAGE_INDEX_MIME,
+        oci.model.OCI_MANIFEST_SCHEMA_V2_MIME,
+        oci.model.DOCKER_MANIFEST_LIST_MIME,
+        oci.model.DOCKER_MANIFEST_SCHEMA_V2_MIME,
+    ):
+        image_reference = oci.model.OciImageReference(image_reference).with_tag(digest)
+
+        return _iter_blob_descriptors_for_manifest(
+            image_reference=image_reference,
+            oci_client=oci_client,
+            include_config_blob=False,
+            fallback_to_first_subimage_if_index=True,
+        )
+
+    if access.type is ocm.AccessType.LOCAL_BLOB:
+        return _iter_blob_descriptors_for_local_blob(
+            access=access,
+            oci_client=oci_client,
+            image_reference=image_reference,
+        )
+    else:
+        return _iter_blob_descriptors_for_oci_blob(
+            access=access,
+            oci_client=oci_client,
+            image_reference=image_reference,
+        )
+
+
+def _iter_blob_descriptors_for_s3(
+    s3_access: ocm.S3Access | ocm.LegacyS3Access,
+    secret_factory: secret_mgmt.SecretFactory,
+    aws_secret_name: str | None = None,
+    chunk_size: int = 8192,
+) -> collections.abc.Generator[BlobDescriptor, None, None]:
+    aws_secret = secret_mgmt.aws.find_cfg(
+        secret_factory=secret_factory,
+        secret_name=aws_secret_name,
+    )
+    s3_client = aws_secret.session.client('s3')
+
+    if isinstance(s3_access, ocm.LegacyS3Access):
+        bucket = s3_access.bucketName
+        key = s3_access.objectKey
+    else:
+        bucket = s3_access.bucket
+        key = s3_access.key
+
+    blob = s3_client.get_object(Bucket=bucket, Key=key)
+
+    size = blob['ContentLength']
+    body = blob['Body']
+
+    yield BlobDescriptor(
+        content=body.iter_chunks(chunk_size=chunk_size),
+        size=size,
+        media_type=s3_access.mediaType,
+        name=f's3://{bucket}/{key}',
+    )
+
+
+def iter_blob_descriptors(
+    component: ocm.Component,
+    access: ocm.Access,
+    oci_client: oci.client.Client,
+    secret_factory: secret_mgmt.SecretFactory,
+    aws_secret_name: str | None = None,
+) -> collections.abc.Generator[BlobDescriptor, None, None]:
+    if access.type is ocm.AccessType.OCI_REGISTRY:
+        access: ocm.OciAccess
+
+        return _iter_blob_descriptors_for_manifest(
+            image_reference=access.imageReference,
+            oci_client=oci_client,
+            include_config_blob=False,
+            fallback_to_first_subimage_if_index=True,
+        )
+
+    elif access.type in (
+        ocm.AccessType.S3,
+        ocm.AccessType.S3_V2,
+    ):
+        return _iter_blob_descriptors_for_s3(
+            s3_access=access,
+            secret_factory=secret_factory,
+            aws_secret_name=aws_secret_name,
+        )
+
+    elif access.type in (
+        ocm.AccessType.LOCAL_BLOB,
+        ocm.AccessType.OCI_BLOB,
+    ):
+        return _iter_blob_descriptors_for_blob(
+            access=access,
+            component=component,
+            oci_client=oci_client,
+        )
+
+    else:
+        raise RuntimeError(f'Unsupported access type: {access.type}')
+
+
+def is_tar_archive(
+    blob_descriptor: BlobDescriptor,
+    resource: ocm.Resource,
+) -> bool:
+    """
+    Returns True if the blob should be treated as a tar archive, based on the media type of the blob
+    descriptor (preferred) or the resource type (fallback).
+    """
+    if (media_type := blob_descriptor.media_type) and not util.media_type_supports(
+        media_type=media_type,
+        type='tar',
+    ):
+        return False
+
+    if not media_type and not util.media_type_supports(resource.type, 'tar'):
+        return False
+
+    return True
+
+
+def iter_tar_archive_contents(
+    data: collections.abc.Iterator[bytes],
+    tar_filter: collections.abc.Callable[[tarfile.TarInfo], tarfile.TarInfo | None] | None = None,
+) -> collections.abc.Generator[tuple[str, io.BytesIO], None, None]:
+    """
+    Yields (name, fileobj) for each regular file in the tar archive read from `data`.
+
+    `data` is consumed as a streaming iterator — it does not need to be seekable. Non-regular
+    entries (directories, symlinks, hardlinks) are skipped. The optional `tar_filter` callback
+    receives a TarInfo and should return it to include the entry or None to skip it.
+
+    The yielded fileobj is only valid until the next iteration. Callers must fully read it
+    before advancing the loop.
+    """
+    with tarfile.open(fileobj=tarutil.FilelikeProxy(data), mode='r|*') as tar_file:
+        tar_file: tarfile.TarFile
+
+        for tar_info in tar_file:
+            if not tar_info.isfile():
+                continue  # always filter out non regular files
+
+            if tar_filter and not tar_filter(tar_info):
+                continue
+
+            yield tar_info.name, tar_file.extractfile(tar_info)
+
+
+def extract_tar_archive_contents(
+    data: collections.abc.Iterator[bytes],
+    file_path: str,
+    tar_filter: collections.abc.Callable[[tarfile.TarInfo], tarfile.TarInfo | None] | None = None,
+    chunk_size: int = 65536,
+):
+    root = os.path.realpath(file_path)
+    os.makedirs(root, exist_ok=True)
+
+    for fname, file in iter_tar_archive_contents(
+        data=data,
+        tar_filter=tar_filter,
+    ):
+        dest = os.path.realpath(os.path.join(root, fname))
+
+        if os.path.commonpath((root, dest)) != root:
+            logger.warning(f'skipping tar member outside of destination: {fname=}')
+            continue
+
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        with open(dest, 'wb') as f:
+            while chunk := file.read(chunk_size):
+                f.write(chunk)
 
 
 async def find_artefact_node_async(
@@ -195,179 +443,6 @@ def find_artefact_node(
             f'no ocm node found for {artefact_name=} {artefact_version=} \
                          {artefact_type=} {artefact_extra_id=}',
         )
-
-
-def _iter_content_for_s3(
-    access: ocm.S3Access | ocm.LegacyS3Access,
-    secret_factory: secret_mgmt.SecretFactory,
-    aws_secret_name: str | None = None,
-) -> collections.abc.Iterator[bytes]:
-    aws_secret = secret_mgmt.aws.find_cfg(
-        secret_factory=secret_factory,
-        secret_name=aws_secret_name,
-    )
-    s3_client = aws_secret.session.client('s3')
-
-    return tarutil.concat_blobs_as_tarstream(
-        blobs=[
-            cnudie.access.s3_access_as_blob_descriptor(
-                s3_client=s3_client,
-                s3_access=access,
-            ),
-        ],
-    )
-
-
-def _iter_content_for_blob(
-    access: ocm.LocalBlobAccess | ocm.OciBlobAccess,
-    component: ocm.Component,
-    oci_client: oci.client.Client,
-) -> collections.abc.Iterator[bytes]:
-    image_reference = component.current_ocm_repo.component_version_oci_ref(
-        name=component.name,
-        version=component.version,
-    )
-
-    if access.type is ocm.AccessType.LOCAL_BLOB:
-        digest = access.localReference.lower()
-    else:
-        digest = access.digest.lower()
-
-    if access.mediaType in (
-        oci.model.OCI_IMAGE_INDEX_MIME,
-        oci.model.OCI_MANIFEST_SCHEMA_V2_MIME,
-        oci.model.DOCKER_MANIFEST_LIST_MIME,
-        oci.model.DOCKER_MANIFEST_SCHEMA_V2_MIME,
-    ):
-        image_reference = oci.model.OciImageReference(image_reference).with_tag(digest)
-
-        return image_layers_as_tarfile_generator(
-            image_reference=image_reference,
-            oci_client=oci_client,
-            include_config_blob=False,
-            fallback_to_first_subimage_if_index=True,
-        )
-
-    if access.type is ocm.AccessType.LOCAL_BLOB:
-        blob_descriptor = local_blob_access_as_blob_descriptor(
-            access=access,
-            oci_client=oci_client,
-            image_reference=image_reference,
-        )
-    else:
-        blob_descriptor = oci_blob_access_as_blob_descriptor(
-            access=access,
-            oci_client=oci_client,
-            image_reference=image_reference,
-        )
-
-    return tarutil.concat_blobs_as_tarstream(blobs=[blob_descriptor])
-
-
-def iter_content_for_resource_node(
-    resource_node: ocm.iter.ResourceNode,
-    oci_client: oci.client.Client,
-    secret_factory: secret_mgmt.SecretFactory,
-    aws_secret_name: str | None = None,
-) -> collections.abc.Iterator[bytes]:
-    access = resource_node.resource.access
-
-    if access.type is ocm.AccessType.OCI_REGISTRY:
-        access: ocm.OciAccess
-
-        return image_layers_as_tarfile_generator(
-            image_reference=access.imageReference,
-            oci_client=oci_client,
-            include_config_blob=False,
-            fallback_to_first_subimage_if_index=True,
-        )
-
-    elif access.type is ocm.AccessType.S3:
-        return _iter_content_for_s3(
-            access=access,
-            secret_factory=secret_factory,
-            aws_secret_name=aws_secret_name,
-        )
-
-    elif access.type in (
-        ocm.AccessType.LOCAL_BLOB,
-        ocm.AccessType.OCI_BLOB,
-    ):
-        return _iter_content_for_blob(
-            access=access,
-            component=resource_node.component,
-            oci_client=oci_client,
-        )
-
-    else:
-        raise RuntimeError(f'Unsupported access type: {access.type}')
-
-
-def image_layers_as_tarfile_generator(
-    image_reference: str | oci.model.OciImageReference,
-    oci_client: oci.client.Client,
-    chunk_size=tarfile.RECORDSIZE,
-    include_config_blob=True,
-    fallback_to_first_subimage_if_index=False,
-) -> collections.abc.Generator[bytes, None, None]:
-    """
-    returns a generator yielding a tar-archive with the passed oci-image's layer-blobs as
-    members. This is somewhat similar to the result of a `docker save` with the notable difference
-    that the cfg-blob is discarded.
-    This function is useful to e.g. upload file system contents of an oci-container-image to some
-    scanning-tool (provided it supports the extraction of tar-archives)
-    If include_config_blob is set to False the config blob will be ignored.
-
-    If fallback_to_first_subimage_if_index is set to True, in case of oci-image-manifest-list the
-    first sub-manifest is taken.
-    """
-    manifest = oci_client.manifest(
-        image_reference=image_reference,
-        accept=oci.model.MimeTypes.prefer_multiarch,
-    )
-
-    image_reference = oci.model.OciImageReference.to_image_ref(image_reference)
-
-    if fallback_to_first_subimage_if_index and isinstance(manifest, oci.model.OciImageManifestList):
-        logger.warning(
-            f'image-index handling not fully implemented - will only scan first image, '
-            f'{image_reference=}, {manifest.mediaType=}',
-        )
-        manifest_ref = manifest.manifests[0]
-        manifest = oci_client.manifest(
-            image_reference=f'{image_reference.ref_without_tag}@{manifest_ref.digest}',
-        )
-
-    blob_refs = manifest.blobs() if include_config_blob else manifest.layers
-
-    if not include_config_blob:
-        logger.debug('skipping config blob')
-
-    def resolve_blob(
-        blob_ref: oci.model.OciBlobRef,
-        image_reference: str,
-    ) -> ioutil.BlobDescriptor:
-        content = oci_client.blob(
-            image_reference=image_reference,
-            digest=blob_ref.digest,
-            stream=True,
-        ).iter_content(chunk_size=chunk_size)
-
-        return ioutil.BlobDescriptor(
-            content=content,
-            size=blob_ref.size,
-            name=f'{blob_ref.digest}.tar',
-        )
-
-    return tarutil.concat_blobs_as_tarstream(
-        blobs=(
-            resolve_blob(
-                blob_ref=blob_ref,
-                image_reference=image_reference,
-            )
-            for blob_ref in blob_refs
-        ),
-    )
 
 
 async def raw_component_descriptor_from_oci_async(

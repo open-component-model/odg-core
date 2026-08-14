@@ -19,7 +19,6 @@ import bdba_utils.scan
 import bdba_utils.util
 import k8s.util
 import k8s.logging
-import ocm
 import ocm.iter
 import odg.model
 import odg.util
@@ -50,26 +49,13 @@ def generate_sbom_with_syft(
 ) -> SBOM:
     logger.info(f'Creating SBOM for resource node {resource_node} using syft')
 
-    access = resource_node.resource.access
-
     with tempfile.TemporaryDirectory(dir=own_dir) as tmp_dir:
-        filename_for_access_type = {
-            ocm.AccessType.LOCAL_BLOB: 'local_blob',
-            ocm.AccessType.OCI_BLOB: 'oci_blob',
-            ocm.AccessType.OCI_REGISTRY: None,
-            ocm.AccessType.S3: 's3',
-        }
-
-        file_path = None
-        if filename := filename_for_access_type.get(access.type):
-            file_path = os.path.join(tmp_dir, filename)
-
         sbom_raw = syft.generate_raw_sbom_for_artefact(
             component=resource_node.component,
-            access=access,
+            resource=resource_node.resource,
             secret_factory=secret_factory,
             oci_client=oci_client,
-            file_path=file_path,
+            file_path=os.path.join(tmp_dir, 'artefact'),
             aws_secret_name=aws_secret_name,
             sbom_output_format=output_format,
         )
@@ -229,6 +215,14 @@ def generate_sbom_for_artefact(
     in the requested format with OCM metadata.
     """
     logger.info(f'Generating SBOM for artefact: {artefact}')
+
+    if not extension_cfg.is_supported(artefact_kind=artefact.artefact_kind):
+        if extension_cfg.on_unsupported is odg.extensions_cfg.WarningVerbosities.FAIL:
+            raise TypeError(
+                f'{artefact.artefact_kind} is not supported by the SBOM Generator extension, maybe '
+                'the filter configurations have to be adjusted to filter out this artefact kind',
+            )
+        return
 
     resource_node = k8s.util.get_ocm_node(
         component_descriptor_lookup=component_descriptor_lookup,
