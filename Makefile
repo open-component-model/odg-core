@@ -108,7 +108,6 @@ build-docker: .check-build-prereqs
 	@echo "Building Docker image..."
 	@docker-buildx build \
 		--build-arg ODG_CORE_LIBS_VERSION=$(ODG_CORE_LIBS_VERSION) \
-		--build-context dist=./dist \
 		--platform linux/amd64,linux/arm64 \
 		-t odg-core:$(ODG_CORE_LIBS_VERSION) \
 		-f Dockerfile \
@@ -120,7 +119,6 @@ build-docker-local: .check-build-prereqs
 	@echo "Building Docker image (local arch)..."
 	@docker-buildx build \
 		--build-arg ODG_CORE_LIBS_VERSION=$(ODG_CORE_LIBS_VERSION) \
-		--build-context dist=./dist \
 		-t odg-core:$(ODG_CORE_LIBS_VERSION) \
 		-f Dockerfile \
 		.

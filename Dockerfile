@@ -46,5 +46,6 @@ RUN apk add --no-cache \
 && chown clamav /freshclam
 
 ARG ODG_CORE_LIBS_VERSION
-RUN --mount=type=bind,from=dist,source=.,target=/dist \
-    uv pip install --system --break-system-packages --no-cache --find-links /dist odg-core-libs==${ODG_CORE_LIBS_VERSION}
+COPY dist/ /dist/
+RUN uv pip install --system --break-system-packages --no-cache --find-links /dist odg-core-libs==${ODG_CORE_LIBS_VERSION} \
+    && rm -rf /dist
