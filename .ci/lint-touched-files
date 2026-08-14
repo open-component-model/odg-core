@@ -22,7 +22,7 @@ echo "${touched_files}"
 (
     pushd "${src_dir}"
     set -e
-    ruff check \
+    uv run ruff check \
         ${touched_files}
     popd
 )

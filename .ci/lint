@@ -21,7 +21,7 @@ export PYTHONPATH="${src_dir}:${PYTHONPATH-""}"
      fi
 
     echo 'running bandit (sast-linter) for all modules'
-    if bandit \
+    if uv run bandit \
         --configfile "${src_dir}/pyproject.toml" \
         --recursive \
         "${src_dir}" ${bandit_extra_args:-}; then

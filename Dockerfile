@@ -14,10 +14,7 @@ COPY src/malware/clamav_entrypoint.sh /
 COPY src/malware/clamd.conf /etc/clamav/clamd.conf
 COPY --from=cbomkit-theia-builder /cbomkit-theia/cbomkit-theia /usr/bin/cbomkit-theia
 
-ARG ODG_CORE_LIBS_VERSION
-
-RUN --mount=type=bind,from=dist,source=.,target=/dist \
-    apk add --no-cache \
+RUN apk add --no-cache \
     bash \
     ca-certificates \
     clamav \
@@ -41,10 +38,13 @@ RUN --mount=type=bind,from=dist,source=.,target=/dist \
     /usr/local/share/ca-certificates/SAPNetCA_G2_2.crt \
 && update-ca-certificates \
 && pip3 install --break-system-packages uv==0.12.3 \
-&& uv pip install --system --break-system-packages --no-cache --find-links ./dist odg-core-libs==${ODG_CORE_LIBS_VERSION} \
 && apk del --no-cache \
     libc-dev \
     libffi-dev \
     python3-dev \
 && mkdir /freshclam \
 && chown clamav /freshclam
+
+ARG ODG_CORE_LIBS_VERSION
+RUN --mount=type=bind,from=dist,source=.,target=/dist \
+    uv pip install --system --break-system-packages --no-cache --find-links /dist odg-core-libs==${ODG_CORE_LIBS_VERSION}

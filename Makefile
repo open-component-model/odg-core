@@ -1,4 +1,4 @@
-.PHONY: help setup lint format test build-clients build-core build-docker run-db run clean
+.PHONY: help setup lint format test build-clients build-core build-docker build-docker-local .check-build-prereqs run-db run clean
 
 # Configuration variables with defaults
 DB_PASSWORD ?= MyPassword
@@ -17,7 +17,8 @@ help:
 	@echo "  test          - Run pytest test suite"
 	@echo "  build-clients - Build bdba and odg client packages"
 	@echo "  build-core    - Build odg-core-libs package"
-	@echo "  build-docker  - Build Docker image"
+	@echo "  build-docker  - Build Docker image for amd64 and arm64"
+	@echo "  build-docker-local - Build Docker image for current architecture only"
 	@echo "  run-db        - Run a PostgreSQL database instance"
 	@echo "  run           - Run the development server"
 	@echo "  clean         - Remove build artifacts"
@@ -92,8 +93,7 @@ build-core:
 	@ls -1 dist/
 
 # Build Docker image
-build-docker:
-	@echo "Building Docker image..."
+.check-build-prereqs:
 	@if [ -z "$(ODG_CORE_LIBS_VERSION)" ]; then \
 		echo "Error: ODG_CORE_LIBS_VERSION environment variable is required"; \
 		echo "Usage: ODG_CORE_LIBS_VERSION=<version> make build-docker"; \
@@ -103,10 +103,24 @@ build-docker:
 		echo "Error: dist directory not found. Run 'make build-core' first."; \
 		exit 1; \
 	fi
+
+build-docker: .check-build-prereqs
+	@echo "Building Docker image..."
 	@docker-buildx build \
 		--build-arg ODG_CORE_LIBS_VERSION=$(ODG_CORE_LIBS_VERSION) \
 		--build-context dist=./dist \
 		--platform linux/amd64,linux/arm64 \
+		-t odg-core:$(ODG_CORE_LIBS_VERSION) \
+		-f Dockerfile \
+		.
+	@echo "Docker image built: odg-core:$(ODG_CORE_LIBS_VERSION)"
+
+# Build Docker image for current architecture only (local development)
+build-docker-local: .check-build-prereqs
+	@echo "Building Docker image (local arch)..."
+	@docker-buildx build \
+		--build-arg ODG_CORE_LIBS_VERSION=$(ODG_CORE_LIBS_VERSION) \
+		--build-context dist=./dist \
 		-t odg-core:$(ODG_CORE_LIBS_VERSION) \
 		-f Dockerfile \
 		.

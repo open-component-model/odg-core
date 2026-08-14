@@ -2,6 +2,10 @@
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.packages.find]
+where = ["../../src"]
+include = ["delivery*", "odg_client*"]
+
 [project]
 name = "odg-client"
 description = "Client library for the Open Delivery Gear"

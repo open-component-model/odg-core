@@ -2,6 +2,10 @@
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.packages.find]
+where = ["../../src"]
+include = ["bdba*"]
+
 [project]
 name = "bdba-client"
 version = "0.15.0"
