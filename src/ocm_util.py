@@ -251,7 +251,10 @@ def iter_blob_descriptors(
             fallback_to_first_subimage_if_index=True,
         )
 
-    elif access.type is ocm.AccessType.S3:
+    elif access.type in (
+        ocm.AccessType.S3,
+        ocm.AccessType.S3_V2,
+    ):
         return _iter_blob_descriptors_for_s3(
             s3_access=access,
             secret_factory=secret_factory,

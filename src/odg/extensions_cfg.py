@@ -322,6 +322,7 @@ class BDBAConfig(BacklogItemMixins):
             ocm.AccessType.OCI_BLOB,
             ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.S3,
+            ocm.AccessType.S3_V2,
         )
 
         is_supported = True
@@ -423,6 +424,7 @@ class BlackDuckConfig(BacklogItemMixins):
             ocm.AccessType.OCI_BLOB,
             ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.S3,
+            ocm.AccessType.S3_V2,
         )
         supported_artefact_types = (
             ocm.ArtefactType.DIRECTORY_TREE,
@@ -614,6 +616,7 @@ class ClamAVConfig(BacklogItemMixins):
             ocm.AccessType.OCI_BLOB,
             ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.S3,
+            ocm.AccessType.S3_V2,
         )
 
         is_supported = True
@@ -771,6 +774,7 @@ class CryptoConfig(BacklogItemMixins):
             ocm.AccessType.OCI_BLOB,
             ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.S3,
+            ocm.AccessType.S3_V2,
         )
         supported_artefact_types = (
             ocm.ArtefactType.DIRECTORY_TREE,
@@ -1250,6 +1254,7 @@ class SBOMGeneratorConfig(BacklogItemMixins):
             ocm.AccessType.OCI_BLOB,
             ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.S3,
+            ocm.AccessType.S3_V2,
         )
         supported_artefact_types = (
             ocm.ArtefactType.DIRECTORY_TREE,
