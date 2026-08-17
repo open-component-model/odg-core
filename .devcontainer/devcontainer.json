@@ -33,7 +33,6 @@
 				"python.testing.unittestEnabled": false,
 				"python.testing.pytestEnabled": true,
 				"python.testing.autoTestDiscoverOnSaveEnabled": true,
-				"git.worktreePath": "/workspaces/odg-core/.vscode/worktrees",
 				"git.worktreeIncludeFiles": [
 					"extensions_cfg.local.yaml",
 					"src/secrets/**"
