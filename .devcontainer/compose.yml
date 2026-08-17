@@ -7,7 +7,7 @@ services:
       - ../:/workspaces/odg-core/:cached
 #      - $HOME/.claude:/home/vscode/.claude:cached
 #      - $HOME/.claude.json:/home/vscode/.claude.json:cached
-      - ${KUBECONFIG:-$HOME/.kube/config}:/home/vscode/.kube/config-orig:cached,ro
+      - ~/.kube/config:/home/vscode/.kube/config-orig:cached,ro
     command: sleep infinity
     environment:
       # For ODG service

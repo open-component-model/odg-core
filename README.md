@@ -85,12 +85,10 @@ The Dev Container provides:
 To work with a KinD cluster:
 
 1. Create the KinD cluster on the host: `kind create cluster --config .devcontainer/kind-config.yml`, which includes `host.docker.internal` as SAN
+1. Flatten your kubeconfig into `~/.kube/config`: `kubectl config view --flatten > ~/.kube/config`
 1. Open the Dev Container (**Reopen in Container** in VS Code)
 1. Open a terminal session. The kubeconfig is refreshed on every shell startup, with `127.0.0.1` replaced by `host.docker.internal`
-1. Run `uv run .devcontainer/prepare-kind.py` in the Dev Container to apply ODG CRDs and create `src/secrets/kubernetes/devcontainers-cluster.yaml`
 1. Update your local [configuration and secrets](https://open-component-model.github.io/open-delivery-gear/contents/how-to/00-hybrid-dev-setup.html#configuration-and-secrets)
-
-If you use Kubeconfig with multiple files, flatten the configs after you created the KinD cluster and before running the Dev Container: `kubectl config view --raw --flatten > ~/.kube/config`.
 
 To clean up the KinD cluster: `kind delete clusters odg-devcontainer-cluster`
 
