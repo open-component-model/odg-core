@@ -3,20 +3,18 @@ import dataclasses
 import datetime
 import functools
 import logging
-import tarfile
 
 import awesomeversion.exceptions
 
 import ci.log
 import oci.client
-import oci.model
 import ocm
-import tarutil
 
 import cnudie.retrieve
 import eol
 import k8s.logging
 import k8s.util
+import ocm_util
 import odg.extensions_cfg
 import odg.findings
 import odg.model
@@ -26,6 +24,7 @@ import osinfo
 import osid_extension.scan as osidscan
 import osid_extension.util as osidutil
 import paths
+import secret_mgmt
 
 
 logger = logging.getLogger(__name__)
@@ -91,49 +90,26 @@ def base_image_osid(
     oci_client: oci.client.Client,
     component: ocm.Component,
     resource: ocm.Resource,
+    secret_factory: secret_mgmt.SecretFactory,
 ) -> odg.model.OperatingSystemId:
-    access = resource.access
-
-    if access.type is ocm.AccessType.LOCAL_BLOB:
-        image_reference = component.current_ocm_repo.component_version_oci_ref(
-            name=component.name,
-            version=component.version,
-        )
-        digest = access.localReference.lower()
-
-        image_reference = oci.model.OciImageReference(image_reference).with_tag(digest)
-
-    elif access.type is ocm.AccessType.OCI_REGISTRY:
-        image_reference = access.imageReference
-
-    else:
-        raise RuntimeError(f'Unsupported access type: {access.type}')
-
-    manifest = oci_client.manifest(
-        image_reference=image_reference,
-        accept=oci.model.MimeTypes.prefer_multiarch,
-    )
-
-    # if multi-arch, randomly choose first entry (assumption: all variants have same os/version)
-    if isinstance(manifest, oci.model.OciImageManifestList):
-        manifest: oci.model.OciImageManifestList
-        manifest: oci.model.OciImageManifestListEntry = manifest.manifests[0]
-        image_reference = oci.model.OciImageReference(image_reference)
-        manifest = oci_client.manifest(image_reference.with_tag(manifest.digest))
-
-    if not manifest.layers:
-        raise ValueError(f'no layers found in manifest for {image_reference}')
-
     last_os_info: odg.model.OperatingSystemId = odg.model.OperatingSystemId()
 
-    for layer in manifest.layers:
-        layer_blob = oci_client.blob(
-            image_reference=image_reference,
-            digest=layer.digest,
-        )
-        fileproxy = tarutil.FilelikeProxy(layer_blob.iter_content(chunk_size=tarfile.BLOCKSIZE))
-        tf = tarfile.open(fileobj=fileproxy, mode='r|*')
-        if os_info := osidscan.determine_osinfo(tf):
+    blob_descriptors_iterator = ocm_util.iter_blob_descriptors(
+        component=component,
+        access=resource.access,
+        oci_client=oci_client,
+        secret_factory=secret_factory,
+        aws_secret_name=None,
+    )
+
+    for blob_descriptor in blob_descriptors_iterator:
+        if not ocm_util.is_tar_archive(
+            blob_descriptor=blob_descriptor,
+            resource=resource,
+        ):
+            logger.warning(f'Only tar archives are supported, detected: {blob_descriptor}')
+
+        if os_info := osidscan.determine_osinfo(blob_descriptor.content):
             last_os_info: odg.model.OperatingSystemId = os_info
 
     return last_os_info
@@ -226,6 +202,7 @@ def process_artefact(
     delivery_service_client: odg_client.DeliveryServiceClient,
     oci_client: oci.client.Client,
     eol_client: eol.EolClient,
+    secret_factory: secret_mgmt.SecretFactory,
     **kwargs,
 ):
     if not osid_finding_config.matches(artefact):
@@ -272,6 +249,7 @@ def process_artefact(
         oci_client=oci_client,
         component=resource_node.component,
         resource=resource_node.resource,
+        secret_factory=secret_factory,
     )
 
     logger.info(f'uploading os-info for {artefact}')

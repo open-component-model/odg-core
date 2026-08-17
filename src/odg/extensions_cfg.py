@@ -322,6 +322,7 @@ class BDBAConfig(BacklogItemMixins):
             ocm.AccessType.OCI_BLOB,
             ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.S3,
+            ocm.AccessType.S3_V2,
         )
 
         is_supported = True
@@ -423,6 +424,7 @@ class BlackDuckConfig(BacklogItemMixins):
             ocm.AccessType.OCI_BLOB,
             ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.S3,
+            ocm.AccessType.S3_V2,
         )
         supported_artefact_types = (
             ocm.ArtefactType.DIRECTORY_TREE,
@@ -449,7 +451,10 @@ class BlackDuckConfig(BacklogItemMixins):
                     f'{access_type=} is not supported for BD scans, {supported_access_types=}',
                 )
 
-        if artefact_type and artefact_type not in supported_artefact_types:
+        if artefact_type and not any(
+            artefact_type.startswith(supported_artefact_type)
+            for supported_artefact_type in supported_artefact_types
+        ):
             is_supported = False
             if self.on_unsupported is WarningVerbosities.WARNING:
                 logger.warning(
@@ -611,6 +616,7 @@ class ClamAVConfig(BacklogItemMixins):
             ocm.AccessType.OCI_BLOB,
             ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.S3,
+            ocm.AccessType.S3_V2,
         )
 
         is_supported = True
@@ -768,6 +774,7 @@ class CryptoConfig(BacklogItemMixins):
             ocm.AccessType.OCI_BLOB,
             ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.S3,
+            ocm.AccessType.S3_V2,
         )
         supported_artefact_types = (
             ocm.ArtefactType.DIRECTORY_TREE,
@@ -795,7 +802,10 @@ class CryptoConfig(BacklogItemMixins):
                     f'{access_type=} is not supported for crypto scans, {supported_access_types=}',
                 )
 
-        if artefact_type and artefact_type not in supported_artefact_types:
+        if artefact_type and not any(
+            artefact_type.startswith(supported_artefact_type)
+            for supported_artefact_type in supported_artefact_types
+        ):
             is_supported = False
             if self.on_unsupported is WarningVerbosities.WARNING:
                 logger.warning(
@@ -1244,6 +1254,7 @@ class SBOMGeneratorConfig(BacklogItemMixins):
             ocm.AccessType.OCI_BLOB,
             ocm.AccessType.OCI_REGISTRY,
             ocm.AccessType.S3,
+            ocm.AccessType.S3_V2,
         )
         supported_artefact_types = (
             ocm.ArtefactType.DIRECTORY_TREE,
@@ -1272,7 +1283,10 @@ class SBOMGeneratorConfig(BacklogItemMixins):
                     f'{supported_access_types=}',
                 )
 
-        if artefact_type and artefact_type not in supported_artefact_types:
+        if artefact_type and not any(
+            artefact_type.startswith(supported_artefact_type)
+            for supported_artefact_type in supported_artefact_types
+        ):
             is_supported = False
             if self.on_unsupported is WarningVerbosities.WARNING:
                 logger.warning(

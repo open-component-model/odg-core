@@ -8,7 +8,6 @@ import urllib.parse
 
 import ci.log
 import cnudie.retrieve
-import ocm.iter
 
 import github_util
 import k8s.util
@@ -188,7 +187,7 @@ def iter_artefact_metadata(
         discovery_date=creation_timestamp.date(),
     )
 
-    if odg.labels.ScanPolicy.SKIP is _find_scan_policy(source_node):
+    if odg.labels.ScanPolicy.SKIP is odg.labels.find_source_scan_policy(source_node):
         logger.info(
             f'Skip label found for source {source_node.source.name}. CodeQL check skipped.',
         )
@@ -284,20 +283,6 @@ def _make_finding(
         discovery_date=creation_timestamp.date(),
         allowed_processing_time=categorisation.allowed_processing_time_raw,
     )
-
-
-def _find_scan_policy(
-    snode: ocm.iter.SourceNode,
-) -> odg.labels.ScanPolicy | None:
-    if label := snode.source.find_label(name=odg.labels.SourceScanLabel.name):
-        label_content = odg.labels.deserialise_label(label)
-        return label_content.value.policy
-
-    if label := snode.component.find_label(name=odg.labels.SourceScanLabel.name):
-        label_content = odg.labels.deserialise_label(label)
-        return label_content.value.policy
-
-    return None
 
 
 def scan(
