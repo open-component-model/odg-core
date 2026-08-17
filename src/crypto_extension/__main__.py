@@ -129,7 +129,7 @@ def scan(
 
     cbom = crypto_extension.cbom.find_cbom_or_create(
         component=resource_node.component,
-        access=resource_node.resource.access,
+        resource=resource_node.resource,
         mapping=mapping,
         oci_client=oci_client,
         secret_factory=secret_factory,

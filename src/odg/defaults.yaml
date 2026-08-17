@@ -211,8 +211,8 @@ rescoring_rulesets:
                 - PR:L
                 - PR:H
               operation: reduce
-        - category_value: user_interaction:gardener-operator
-          name: user-interaction-gardener-operator
+        - category_value: user_interaction:operator
+          name: user-interaction-operator
           rules:
             - cve_values:
                 - UI:R

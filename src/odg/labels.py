@@ -7,14 +7,9 @@ import sys
 import dacite
 
 import ocm
+import ocm.iter
 
 import odg.cvss
-
-
-@dataclasses.dataclass(frozen=True)
-class PathRegexes:
-    include_paths: list[str] = dataclasses.field(default_factory=list)
-    exclude_paths: list[str] = dataclasses.field(default_factory=list)
 
 
 class ScanPolicy(enum.Enum):
@@ -34,27 +29,32 @@ class Label:
 
 
 @dataclasses.dataclass(frozen=True)
-class ScanningHint(LabelValue):
+class BinaryScanPolicy(LabelValue):
     policy: ScanPolicy
-    path_config: PathRegexes | None
-    comment: str | None
+    comment: str | None = None
 
 
 @dataclasses.dataclass(frozen=True)
-class BinaryIdScanLabel(Label):
-    name = 'cloud.gardener.cnudie/dso/scanning-hints/binary_id/v1'
-    value: ScanningHint
+class BinaryScanPolicyLabel(Label):
+    name = 'odg.ocm.software/binary-scan-policy'
+    value: BinaryScanPolicy
 
 
 @dataclasses.dataclass(frozen=True)
-class SourceScanLabel(Label):
-    name = 'cloud.gardener.cnudie/dso/scanning-hints/source_analysis/v1'
-    value: ScanningHint
+class SourceScanPolicy(LabelValue):
+    policy: ScanPolicy
+    comment: str | None = None
+
+
+@dataclasses.dataclass(frozen=True)
+class SourceScanPolicyLabel(Label):
+    name = 'odg.ocm.software/source-scan-policy'
+    value: SourceScanPolicy
 
 
 @dataclasses.dataclass(frozen=True)
 class PurposeLabel(Label):
-    name = 'gardener.cloud/purposes'
+    name = 'odg.ocm.software/purposes'
     value: tuple[str, ...]
 
 
@@ -71,8 +71,8 @@ class PackageVersionHintLabel(Label):
 
 
 @dataclasses.dataclass(frozen=True)
-class CveCategorisationLabel(Label):
-    name = 'gardener.cloud/cve-categorisation'
+class RiskProfileLabel(Label):
+    name = 'security.ocm.software/risk-profile'
     value: odg.cvss.CveCategorisation
 
 
@@ -92,6 +92,19 @@ def _label_to_type() -> dict[str, Label]:
     return label_names_to_types
 
 
+_LABEL_NAME_ALIASES = {
+    'cloud.gardener.cnudie/dso/scanning-hints/binary_id/v1': BinaryScanPolicyLabel.name,
+    'cloud.gardener.cnudie/dso/scanning-hints/source_analysis/v1': SourceScanPolicyLabel.name,
+    'gardener.cloud/cve-categorisation': RiskProfileLabel.name,
+    'gardener.cloud/purposes': PurposeLabel.name,
+}
+
+
+@functools.cache
+def get_label_names_with_aliases(label_type: type[Label]) -> list[str]:
+    return [label_type.name] + [k for k, v in _LABEL_NAME_ALIASES.items() if v == label_type.name]
+
+
 def deserialise_label(
     label: ocm.Label | dict,
 ):
@@ -101,7 +114,9 @@ def deserialise_label(
             'value': label.value,
         }
 
-    if not (t := _label_to_type().get(label['name'])):
+    name = _LABEL_NAME_ALIASES.get(label['name'], label['name'])
+
+    if not (t := _label_to_type().get(name)):
         raise ValueError(f"unknown {label['name']=}")
 
     return dacite.from_dict(
@@ -111,3 +126,17 @@ def deserialise_label(
             cast=[tuple, enum.Enum],
         ),
     )
+
+
+def find_source_scan_policy(
+    snode: ocm.iter.SourceNode,
+) -> ScanPolicy | None:
+    for name in get_label_names_with_aliases(SourceScanPolicyLabel):
+        if label := snode.source.find_label(name=name):
+            return deserialise_label(label).value.policy
+
+    for name in get_label_names_with_aliases(SourceScanPolicyLabel):
+        if label := snode.component.find_label(name=name):
+            return deserialise_label(label).value.policy
+
+    return None

@@ -3,6 +3,7 @@ import tarfile
 
 import dacite
 
+import ocm_util
 import odg.model
 import version
 
@@ -53,24 +54,24 @@ def _parse_debian_version(contents: str) -> collections.abc.Generator[tuple[str,
     yield ('VERSION_ID', line)
 
 
-def determine_osinfo(tarfh: tarfile.TarFile) -> odg.model.OperatingSystemId | None:
+def determine_osinfo(
+    tar_archive: collections.abc.Iterator[bytes],
+) -> odg.model.OperatingSystemId | None:
     """
     tries to determine the operating system identification, roughly as specified by
         https://www.freedesktop.org/software/systemd/man/os-release.html
     and otherwise following some conventions believed to be common.
 
-    The argument (an opened tarfile) is being read from its initial position, possibly (but
-    not necessarily) to the end. The underlying stream does not need to be seekable.
-    It is the caller's responsibility to close the tarfile handle after this function returns.
+    The argument is a streaming iterator of bytes from a tar archive. It does not need to be
+    seekable and will be read to the end.
 
-    The tarfile is expected to contain a directory tree from a "well-known" unix-style operating
+    The tar archive is expected to contain a directory tree from a "well-known" unix-style operating
     system distribution. In particular, the following (GNU/) Linux distributions are well-supported:
     - alpine
     - debian
     - centos
 
-    In case nothing was recognised within the given tarfile, the returned OperatingSystemId's
-    attributes will all be `None`.
+    In case nothing was recognised within the given tar archive, None is returned.
     """
     known_fnames = (
         'debian_version',
@@ -80,21 +81,22 @@ def determine_osinfo(tarfh: tarfile.TarFile) -> odg.model.OperatingSystemId | No
 
     os_info = {}
 
-    for info in tarfh:
-        fname = info.name.split('/')[-1]
+    def _tar_filter(member: tarfile.TarInfo, *args, **kwargs) -> tarfile.TarInfo | None:
+        if member.name.split('/')[-1] not in known_fnames:
+            return
 
-        if fname not in known_fnames:
-            continue
+        if member.issym():
+            return  # we assume fnames are the same (this assumption might not always be correct)
 
-        if info.issym():
-            # we assume fnames are the same (this assumption might not always be correct)
-            continue
+        return member
 
-        if not info.isfile():
-            continue
-
+    for fname, file in ocm_util.iter_tar_archive_contents(
+        data=tar_archive,
+        tar_filter=_tar_filter,
+    ):
         # found an "interesting" file
-        contents = tarfh.extractfile(info).read().decode('utf-8')
+        fname = fname.split('/')[-1]
+        contents = file.read().decode('utf-8')
 
         if fname == 'os-release':
             for k, v in _parse_os_release(contents):
