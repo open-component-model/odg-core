@@ -75,10 +75,10 @@ build-clients:
 	@echo "Building client packages..."
 	@mkdir -p dist
 	@echo "Building bdba-client package..."
-	@cd src && uv run python3 ../setup.bdba-client.py bdist_wheel --dist-dir ../dist
+	@uv run --directory src python3 ../setup.bdba-client.py bdist_wheel --dist-dir ../dist
 	@rm -rf src/build
 	@echo "Building odg-client package..."
-	@cd src && uv run python3 ../setup.odg-client.py bdist_wheel --dist-dir ../dist
+	@uv run --directory src python3 ../setup.odg-client.py bdist_wheel --dist-dir ../dist
 	@rm -rf src/build
 	@echo "Client packages built:"
 	@ls -1 dist/
@@ -119,6 +119,7 @@ build-docker-local: .check-build-prereqs
 	@echo "Building Docker image (local arch)..."
 	@docker-buildx build \
 		--build-arg ODG_CORE_LIBS_VERSION=$(ODG_CORE_LIBS_VERSION) \
+		--load \
 		-t odg-core:$(ODG_CORE_LIBS_VERSION) \
 		-f Dockerfile \
 		.
