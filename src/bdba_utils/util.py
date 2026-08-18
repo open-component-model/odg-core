@@ -223,7 +223,7 @@ def iter_artefact_metadata(
                         data=vulnerability_rescoring,
                     )
 
-                vulnerability_finding = odg.model.VulnerabilityFinding(
+                vulnerability_finding = odg.model.BDBAVulnerabilityFinding(
                     package_name=package_name,
                     package_version=package_version,
                     base_url=scan_result.base_url,
@@ -232,7 +232,7 @@ def iter_artefact_metadata(
                     group_id=scan_result.group_id,
                     severity=categorisation.id,
                     cve=vulnerability.cve,
-                    cvss_v3_score=vulnerability.cve_severity(),
+                    cvss_score=vulnerability.cve_severity(),
                     cvss=odg.cvss.CVSSV3.parse(vulnerability.cvss),
                     summary=vulnerability.summary,
                 )
@@ -250,21 +250,21 @@ def iter_artefact_metadata(
 
                 if (
                     (existing_finding := existing_findings_by_key.get(artefact_metadata.key))
-                    and existing_finding.data.cvss_v3_score != artefact_metadata.data.cvss_v3_score
+                    and existing_finding.data.cvss_score != artefact_metadata.data.cvss_score
                     and existing_finding.data.severity != artefact_metadata.data.severity
                     and existing_finding.allowed_processing_time
                     != artefact_metadata.allowed_processing_time
                 ):
                     # The finding has already been reported previously but in the meantime the CVSS
-                    # v3 score has changed and with that, also a new categorisation (aka. severity)
+                    # score has changed and with that, also a new categorisation (aka. severity)
                     # was applied with a new allowed processing time. To reflect the updated time,
                     # a rescoring must be created.
 
-                    previous_score = existing_finding.data.cvss_v3_score
+                    previous_score = existing_finding.data.cvss_score
                     previous_severity = existing_finding.data.severity
                     previous_time = existing_finding.allowed_processing_time
 
-                    new_score = artefact_metadata.data.cvss_v3_score
+                    new_score = artefact_metadata.data.cvss_score
                     new_severity = artefact_metadata.data.severity
                     new_time = artefact_metadata.allowed_processing_time
 

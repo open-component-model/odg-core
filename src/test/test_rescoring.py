@@ -5,6 +5,7 @@ import pytest
 import consts
 import odg.findings
 import odg.model
+import rescore.artefacts
 import rescore.model
 import rescore.utility
 
@@ -396,3 +397,62 @@ def test_scoped_component_artefact_id_artefact_extra_id_without_version_key():
     assert result.artefact.artefact_extra_id == {
         'platform': 'linux/amd64',
     }
+
+
+@pytest.mark.asyncio
+async def test_iter_rescoring_proposals_vulnerability_cvss_none(
+    vulnerability_finding_cfg: odg.findings.Finding,
+):
+    categorisation = vulnerability_finding_cfg.categorisations[1]  # MEDIUM
+
+    am = odg.model.ArtefactMetadata(
+        artefact=odg.model.ComponentArtefactId(
+            component_name='example.org/my-component',
+            component_version='1.2.3',
+            artefact_kind=odg.model.ArtefactKind.RESOURCE,
+            artefact=odg.model.LocalArtefactId(
+                artefact_name='my-artefact',
+                artefact_version='1.0.0',
+                artefact_type='ociImage',
+            ),
+        ),
+        meta=odg.model.Metadata(
+            datasource=odg.model.Datasource.BDBA,
+            type=odg.model.Datatype.VULNERABILITY_FINDING,
+            creation_date=datetime.datetime.now(),
+            last_update=datetime.datetime.now(),
+        ),
+        data=odg.model.BDBAVulnerabilityFinding(
+            package_name='some-package',
+            package_version='1.0.0',
+            cve='CVE-2021-12345',
+            cvss_score=5.0,
+            cvss=None,
+            severity=categorisation.id,
+            base_url='https://bdba.example.org',
+            report_url='https://bdba.example.org/products/1/',
+            product_id=1,
+            group_id=1,
+        ),
+        discovery_date=datetime.date.today(),
+    )
+
+    proposals = [
+        proposal
+        async for proposal in rescore.artefacts._iter_rescoring_proposals(
+            artefact_metadata=[am],
+            rescorings=[],
+            scanner_writebacks=[],
+            finding_cfgs=[vulnerability_finding_cfg],
+            cve_categorisation=None,
+            sprints_configuration=None,
+        )
+    ]
+
+    assert len(proposals) == 1
+    proposal = proposals[0]
+    assert isinstance(proposal.finding, rescore.artefacts.VulnerabilityFinding)
+    assert proposal.finding.cvss is None
+    assert proposal.finding.cve == 'CVE-2021-12345'
+    assert proposal.finding.cvss_score == 5.0
+    assert proposal.finding.cvss_v3_score == 5.0  # backwards-compat alias

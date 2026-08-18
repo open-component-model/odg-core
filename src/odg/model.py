@@ -9,12 +9,11 @@ import textwrap
 import typing
 
 import dacite
-
 import ocm
 import ocm.iter
+import typing_extensions
 
 import odg.cvss
-
 
 logger = logging.getLogger(__name__)
 
@@ -397,8 +396,6 @@ class OperatingSystemId:
 
 @dataclasses.dataclass
 class BDBAMixin:
-    package_name: str
-    package_version: str | None  # bdba might be unable to determine a version
     base_url: str
     report_url: str
     product_id: int
@@ -448,6 +445,8 @@ class FilesystemPath:
 
 @dataclasses.dataclass
 class StructureInfo(BDBAMixin):
+    package_name: str
+    package_version: str | None  # bdba might be unable to determine a version
     licenses: list[License]
     filesystem_paths: list[FilesystemPath]
 
@@ -490,6 +489,8 @@ class IPFinding(Finding):
 
 @dataclasses.dataclass
 class LicenseFinding(Finding, BDBAMixin):
+    package_name: str
+    package_version: str | None  # bdba might be unable to determine a version
     license: License
 
     @property
@@ -498,15 +499,45 @@ class LicenseFinding(Finding, BDBAMixin):
 
 
 @dataclasses.dataclass
-class VulnerabilityFinding(Finding, BDBAMixin):
+class VulnerabilityFinding(Finding):
+    package_name: str
+    package_version: str | None
     cve: str
-    cvss_v3_score: float
-    cvss: odg.cvss.CVSSV3 | dict
-    summary: str | None
+    purl: str | None = None
+    cvss_score: float | None = None  # allow fallback to cvss_v3_score for compatibility
+    cvss: odg.cvss.CVSSV3 | dict | None = None
+    rating_source: str | None = None  # name of the CVSS rating source, e.g. 'NVD', 'redhat', 'alma'
+    summary: str | None = None
+    recommendation: str | None = None
+    urls: list[str] = dataclasses.field(default_factory=list)
+
+    def __post_init__(self):
+        if self.cvss_score is None:
+            raise ValueError(f'cvss_score is required (cve={self.cve})')
+        nvd_url = f'https://nvd.nist.gov/vuln/detail/{self.cve}'
+        if self.cve.startswith('CVE-') and nvd_url not in self.urls:
+            self.urls.append(nvd_url)
 
     @property
     def key(self) -> str:
         return _as_key(self.package_name, self.package_version, self.cve)
+
+
+@dataclasses.dataclass
+class BDBAVulnerabilityFinding(VulnerabilityFinding, BDBAMixin):
+    cvss_v3_score: typing.Annotated[
+        float | None,
+        typing_extensions.deprecated('use cvss_score instead'),
+    ] = None
+
+    def __post_init__(self):
+        if self.cvss_score is None and self.cvss_v3_score is not None:
+            self.cvss_score = self.cvss_v3_score
+        if self.report_url:
+            bdba_link = f'[BDBA {self.product_id}]({self.report_url})'
+            if bdba_link not in self.urls:
+                self.urls.append(bdba_link)
+        super().__post_init__()
 
 
 @dataclasses.dataclass
@@ -1708,6 +1739,7 @@ FindingModels = (
     | LicenseFinding
     | OsIdFinding
     | SastFinding
+    | BDBAVulnerabilityFinding
     | VulnerabilityFinding
 )
 InformationalModels = StructureInfo | CryptoAsset | ResponsibleInfo

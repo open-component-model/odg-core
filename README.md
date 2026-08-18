@@ -88,7 +88,8 @@ To work with a KinD cluster:
 1. Flatten your kubeconfig into `~/.kube/config`: `kubectl config view --flatten > ~/.kube/config`
 1. Open the Dev Container (**Reopen in Container** in VS Code)
 1. Open a terminal session. The kubeconfig is refreshed on every shell startup, with `127.0.0.1` replaced by `host.docker.internal`
-1. Update your local [configuration and secrets](https://open-component-model.github.io/open-delivery-gear/contents/how-to/00-hybrid-dev-setup.html#configuration-and-secrets)
+1. Copy the extensions config: `cp extensions_cfg.yaml extensions_cfg.local.yaml`
+1. Adjust the local [configuration and secrets](https://open-component-model.github.io/open-delivery-gear/contents/how-to/00-hybrid-dev-setup.html#configuration-and-secrets) to your needs
 
 To clean up the KinD cluster: `kind delete clusters odg-devcontainer-cluster`
 

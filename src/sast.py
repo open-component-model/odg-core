@@ -34,12 +34,12 @@ def has_local_linter(
     resources: list[ocm.Resource],
 ) -> bool:
     for resource in resources:
-        if not (label := resource.find_label(name=odg.labels.PurposeLabel.name)):
-            continue
-
-        label_content = odg.labels.deserialise_label(label)
-        if AnalysisLabel.SAST.value in label_content.value:
-            return True
+        for name in odg.labels.get_label_names_with_aliases(odg.labels.PurposeLabel):
+            if label := resource.find_label(name=name):
+                label_content = odg.labels.deserialise_label(label)
+                if AnalysisLabel.SAST.value in label_content.value:
+                    return True
+                break
 
     return False
 

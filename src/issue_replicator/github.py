@@ -2,23 +2,22 @@ import collections
 import collections.abc
 import copy
 import dataclasses
-import enum
 import datetime
+import enum
 import functools
 import hashlib
 import logging
 import re
 import textwrap
 
-import github3
-import github3.issues.issue
-import github3.issues.milestone
-import github3.repos
-
 import cnudie.retrieve
 import github.limits
 import github.retry
 import github.util
+import github3
+import github3.issues.issue
+import github3.issues.milestone
+import github3.repos
 import ocm.iter
 import ocm.util
 
@@ -31,7 +30,6 @@ import odg_client.model
 import rescore.utility
 import sprints.model as sm
 import util
-
 
 logger = logging.getLogger(__name__)
 
@@ -1306,7 +1304,7 @@ def vulnerability_summary(
 
         current_categorisation = odg.findings.categorise_finding(
             finding_cfg=finding_cfg,
-            finding_property=aggregated_finding.finding.data.cvss_v3_score,
+            finding_property=aggregated_finding.finding.data.cvss_score,
         )
 
         rescored_categorisation = rescore.utility.rescore_finding(
@@ -1336,7 +1334,7 @@ def vulnerability_summary(
     finding_table_callback = {
         'Affected Package': lambda f, _: f'`{f.finding.data.package_name}`',
         'CVE': lambda f, _: f'`{f.finding.data.cve}`',
-        'CVE Score': lambda f, _: f'`{f.finding.data.cvss_v3_score}`',
+        'CVE Score': lambda f, _: f'`{f.finding.data.cvss_score}`',
         'Severity': lambda f, g: _severity_str(
             aggregated_finding=f,
             finding_group=g,
@@ -1365,12 +1363,13 @@ def vulnerability_summary(
         ),
     }
 
-    report_urls_callback = lambda finding_group: sorted(
-        {  # noqa: E731
-            f'[BDBA {finding.finding.data.product_id}]({finding.finding.data.report_url})'
-            for finding in finding_group.findings
-        },
-    )
+    def report_urls_callback(finding_group: FindingGroup) -> list[str]:
+        # only return URLs for BDBA findings, to link to the BDBA report
+        urls = set()
+        for finding in finding_group.findings:
+            if isinstance(finding.finding.data, odg.model.BDBAVulnerabilityFinding):
+                urls.update(finding.finding.data.urls)
+        return sorted(urls)
 
     def group_aggregated_findings(
         aggregated_findings: tuple[AggregatedFinding],
@@ -1401,7 +1400,7 @@ def vulnerability_summary(
             for findings_for_package_and_cve in sorted(
                 findings_for_package_by_cve.values(),
                 key=lambda finding_for_package_and_cve: (
-                    -finding_for_package_and_cve.finding.data.cvss_v3_score,
+                    -finding_for_package_and_cve.finding.data.cvss_score,
                     finding_for_package_and_cve.finding.data.cve,
                 ),
             )

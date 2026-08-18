@@ -27,12 +27,11 @@ class ScanRequest:
     def skip_vulnerability_scan(self) -> bool:
         # hardcode skip-info to be determined by artefact
         artefact = self.artefact
-
-        if not (label := artefact.find_label(name=odg.labels.BinaryIdScanLabel.name)):
-            return False
-
-        label: odg.labels.BinaryIdScanLabel = odg.labels.deserialise_label(label=label)
-        return label.value.policy is odg.labels.ScanPolicy.SKIP
+        for name in odg.labels.get_label_names_with_aliases(odg.labels.BinaryScanPolicyLabel):
+            if label := artefact.find_label(name=name):
+                label: odg.labels.BinaryScanPolicyLabel = odg.labels.deserialise_label(label=label)
+                return label.value.policy is odg.labels.ScanPolicy.SKIP
+        return False
 
     def __str__(self):
         return (

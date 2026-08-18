@@ -9,12 +9,23 @@ def _make_component_and_resource(
     resource_label: ocm.Label | None,
     component_label: ocm.Label | None,
 ):
-    resource = unittest.mock.Mock(spec=ocm.Resource)
-    resource.find_label.return_value = resource_label
-
-    component = unittest.mock.Mock(spec=ocm.Component)
-    component.find_label.return_value = component_label
-
+    resource = ocm.Resource(
+        name='test-resource',
+        version='1.0.0',
+        type='ociImage',
+        access=None,
+        labels=[resource_label] if resource_label else [],
+    )
+    component = ocm.Component(
+        name='test-component',
+        version='1.0.0',
+        repositoryContexts=[],
+        provider='test',
+        sources=[],
+        componentReferences=[],
+        resources=[resource],
+        labels=[component_label] if component_label else [],
+    )
     return component, resource
 
 

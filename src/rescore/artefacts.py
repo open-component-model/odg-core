@@ -14,9 +14,9 @@ import sqlalchemy as sa
 import sqlalchemy.ext.asyncio as sqlasync
 
 import consts
-import features
 import deliverydb.model as dm
 import deliverydb.util as du
+import features
 import k8s.backlog
 import k8s.util
 import ocm_util
@@ -29,7 +29,6 @@ import secret_mgmt.oauth_cfg
 import sprints.model as sm
 import sprints.util as su
 import util
-
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +55,9 @@ class VulnerabilityFinding(odg.model.Finding):
     package_name: str
     package_versions: set[str]
     cve: str
-    cvss_v3_score: float
-    cvss: str
+    cvss_score: float | None
+    cvss_v3_score: float | None  # keep for backwards compatibility, `cvss_score` is prefered
+    cvss: str | None
     summary: str | None
     urls: list[str]
     filesystem_paths: list[odg.model.FilesystemPath]
@@ -436,8 +436,8 @@ async def _iter_rescoring_proposals(
 
             if finding_cfg.type is odg.model.Datatype.VULNERABILITY_FINDING:
                 cve = am.data.cve
-                cvss = odg.cvss.CVSSV3.from_dict(cvss=am.data.cvss)
-                cvss_v3_score = am.data.cvss_v3_score
+                cvss = odg.cvss.CVSSV3.from_dict(cvss=am.data.cvss) if am.data.cvss else None
+                cvss_score = am.data.cvss_score
 
                 am_across_package_versions = tuple(
                     artefact_metadatum
@@ -468,8 +468,13 @@ async def _iter_rescoring_proposals(
                     ),
                 )
 
-                # only propose rescoring if finding is not rescored yet
-                if not current_rescorings and finding_cfg.rescoring_ruleset and cve_categorisation:
+                # only propose rescoring if finding is not rescored yet and CVSS v3 data is present
+                if (
+                    not current_rescorings
+                    and finding_cfg.rescoring_ruleset
+                    and cve_categorisation
+                    and cvss is not None
+                ):
                     rescoring_rules = list(
                         rescore.utility.matching_rescore_rules(
                             rescoring_rules=finding_cfg.rescoring_ruleset.rules,
@@ -495,10 +500,11 @@ async def _iter_rescoring_proposals(
                             'package_versions': package_versions,
                             'severity': severity,
                             'cve': cve,
-                            'cvss_v3_score': cvss_v3_score,
-                            'cvss': f'{cvss}',
+                            'cvss_score': cvss_score,
+                            'cvss_v3_score': cvss_score,
+                            'cvss': f'{cvss}' if cvss is not None else None,
                             'summary': am.data.summary,
-                            'urls': [f'https://nvd.nist.gov/vuln/detail/{cve}'],
+                            'urls': am.data.urls,
                             'filesystem_paths': filesystem_paths,
                         },
                         'finding_type': finding_cfg.type,

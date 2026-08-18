@@ -1,27 +1,25 @@
 import collections.abc
 import dataclasses
 import datetime
-import dataclasses_json
 import http
 import logging
 import tarfile
 import zlib
 
 import aiohttp.web
-import dacite.exceptions
-import sqlalchemy as sa
-import sqlalchemy.ext.asyncio as sqlasync
-
 import cnudie.retrieve
 import cnudie.retrieve_async
 import cnudie.util
+import dacite.exceptions
+import dataclasses_json
 import github.pullrequest
 import oci.client_async
 import oci.model as om
 import ocm
 import ocm.iter
 import ocm.iter_async
-import ocm.util
+import sqlalchemy as sa
+import sqlalchemy.ext.asyncio as sqlasync
 
 import compliance_summary as cs
 import consts
@@ -36,7 +34,6 @@ import responsibles
 import responsibles.labels
 import util
 import yp
-
 
 logger = logging.getLogger(__name__)
 
@@ -371,9 +368,9 @@ class ComponentResponsibles(aiohttp.web.View):
           schema:
             type: string
           description:
-            If given and specific responsibles are configured for the given artefact, (using label
-            `cloud.gardener.cnudie/responsibles`), then those take precedence over component-wide
-            responsibles.
+            If given and specific responsibles are configured for the given artefact (using label
+            `odg.ocm.software/responsibles`; the legacy label `cloud.gardener.cnudie/responsibles`
+            is still supported), then those take precedence over component-wide responsibles.
         - in: query
           name: ocm_repo_url
           required: false
@@ -419,48 +416,13 @@ class ComponentResponsibles(aiohttp.web.View):
         main_source = ocm.util.main_source(component_descriptor.component)
         artifact_name = util.param(params, 'artifact_name')
 
-        def _responsibles_label(
-            component: ocm.Component,
-            artifact_name: str | None = None,
-            owners_label: str = responsibles.labels.ResponsiblesLabel.name,
-        ) -> responsibles.labels.ResponsiblesLabel | None:
-            """
-            Returns the most specific ResponsiblesLabel for the given component and artifact name,
-            or `None` if no label is found.
-
-            If `artifact_name` is given, a fitting artifact with an owner label is looked up and
-            the attached label is returned. Otherwise, a fallback to component-level owner-label
-            happens.
-            """
-            if artifact_name:
-                matching_artifacts = [
-                    a for a in component.resources + component.sources if a.name == artifact_name
-                ]
-                if not matching_artifacts:
-                    raise aiohttp.web.HTTPNotFound(
-                        text=f'{component.name}:{component.version} has no {artifact_name=}',
-                    )
-
-                for artifact in matching_artifacts:
-                    artifact: ocm.Artifact
-                    # hack: hard-code to using first matching artifact with label for now
-                    if responsibles_label := artifact.find_label(name=owners_label):
-                        return responsibles.labels.ResponsiblesLabel.from_dict(
-                            data_dict=dataclasses.asdict(responsibles_label),
-                        )
-
-            if responsibles_label := component.find_label(name=owners_label):
-                return responsibles.labels.ResponsiblesLabel.from_dict(
-                    data_dict=dataclasses.asdict(responsibles_label),
-                )
-
-            return None
-
         try:
-            responsibles_label = _responsibles_label(
+            responsibles_label = responsibles.labels.find_responsibles_label(
                 component=component,
                 artifact_name=artifact_name,
             )
+        except ValueError as e:
+            raise aiohttp.web.HTTPNotFound(text=str(e))
         except (
             dacite.exceptions.UnionMatchError,
             dacite.exceptions.WrongTypeError,

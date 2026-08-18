@@ -927,7 +927,8 @@ def categorise_finding(
 
         elif isinstance(selector, VulnerabilityFindingSelector):
             if (
-                finding_property >= selector.cve_score_range.min
+                finding_property is not None
+                and finding_property >= selector.cve_score_range.min
                 and finding_property <= selector.cve_score_range.max
             ):
                 return categorisation

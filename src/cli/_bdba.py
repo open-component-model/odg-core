@@ -4,9 +4,8 @@ import itertools
 import logging
 import pprint
 
-import tabulate
-
 import ocm.iter
+import tabulate
 import tarutil
 
 import bdba.client
@@ -17,7 +16,6 @@ import lookups
 import ocm_util
 import odg.model
 import util
-
 
 __cmd_name__ = 'bdba'
 logger = logging.getLogger(__name__)
@@ -166,17 +164,13 @@ def scan(
         r
         for r in results
         if (
-            isinstance(r.data, odg.model.VulnerabilityFinding)
-            and r.data.cvss_v3_score >= cve_threshold
+            isinstance(r.data, odg.model.VulnerabilityFinding) and r.data.cvss_score >= cve_threshold
         )
     ]
     results_below_threshold = [
         r
         for r in results
-        if (
-            isinstance(r.data, odg.model.VulnerabilityFinding)
-            and r.data.cvss_v3_score < cve_threshold
-        )
+        if (isinstance(r.data, odg.model.VulnerabilityFinding) and r.data.cvss_score < cve_threshold)
     ]
 
     logger.info('Summary of found vulnerabilities:')
@@ -194,16 +188,16 @@ def scan(
             key = f'{c_id}:{a_id}:{p_id}'
 
             cve = r.data.cve
-            cvss_v3_score = r.data.cvss_v3_score
+            cvss_score = r.data.cvss_score
 
             if key in grouped_results:
-                grouped_results[key]['vulnerabilities'] += f'\n{cve} ({cvss_v3_score})'
+                grouped_results[key]['vulnerabilities'] += f'\n{cve} ({cvss_score})'
             else:
                 grouped_results[key] = {
                     'c_id': c_id,
                     'a_id': a_id,
                     'p_id': p_id,
-                    'vulnerabilities': f'{cve} ({cvss_v3_score})',
+                    'vulnerabilities': f'{cve} ({cvss_score})',
                 }
 
         return grouped_results
