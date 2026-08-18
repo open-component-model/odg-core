@@ -56,6 +56,7 @@ class VulnerabilityFinding(odg.model.Finding):
     package_versions: set[str]
     cve: str
     cvss_score: float | None
+    cvss_v3_score: float | None  # keep for backwards compatibility, `cvss_score` is prefered
     cvss: str | None
     summary: str | None
     urls: list[str]
@@ -500,6 +501,7 @@ async def _iter_rescoring_proposals(
                             'severity': severity,
                             'cve': cve,
                             'cvss_score': cvss_score,
+                            'cvss_v3_score': cvss_score,
                             'cvss': f'{cvss}' if cvss is not None else None,
                             'summary': am.data.summary,
                             'urls': am.data.urls,
