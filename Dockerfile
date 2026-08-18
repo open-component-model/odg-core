@@ -1,13 +1,13 @@
-FROM golang:alpine AS cbomkit-theia-builder
+FROM golang:1.26.6-alpine3.24 AS cbomkit-theia-builder
 ARG CBOMKIT_THEIA_VERSION=1.0.1
 RUN apk add --no-cache git \
  && git clone --branch ${CBOMKIT_THEIA_VERSION} https://github.com/IBM/cbomkit-theia.git /cbomkit-theia \
  && cd /cbomkit-theia && go mod download && go build
 
-FROM alpine:3
+FROM python:3.12-alpine3.24
 
 # uv from its official image — no pip, no --break-system-packages
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.12.5 /uv /uvx /usr/local/bin/
 
 COPY src/malware/clamav_entrypoint.sh /
 COPY src/malware/clamd.conf /etc/clamav/clamd.conf
@@ -22,7 +22,6 @@ RUN apk add --no-cache \
     git \
     helm \
     postgresql16-client \
-    python3 \
     syft \
  && curl https://aia.pki.co.sap.com/aia/SAP%20Global%20Root%20CA.crt -o \
     /usr/local/share/ca-certificates/SAP_Global_Root_CA.crt \
