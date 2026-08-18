@@ -454,3 +454,5 @@ async def test_iter_rescoring_proposals_vulnerability_cvss_none(
     assert isinstance(proposal.finding, rescore.artefacts.VulnerabilityFinding)
     assert proposal.finding.cvss is None
     assert proposal.finding.cve == 'CVE-2021-12345'
+    assert proposal.finding.cvss_score == 5.0
+    assert proposal.finding.cvss_v3_score == 5.0  # backwards-compat alias
