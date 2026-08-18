@@ -76,6 +76,18 @@ class CveCategorisationLabel(Label):
     value: odg.cvss.CveCategorisation
 
 
+@dataclasses.dataclass(frozen=True)
+class ArtefactReferenceEntry:
+    identity: dict
+
+
+@dataclasses.dataclass(frozen=True)
+class ArtefactReferencesLabel(Label):
+    name = 'ocm.software/artefact-references'
+    label_version = 'v1alpha1'
+    value: tuple[ArtefactReferenceEntry, ...]
+
+
 @functools.cache
 def _label_to_type() -> dict[str, Label]:
     own_module = sys.modules[__name__]

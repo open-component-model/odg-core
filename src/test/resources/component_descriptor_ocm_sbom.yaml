@@ -1,0 +1,119 @@
+componentDescriptors:
+  - component:
+      name: my.org/my-component
+      version: 1.0.0
+      repositoryContexts:
+        - baseUrl: registry.example.com
+          type: ociRegistry
+      provider: ""
+      sources: []
+      componentReferences: []
+      resources:
+        - name: my-image
+          version: 1.0.0
+          type: ociImage
+          relation: local
+          access:
+            type: ociRegistry
+            imageReference: registry.example.com/my-image:1.0.0
+          labels: []
+          extraIdentity: {}
+        - name: my-image-sbom
+          version: 1.0.0
+          type: sbom
+          relation: local
+          access:
+            type: ociRegistry
+            imageReference: registry.example.com/my-image-sbom:1.0.0
+          labels:
+            - name: ocm.software/artefact-references
+              version: v1alpha1
+              value:
+                - identity:
+                    name: my-image
+          extraIdentity: {}
+      labels: []
+    meta:
+      schemaVersion: v2
+    signatures: []
+
+  - component:
+      name: my.org/my-component
+      version: 2.0.0
+      repositoryContexts:
+        - baseUrl: registry.example.com
+          type: ociRegistry
+      provider: ""
+      sources: []
+      componentReferences: []
+      resources:
+        - name: my-image
+          version: 2.0.0
+          type: ociImage
+          relation: local
+          access:
+            type: ociRegistry
+            imageReference: registry.example.com/my-image:2.0.0
+          labels: []
+          extraIdentity:
+            arch: amd64
+        - name: my-image-sbom-amd64
+          version: 2.0.0
+          type: sbom
+          relation: local
+          access:
+            type: ociRegistry
+            imageReference: registry.example.com/my-image-sbom-amd64:2.0.0
+          labels:
+            - name: ocm.software/artefact-references
+              version: v1alpha1
+              value:
+                - identity:
+                    name: my-image
+                    arch: amd64
+          extraIdentity:
+            architecture: amd64
+        - name: my-image-sbom-arm64
+          version: 2.0.0
+          type: sbom
+          relation: local
+          access:
+            type: ociRegistry
+            imageReference: registry.example.com/my-image-sbom-arm64:2.0.0
+          labels:
+            - name: ocm.software/artefact-references
+              version: v1alpha1
+              value:
+                - identity:
+                    name: my-image
+                    arch: arm64
+          extraIdentity:
+            architecture: arm64
+      labels: []
+    meta:
+      schemaVersion: v2
+    signatures: []
+
+  - component:
+      name: my.org/my-component-no-sbom
+      version: 1.0.0
+      repositoryContexts:
+        - baseUrl: registry.example.com
+          type: ociRegistry
+      provider: ""
+      sources: []
+      componentReferences: []
+      resources:
+        - name: my-image
+          version: 1.0.0
+          type: ociImage
+          relation: local
+          access:
+            type: ociRegistry
+            imageReference: registry.example.com/my-image:1.0.0
+          labels: []
+          extraIdentity: {}
+      labels: []
+    meta:
+      schemaVersion: v2
+    signatures: []
