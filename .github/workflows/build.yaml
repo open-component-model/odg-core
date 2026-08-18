@@ -32,8 +32,6 @@ jobs:
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
       - uses: gardener/cc-utils/.github/actions/trusted-checkout@v1
-        with:
-          trusted-label: reviewed/ok-to-test
       - uses: gardener/cc-utils/.github/actions/install-gardener-gha-libs@v1
       - name: create distribution packages
         id: packages
@@ -117,8 +115,6 @@ jobs:
       contents: read
     steps:
       - uses: gardener/cc-utils/.github/actions/trusted-checkout@v1
-        with:
-          trusted-label: reviewed/ok-to-test
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
       - name: Export odg-extension-definitions
@@ -148,8 +144,6 @@ jobs:
       contents: read
     steps:
       - uses: gardener/cc-utils/.github/actions/trusted-checkout@v1
-        with:
-          trusted-label: reviewed/ok-to-test
       - name: Export Helmchart-Imagemap
         run: |
           set -eu
@@ -177,8 +171,6 @@ jobs:
       contents: read
     steps:
       - uses: gardener/cc-utils/.github/actions/trusted-checkout@v1
-        with:
-          trusted-label: reviewed/ok-to-test
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
       - name: Retrieve Distribution Packages
@@ -234,8 +226,6 @@ jobs:
       contents: read
     steps:
       - uses: gardener/cc-utils/.github/actions/trusted-checkout@v1
-        with:
-          trusted-label: reviewed/ok-to-test
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
       - name: Retrieve Distribution Packages
