@@ -37,7 +37,7 @@
 					{
 						"name": "odg-dev",
 						"host": "db",
-						"port": 5432,
+						"port": "5432",
 						"database": "postgres",
 						"user": "postgres",
 						"password": "MyPassword",

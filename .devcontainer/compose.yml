@@ -19,6 +19,7 @@ services:
       DB_USER: postgres
       DB_PASSWORD: MyPassword
       DB_NAME: postgres
+      EXTENSIONS_CFG_PATH: /workspaces/odg-core/extensions_cfg.local.yaml
     depends_on:
       db:
         condition: service_healthy
