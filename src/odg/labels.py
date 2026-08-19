@@ -117,7 +117,9 @@ def deserialise_label(
     name = _LABEL_NAME_ALIASES.get(label['name'], label['name'])
 
     if not (t := _label_to_type().get(name)):
-        raise ValueError(f"unknown {label['name']=}")
+        raise ValueError(
+            f'unknown {label['name']=}',
+        )
 
     return dacite.from_dict(
         data_class=t,

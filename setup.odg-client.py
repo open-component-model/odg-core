@@ -1,4 +1,5 @@
 import os
+import tomllib
 
 import semver
 import setuptools
@@ -8,13 +9,8 @@ own_dir = os.path.abspath(os.path.dirname(__file__))
 
 
 def requirements():
-    with open(os.path.join(own_dir, 'requirements.odg-client.txt')) as f:
-        for line in f.readlines():
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-
-            yield line
+    with open(os.path.join(own_dir, 'packages', 'odg-client', 'pyproject.toml'), 'rb') as f:
+        return tomllib.load(f)['project']['dependencies']
 
 
 def bump_version():
@@ -26,14 +22,12 @@ setuptools.setup(
     name='odg-client',
     version=str(bump_version()),
     description='Client library for the Open Delivery Gear',
-    long_description='Client library for the Delivery Service (part of the Open Delivery Gear)',
-    long_description_content_type='text/markdown',
-    python_requires='>=3.11',
-    package_dir={'': 'src'},
+    python_requires='>=3.12',
+    package_dir={'': '.'},
     py_modules=[],
     packages=[
         'delivery',
         'odg_client',
     ],
-    install_requires=list(requirements()),
+    install_requires=requirements(),
 )

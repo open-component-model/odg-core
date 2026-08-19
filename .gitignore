@@ -8,4 +8,8 @@ logs*
 .venv
 kubeconfig
 secrets/
+build/
+dist/
+*.egg-info/
+*.bak
 extensions_cfg.local.yaml

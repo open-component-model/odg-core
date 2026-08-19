@@ -4,9 +4,10 @@ set -eu
 # usage: $1: <src-dir>
 
 src_dir="${1:-"$(readlink -f "$(dirname "${0}")/..")"}"
-if ! ruff format --check "${src_dir}"; then
+if ! uv run --project "${src_dir}" ruff format --check "${src_dir}"; then
     echo -e "\n=============================================="
-    echo -e " run '\033[32mruff format\033[0m' to apply suggested changes "
+    echo -e " run '\033[32muv run ruff format\033[0m' to apply suggested changes "
+    echo -e " run '\033[32muv run ruff check --fix\033[0m' to auto-fix lint issues "
     echo -e "=============================================="
     exit 1
 fi

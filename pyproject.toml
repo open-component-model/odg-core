@@ -1,5 +1,66 @@
+[build-system]
+requires = ["setuptools", "semver"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "odg-core-libs"
+description = "Mandatory system internals for the Open Delivery Gear"
+requires-python = ">=3.12"
+dynamic = ["version"]
+dependencies = [
+    "bdba-client",
+    "odg-client",
+    "aiohttp",
+    "aiohttp-swagger3",
+    "awesomeversion",
+    "boto3",
+    "brotli",
+    "cachetools",
+    "cyclonedx-python-lib",
+    "dacite",
+    "dataclasses-json",
+    "gardener-cicd-libs",
+    "github3.py",
+    "htmllistparse",
+    "jsonpath-ng",
+    "jsonschema",
+    "kubernetes",
+    "prometheus_client",
+    "psycopg[binary]",
+    "pyjwt",
+    "requests",
+    "sqlalchemy>1.4.0",
+    "starlette",
+    "urllib3",
+    "uvicorn",
+    "watchdog",
+    "python-dateutil",
+]
+
+[tool.uv.workspace]
+members = ["packages/bdba-client", "packages/odg-client"]
+
+[tool.uv.sources]
+bdba-client = { workspace = true }
+odg-client = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "aiohttp-devtools",
+    "aiosqlite",
+    "greenlet",
+    "numpy",
+    "pytest<9.1",
+    "pytest-asyncio",
+    "scipy",
+    "ruff",
+    "bandit",
+    "semver",
+    "setuptools",
+]
+
 [tool.bandit]
-exclude_dirs = ['test']
+exclude_dirs = ['test', '.venv']
 skips = [
   'B104', # we intendedly bind to `0.0.0.0` in productive environments only
   'B105', # we do not hardcode passwords
