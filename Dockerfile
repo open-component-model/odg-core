@@ -14,15 +14,15 @@ COPY src/malware/clamd.conf /etc/clamav/clamd.conf
 COPY --from=cbomkit-theia-builder /cbomkit-theia/cbomkit-theia /usr/bin/cbomkit-theia
 
 RUN apk add --no-cache \
-    bash \
-    ca-certificates \
-    clamav \
-    clamav-libunrar \
-    curl \
-    git \
-    helm \
-    postgresql16-client \
-    syft \
+    bash=5.3.9-r1 \
+    ca-certificates=20260611-r0 \
+    clamav=1.4.6-r0 \
+    clamav-libunrar=1.4.6-r0 \
+    curl=8.21.0-r0 \
+    git=2.54.0-r0 \
+    helm=3.19.0-r7 \
+    postgresql16-client=16.15-r0 \
+    syft=1.42.4-r1 \
  && curl https://aia.pki.co.sap.com/aia/SAP%20Global%20Root%20CA.crt -o \
     /usr/local/share/ca-certificates/SAP_Global_Root_CA.crt \
  && curl https://aia.pki.co.sap.com/aia/SAPNetCA_G2_2.crt -o \
