@@ -94,13 +94,13 @@ def iter_vulnerability_findings(
     - Skips findings where categorise_finding() returns None (outside configured score ranges).
     - Skips findings with no numeric CVSS score.
     """
-    components_by_ref: dict[str, CyclonedxComponent] = {}
-    for c in cyclonedx.get('components') or []:
-        if ref := c.get('bom-ref'):
-            components_by_ref[ref] = CyclonedxComponent.from_dict(c)
-    meta_component = cyclonedx.get('metadata', {}).get('component') or {}
-    if meta_ref := meta_component.get('bom-ref'):
-        components_by_ref.setdefault(meta_ref, CyclonedxComponent.from_dict(meta_component))
+    cdx_components_by_ref: dict[str, CyclonedxComponent] = {}
+    for cdx_component in cyclonedx.get('components') or []:
+        if ref := cdx_component.get('bom-ref'):
+            cdx_components_by_ref[ref] = CyclonedxComponent.from_dict(cdx_component)
+    cdx_meta_component = cyclonedx.get('metadata', {}).get('component') or {}
+    if meta_ref := cdx_meta_component.get('bom-ref'):
+        cdx_components_by_ref.setdefault(meta_ref, CyclonedxComponent.from_dict(cdx_meta_component))
 
     for vuln in cyclonedx.get('vulnerabilities') or []:
         if not (cve := vuln.get('id')):
@@ -151,17 +151,17 @@ def iter_vulnerability_findings(
 
         for affect in affects:
             ref = affect.get('ref', '')
-            component = components_by_ref.get(ref)
-            if not component or not component.name:
+            cdx_component = cdx_components_by_ref.get(ref)
+            if not cdx_component or not cdx_component.name:
                 raise ValueError(f'{cve}: component {ref!r} has no name')
-            if not component.version:
+            if not cdx_component.version:
                 raise ValueError(f'{cve}: component {ref!r} has no version')
             yield odg.model.VulnerabilityFinding(
                 severity=categorisation.id,
-                package_name=component.name,
-                package_version=component.version,
+                package_name=cdx_component.name,
+                package_version=cdx_component.version,
                 cve=cve,
-                purl=component.purl,
+                purl=cdx_component.purl,
                 cvss_score=cvss_score,
                 cvss=cvss,
                 rating_source=rating_source,
