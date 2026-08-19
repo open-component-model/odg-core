@@ -817,22 +817,21 @@ class TestIterVulnerabilityFindings:
         assert findings[0].cvss_score == 5.5  # NVD alias wins over GHSA 6.0
         assert findings[0].rating_source == 'National Vulnerability Database'
 
-        # 'medium' → 5.0 fallback, which falls in MEDIUM range (4.0–6.9)
-        findings = list(
-            scanner_utils.cyclonedx.iter_vulnerability_findings(
-                self._make_cyclonedx(score=None, vector=None),
-                vulnerability_cfg,
-            ),
-        )
-        assert len(findings) == 1
-        assert findings[0].cvss_score == 5.0
-        assert findings[0].cvss is None
-
     def test_below_threshold_is_skipped(self, vulnerability_cfg):
         # score=1.0 is below MEDIUM minimum (4.0) → categorise_finding returns None → skip
         findings = list(
             scanner_utils.cyclonedx.iter_vulnerability_findings(
                 self._make_cyclonedx(score=1.0, vector=None),
+                vulnerability_cfg,
+            ),
+        )
+        assert findings == []
+
+    def test_no_numeric_score_is_skipped(self, vulnerability_cfg):
+        # Severity-only ratings (no numeric score) must be skipped entirely.
+        findings = list(
+            scanner_utils.cyclonedx.iter_vulnerability_findings(
+                self._make_cyclonedx(score=None, vector=None),
                 vulnerability_cfg,
             ),
         )
