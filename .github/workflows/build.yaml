@@ -29,10 +29,8 @@ jobs:
     outputs:
       version: ${{ steps.packages.outputs.version }}
     steps:
-      - name: install setuptools
-        run: |
-          pip3 install --root-user-action ignore \
-            setuptools
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
       - uses: gardener/cc-utils/.github/actions/trusted-checkout@v1
       - uses: gardener/cc-utils/.github/actions/install-gardener-gha-libs@v1
       - name: create distribution packages
@@ -60,7 +58,7 @@ jobs:
             setup.py \
           ; do
           echo "building distribution package from ${path}"
-          python3 ${path} \
+          uv run python3 ${path} \
               bdist_wheel \
               --dist-dir ${pkg_dir}
           rm -rf build
@@ -104,7 +102,7 @@ jobs:
           ocm-resources-file: dist/ocm_resources.yaml
           blobs-directory: dist/blobs.d
       - name: upload python-packages as artefact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: distribution-packages
           path: distribution-packages.tar.gz
@@ -117,11 +115,13 @@ jobs:
       contents: read
     steps:
       - uses: gardener/cc-utils/.github/actions/trusted-checkout@v1
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
       - name: Export odg-extension-definitions
         run: |
           set -euo pipefail
 
-          echo "${{ needs.prepare.outputs.version }}" | .ci/write-version
+          echo "${{ needs.prepare.outputs.version }}" | uv run .ci/write-version
 
           mkdir blobs.d
           tar czf blobs.d/extension_definitions.tar.gz extension-definitions.yaml
@@ -171,29 +171,18 @@ jobs:
       contents: read
     steps:
       - uses: gardener/cc-utils/.github/actions/trusted-checkout@v1
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
       - name: Retrieve Distribution Packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8.0.1
         with:
           name: distribution-packages
       - name: lint
         run: |
           tar xf distribution-packages.tar.gz -C /tmp
 
-          echo "installing linters"
-          if ! pip3 install --pre --upgrade --break-system-packages \
-            --find-links /tmp/dist \
-            -r requirements.bdba-client.txt \
-            -r requirements.odg-client.txt \
-            -r requirements.txt \
-            numpy \
-            scipy \
-            bandit \
-            ruff \
-            setuptools \
-              > /tmp/pip3-install.log; then
-            echo "error while trying to install packages:"
-            cat /tmp/pip3-install.log
-          fi
+          echo "installing packages"
+          uv sync --find-links /tmp/dist
 
           echo "running linters"
           blobs_dir=blobs.d
@@ -237,8 +226,10 @@ jobs:
       contents: read
     steps:
       - uses: gardener/cc-utils/.github/actions/trusted-checkout@v1
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
       - name: Retrieve Distribution Packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8.0.1
         with:
           name: distribution-packages
       - name: run-tests
@@ -246,13 +237,7 @@ jobs:
           tar xf distribution-packages.tar.gz -C /tmp
 
           echo "installing packages"
-          if ! pip3 install --pre --upgrade --break-system-packages \
-            --find-links /tmp/dist \
-            -r requirements-dev.txt \
-              > /tmp/pip3-install.log; then
-            echo "error while trying to install packages:"
-            cat /tmp/pip3-install.log
-          fi
+          uv sync --find-links /tmp/dist
 
           echo "running tests"
           .ci/smoke-test

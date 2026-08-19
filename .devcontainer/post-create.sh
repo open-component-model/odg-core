@@ -20,3 +20,12 @@ fi
 EOF
     echo "Kubeconfig refresh hook added to $BASHRC"
 fi
+
+# Prepare KinD cluster if available
+if [[ -f "$HOME/.kube/config-orig" ]]; then
+    mkdir -p "$HOME/.kube"
+    sed 's/127\.0\.0\.1/host.docker.internal/g' "$HOME/.kube/config-orig" > "$HOME/.kube/config"
+fi
+if kubectl cluster-info --context kind-odg-devcontainer-cluster &>/dev/null; then
+    uv run .devcontainer/prepare-kind.py
+fi

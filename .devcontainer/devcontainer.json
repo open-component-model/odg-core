@@ -29,6 +29,7 @@
 						"source.organizeImports.ruff": "always"
 					}
 				},
+				"python.defaultInterpreterPath": "/workspaces/odg-core/.venv/bin/python",
 				"python.testing.pytestArgs": ["src"],
 				"python.testing.unittestEnabled": false,
 				"python.testing.pytestEnabled": true,

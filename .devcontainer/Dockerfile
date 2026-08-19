@@ -13,9 +13,4 @@ RUN apt-get update \
 
 RUN mkdir -p /home/vscode/.kube && chown vscode /home/vscode/.kube
 
-COPY requirements*.txt /tmp/
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip3 install \
-    -r /tmp/requirements.txt \
-    -r /tmp/requirements-dev.txt \
-    && rm /tmp/requirements*.txt
+RUN pip3 install uv==0.12.3

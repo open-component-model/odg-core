@@ -29,21 +29,34 @@ The ODG-Core Python HTTP web server can be started locally as a standalone appli
 
 #### Dependencies and Setup
 
-First, you need to prepare your local environment.
-The Makefile implements convenient commands for setup, but makes certain assumptions (e.g. it **does not** use virtual environments). If you have a strong opinion on how to set up your local development environment, please review the Makefile in detail.
-
-If you are fine with installing the Python packages globally, please run:
+First, you need to prepare your local environment. Install `uv` (e.g. `brew install uv`), then run:
 
 ```shell
 make setup
 ```
 
+This creates a project-local `.venv` with all dependencies pinned from `uv.lock`. Afterwards you can either prefix commands with `uv run` (e.g. `uv run pytest`) or activate the venv manually.
+
+Common Makefile targets:
+
+| Target | Description |
+| --- | --- |
+| `make setup` | Create/update `.venv` from lock file |
+| `make run-db` | Start a local PostgreSQL instance |
+| `make run` | Start the development server |
+| `make test` | Run the test suite |
+| `make lint` | Run ruff and bandit |
+| `make format` | Check code formatting |
+| `make build-core` | Build the `odg-core-libs` wheel |
+| `make build-clients` | Build `bdba-client` and `odg-client` wheels |
+| `make build-docker-local` | Build the OCI image for your local architecture |
+| `make build-docker` | Build the OCI image for all supported architectures |
+| `make clean` | Remove build artifacts |
+
 #### Running the Web Server
 
 The Makefile features a convenient command to run the ODG-Core web server in a lightweight fashion. This naturally has limitations, as most features will be turned off.
 If you want to run specific features, please review the Makefile and build your custom `run` command.
-
-To run ODG-Core in a simple configuration, please use:
 
 ```shell
 make run
@@ -72,13 +85,11 @@ The Dev Container provides:
 To work with a KinD cluster:
 
 1. Create the KinD cluster on the host: `kind create cluster --config .devcontainer/kind-config.yml`, which includes `host.docker.internal` as SAN
+1. Flatten your kubeconfig into `~/.kube/config`: `kubectl config view --flatten > ~/.kube/config`
 1. Open the Dev Container (**Reopen in Container** in VS Code)
 1. Open a terminal session. The kubeconfig is refreshed on every shell startup, with `127.0.0.1` replaced by `host.docker.internal`
-1. Run `.devcontainer/prepare-kind.py` in the Dev Container to apply ODG CRDs and create `src/secrets/kubernetes/devcontainers-cluster.yaml`
 1. Copy the extensions config: `cp extensions_cfg.yaml extensions_cfg.local.yaml`
 1. Adjust the local [configuration and secrets](https://open-component-model.github.io/open-delivery-gear/contents/how-to/00-hybrid-dev-setup.html#configuration-and-secrets) to your needs
-
-If you use Kubeconfig with multiple files, flatten first: `kubectl config view --raw --flatten > ~/.kube/config`.
 
 To clean up the KinD cluster: `kind delete clusters odg-devcontainer-cluster`
 

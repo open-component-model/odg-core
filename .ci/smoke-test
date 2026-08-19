@@ -5,4 +5,4 @@ set -eu
 own_dir="$(dirname "${BASH_SOURCE[0]}")"
 repo_root="${own_dir}/.."
 
-"${repo_root}/src/smoke_test.py"
+uv run "${repo_root}/src/smoke_test.py"

@@ -1,4 +1,0 @@
-cachecontrol
-dacite
-python-dateutil
-requests
