@@ -31,10 +31,17 @@ RUN apk add --no-cache \
  && mkdir /freshclam \
  && chown clamav /freshclam
 
-ARG ODG_CORE_LIBS_VERSION
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Workaround to pin versions for pip install with local deps 
+COPY uv.lock pyproject.toml ./
+RUN uv export --frozen --no-dev --no-emit-project --no-emit-workspace \
+        --format=requirements-txt -o constraints.txt
+
+ARG ODG_CORE_LIBS_VERSION
 COPY dist/ /dist/
 RUN uv venv "$VIRTUAL_ENV" \
- && uv pip install --no-cache --find-links /dist odg-core-libs==${ODG_CORE_LIBS_VERSION} \
- && rm -rf /dist
+ && uv pip install --no-cache --find-links /dist \
+        --constraint constraints.txt \
+        odg-core-libs==${ODG_CORE_LIBS_VERSION} \
