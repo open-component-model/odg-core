@@ -1,8 +1,20 @@
+import calendar
+import time
+
 import pytest
 import yaml
+from unittest.mock import patch
 
 import paths
 import responsibles.github_statistics as rg
+
+# global_stats() weights commits by age relative to time.time(). The test
+# fixtures contain historical contributor data (2020-2022). As real time
+# advances, the sigmoid re-fit shifts which authors fall into the percentile
+# brackets, making the assertion unstable. Freeze to a fixed epoch so the
+# test is deterministic regardless of when it runs.
+# See: test_responsibles_heuristic_time_sensitivity.md
+_FROZEN_EPOCH = calendar.timegm(time.strptime('2023-06-01', '%Y-%m-%d'))
 
 
 @pytest.fixture()
@@ -15,6 +27,15 @@ def negative_list():
 def positive_list():
     with open(paths.test_resources_gardener_org_members, 'r') as f:
         return yaml.load(f, Loader=yaml.SafeLoader)['usernames']
+
+
+@pytest.fixture(autouse=True)
+def freeze_time():
+    with patch(
+        'responsibles.github_statistics.time.time',
+        return_value=_FROZEN_EPOCH,
+    ):
+        yield
 
 
 def _is_candidate_stat(
