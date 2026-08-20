@@ -40,8 +40,8 @@ RUN uv export --frozen --no-dev --no-emit-project --no-emit-workspace \
         --format=requirements-txt -o constraints.txt
 
 ARG ODG_CORE_LIBS_VERSION
-COPY dist/ /dist/
-RUN uv venv "$VIRTUAL_ENV" \
+RUN --mount=type=bind,source=dist/,target=/dist \
+    uv venv "$VIRTUAL_ENV" \
  && uv pip install --no-cache --find-links /dist \
         --constraint constraints.txt \
-        odg-core-libs==${ODG_CORE_LIBS_VERSION} \
+        odg-core-libs==${ODG_CORE_LIBS_VERSION}
