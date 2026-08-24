@@ -52,11 +52,13 @@ def _run_trivy(subcommand: str, args: list[str], timeout: int = 600) -> dict:
         timeout=timeout,
     )
     if result.returncode != 0:
-        logger.error(f'trivy {subcommand} failed (exit {result.returncode}):\n{result.stderr.decode()}')
+        logger.error(
+            f'trivy {subcommand} failed (exit {result.returncode}):\n{result.stderr.decode()}'
+        )
         result.check_returncode()
     cyclonedx = json.loads(result.stdout)
     logger.debug(
         f'trivy {subcommand} returned {len(cyclonedx.get("vulnerabilities") or [])} CVE(s) '
-        f'across {len(cyclonedx.get("components") or [])} component(s)'
+        f'across {len(cyclonedx.get("components") or [])} component(s)',
     )
     return cyclonedx
