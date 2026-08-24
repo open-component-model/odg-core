@@ -34,7 +34,7 @@ _OCI_IMAGE_MEDIA_TYPES = frozenset(
         'application/vnd.oci.image.manifest.v1+tar',
         'application/vnd.oci.image.manifest.v1+tar+gzip',
         'application/vnd.oci.image.index.v1+tar.gzip',
-    }
+    },
 )
 
 
@@ -84,7 +84,7 @@ class Scanner(abc.ABC):
                 logger.debug('found OCI SBOM artifact, routing to scan_sbom')
                 return self.scan_sbom(sbom)
 
-        if access.type is ocm.AccessType.OCI_REGISTRY:
+        if access.type == ocm.AccessType.OCI_REGISTRY:
             logger.debug(f'scanning OCI image {access.imageReference!r}')
             return self.scan_oci_image(access.imageReference)
 
@@ -272,7 +272,10 @@ def run_scan(
             )
 
     if cyclonedx is None:
-        cyclonedx = scanner.scan_ocm_resource(resource_node=resource_node, oci_client=oci_client)
+        cyclonedx = scanner.scan_ocm_resource(
+            resource_node=resource_node,
+            oci_client=oci_client,
+        )
 
     findings = list(
         scanner_utils.cyclonedx.parse_vulnerability_findings(
@@ -365,9 +368,13 @@ def _fetch_oci_sbom(
     oci_client,
 ) -> dict | None:
     access = resource_node.resource.access
-    if access.type is not ocm.AccessType.OCI_REGISTRY:
+    if access.type != ocm.AccessType.OCI_REGISTRY:
         return None
-    manifest = oci_client.manifest(image_reference=access.imageReference)
+    try:
+        manifest = oci_client.manifest(image_reference=access.imageReference)
+    except Exception as e:
+        logger.warning(f'failed to fetch OCI SBOM manifest for {access.imageReference!r}: {e}')
+        return None
     if not manifest.layers:
         return None
     layer = manifest.layers[0]
