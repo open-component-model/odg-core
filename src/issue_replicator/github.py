@@ -1368,7 +1368,9 @@ def vulnerability_summary(
         urls = set()
         for finding in finding_group.findings:
             if isinstance(finding.finding.data, odg.model.BDBAVulnerabilityFinding):
-                urls.update(finding.finding.data.urls)
+                for url in finding.finding.data.urls:
+                    if 'nvd.nist.gov' not in url:
+                        urls.add(url)
         return sorted(urls)
 
     def group_aggregated_findings(
