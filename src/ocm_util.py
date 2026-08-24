@@ -25,6 +25,62 @@ import util
 logger = logging.getLogger(__name__)
 
 
+def _init_read_gz(self):
+    """Initialize for reading a gzip compressed fileobj."""
+    self.cmp = self.zlib.decompressobj(-self.zlib.MAX_WBITS)
+    self.dbuf = b''
+
+    # taken from gzip.GzipFile with some alterations
+    if self.__read(2) != b'\037\213':
+        raise tarfile.ReadError('not a gzip file')
+    if self.__read(1) != b'\010':
+        raise tarfile.CompressionError('unsupported compression method')
+
+    flag = ord(self.__read(1))
+    self.__read(6)
+
+    if flag & 4:
+        xlen = ord(self.__read(1)) + 256 * ord(self.__read(1))
+        self.__read(xlen)
+    if flag & 8:
+        while True:
+            s = self.__read(1)
+            if not s or s == tarfile.NUL:
+                break
+    if flag & 16:
+        while True:
+            s = self.__read(1)
+            if not s or s == tarfile.NUL:
+                break
+    if flag & 2:
+        self.__read(2)
+
+
+def __read(self, size):
+    """Return size bytes from stream. If internal buffer is empty,
+    read another block from the stream.
+    """
+    c = len(self.buf)
+    t = [self.buf]
+    while c < size:
+        buf = self.fileobj.read(self.bufsize)
+        if not buf:
+            break
+        t.append(buf)
+        c += len(buf)
+    t = b''.join(t)
+    self.buf = t[size:]
+    return t[:size]
+
+
+# In Python 3.12, the `tarfile` module does not skip the FEXTRA and FCOMMENT data fields in the gzip
+# header which causes a `tarfile.ReadError` when trying to process gzipped tar archives containing
+# those fields. Therefore, overwriting these functions by the functions which are part of Python 3.14
+# (where the bug is resolved). For reference, see https://github.com/python/cpython/issues/107398.
+tarfile._Stream._init_read_gz = _init_read_gz
+tarfile._Stream.__read = __read
+
+
 @dataclasses.dataclass
 class BlobDescriptor:
     content: collections.abc.Generator[bytes, None, None]
