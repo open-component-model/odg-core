@@ -1220,10 +1220,13 @@ class TestScannerDispatch:
     @staticmethod
     def _make_node(resource):
         component = ocm.Component(
-            name='example.org/comp', version='1.0',
+            name='example.org/comp',
+            version='1.0',
             repositoryContexts=[ocm.OciOcmRepository(baseUrl='example.org')],
             provider='test',
-            sources=[], componentReferences=[], resources=[],
+            sources=[],
+            componentReferences=[],
+            resources=[],
         )
         return ocm.iter.ResourceNode(
             path=(ocm.iter.NodePathEntry(component=component),),
@@ -1240,7 +1243,9 @@ class TestScannerDispatch:
 
     def test_oci_registry_routes_to_scan_oci_image(self):
         resource = ocm.Resource(
-            name='img', version='1.0', type=ocm.ArtefactType.OCI_IMAGE,
+            name='img',
+            version='1.0',
+            type=ocm.ArtefactType.OCI_IMAGE,
             access=ocm.OciAccess(imageReference='example.org/img:1.0'),
         )
         scanner = _FakeScanner()
@@ -1250,7 +1255,9 @@ class TestScannerDispatch:
     def test_oci_image_media_type_routes_to_scan_oci_image_archive(self):
         media_type = 'application/vnd.oci.image.manifest.v1+tar+gzip'
         resource = ocm.Resource(
-            name='img', version='1.0', type=ocm.ArtefactType.OCI_IMAGE,
+            name='img',
+            version='1.0',
+            type=ocm.ArtefactType.OCI_IMAGE,
             access=ocm.LocalBlobAccess(localReference='sha256:abc', mediaType=media_type, size=1),
         )
         with unittest.mock.patch(
@@ -1264,7 +1271,9 @@ class TestScannerDispatch:
     def test_tar_blob_routes_to_scan_file_with_is_tar_true(self):
         media_type = 'application/x-tar'
         resource = ocm.Resource(
-            name='tree', version='1.0', type=ocm.ArtefactType.DIRECTORY_TREE,
+            name='tree',
+            version='1.0',
+            type=ocm.ArtefactType.DIRECTORY_TREE,
             access=ocm.LocalBlobAccess(localReference='sha256:def', mediaType=media_type, size=1),
         )
         with unittest.mock.patch(
@@ -1279,7 +1288,9 @@ class TestScannerDispatch:
     def test_sbom_artefact_type_routes_to_scan_sbom(self):
         sbom_payload = {'bomFormat': 'CycloneDX', 'specVersion': '1.5'}
         resource = ocm.Resource(
-            name='sbom', version='1.0', type=ocm.ArtefactType.SBOM,
+            name='sbom',
+            version='1.0',
+            type=ocm.ArtefactType.SBOM,
             access=ocm.OciAccess(imageReference='example.org/sbom:1.0'),
         )
         layer = unittest.mock.Mock()
