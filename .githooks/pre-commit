@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -e
+
+# Only act on staged Python files (added, copied, modified, renamed)
+mapfile -d '' STAGED < <(git diff --cached --name-only -z --diff-filter=ACMR -- '*.py')
+if [ "${#STAGED[@]}" -eq 0 ]; then
+    exit 0
+fi
+
+echo "pre-commit: applying ruff format..."
+make format-staged
+
+echo "pre-commit: running ruff lint (auto-fix)..."
+make lint-staged || RUFF_STATUS=$?
+
+exit "${RUFF_STATUS:-0}"

@@ -16,14 +16,6 @@ def iter_existing_findings(
     finding_type: odg.model.Datatype | tuple[odg.model.Datatype, ...],
     datasource: odg.model.Datasource,
 ) -> collections.abc.Generator[odg.model.ArtefactMetadata, None, None]:
-    """
-    Yield all findings currently stored in the delivery service for a given resource.
-
-    delivery_service_client: Client for the ODG delivery service API
-    resource_node: OCM resource node identifying the component + artefact to query
-    finding_type: Datatype (or tuple of datatypes) to filter by
-    datasource: Datasource to filter by — only findings written by this scanner are returned
-    """
     artefact = odg.model.component_artefact_id_from_ocm(
         component=resource_node.component_id,
         artefact=resource_node.resource,
@@ -44,16 +36,13 @@ def delete_stale_findings(
     delivery_service_client: odg_client.DeliveryServiceClient,
 ) -> None:
     """
-    Delete findings from the delivery service that were present in a previous scan but are
-    absent from the current one (e.g. a patched vulnerability or resolved false positive).
+    Deletes findings from the delivery service that were present in a previous scan but are absent
+    from the current one (e.g. a vulnerability that was patched, or a custom version entry that
+    resolved a false positive).
 
-    A finding is considered present when both its datatype and data key (package+version+CVE
-    for vulnerability findings) match. The component version is intentionally excluded because
-    findings are stored without it.
-
-    existing_findings_by_key: keyed by finding data key, from iter_existing_findings()
-    current_findings: findings produced by the current scan run
-    delivery_service_client: Client for the ODG delivery service API
+    A finding is considered present in the current scan when both its datatype and its data key
+    (package+version+CVE for vulnerability findings) match. The artefact's component version is
+    intentionally excluded from this comparison because findings are stored without it.
     """
     current_type_and_data_keys = {
         (am.meta.type, am.data.key)
@@ -77,15 +66,10 @@ def iter_package_version_overwrites(
     delivery_service_client: odg_client.DeliveryServiceClient,
 ) -> collections.abc.Iterable[odg.model.PackageVersionScannerWriteback]:
     """
-    Yield package-version overwrite entries for a given component/resource.
-
-    Merges hints from the delivery service (scanner writebacks) and OCM label hints.
-    Resource-level labels take precedence over component-level labels; if a resource label
-    is present the component label is ignored entirely.
-
-    component: OCM component that owns the resource
-    resource: OCM resource to look up overwrite hints for
-    delivery_service_client: Client for the ODG delivery service API
+    Yields package-version overwrite entries for a given component/resource, merging
+    hints from the delivery service (scanner writebacks) and OCM label hints. Resource-level
+    labels take precedence over component-level labels; if a resource label is present the
+    component label is ignored entirely.
     """
     artefact = odg.model.component_artefact_id_from_ocm(
         component=component,
@@ -122,10 +106,10 @@ def make_artefact_scan_info(
     datasource: odg.model.Datasource,
 ) -> odg.model.ArtefactMetadata:
     """
-    Return the mandatory ARTEFACT_SCAN_INFO heartbeat record for a completed scan.
+    Returns the mandatory ARTEFACT_SCAN_INFO envelope for a completed scan.
 
-    resource_node: OCM resource node that was scanned
-    datasource: Datasource enum value for this scanner — used as the primary key namespace
+    New scanner extensions should call this to emit the scan heartbeat without needing to know
+    about the internal ArtefactMetadata structure.
     """
     return odg.model.artefact_scan_info(
         artefact_node=resource_node,

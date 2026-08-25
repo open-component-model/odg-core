@@ -26,15 +26,9 @@ def compute_auto_triage_cves(
     cve_categorisation: odg.cvss.CveCategorisation,
 ) -> list[str]:
     """
-    Return CVE IDs that should be automatically triaged to zero for a single package component.
-
-    Returns an empty list if none qualify or if component_version is None.
-
-    component_name: Package name (used for logging only)
-    component_version: Package version; if None, no auto-triage is performed
-    vulnerabilities: Candidates to evaluate — typically one per CVE for this component
-    vulnerability_cfg: Finding config supplying rescoring rules and score thresholds
-    cve_categorisation: CVSS categorisation data used to match rescoring rules
+    Given a list of vulnerability candidates for a single package component, returns the CVE IDs
+    that should be automatically triaged to zero based on the rescoring ruleset and CVE
+    categorisation. Returns an empty list if none qualify.
     """
     if not component_version:
         return []
@@ -55,7 +49,7 @@ def compute_auto_triage_cves(
 
         try:
             cvss = odg.cvss.CVSSV3.parse(v.cvss_vector)
-        except (ValueError, KeyError, IndexError):
+        except ValueError, KeyError, IndexError:
             logger.debug('could not parse CVSS vector %r for %s', v.cvss_vector, v.cve)
             continue
 
@@ -76,7 +70,7 @@ def compute_auto_triage_cves(
             auto_triage_cves.append(v.cve)
 
     if auto_triage_cves:
-        logger.debug(
+        logger.info(
             f'auto-triage candidates for {component_name}:{component_version}: {auto_triage_cves}',
         )
 

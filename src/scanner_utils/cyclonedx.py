@@ -1,10 +1,11 @@
 import collections.abc
+import dataclasses
 import logging
+import re
 
 import odg.cvss
 import odg.findings
 import odg.model
-
 
 logger = logging.getLogger(__name__)
 
@@ -16,36 +17,62 @@ _SOURCE_ALIASES: dict[str, str] = {
     'national vulnerability database': 'nvd',
 }
 
-_SEVERITY_FALLBACK: dict[str, float] = {
-    'critical': 9.5,
-    'high': 8.0,
-    'medium': 5.0,
-    'low': 2.0,
-}
+_CVSS_PREFIX_RE = re.compile(r'^CVSS:[^/]+/')
+
+
+@dataclasses.dataclass
+class CyclonedxRating:
+    method: str
+    score: float | None
+    severity: str
+    vector: str | None
+    source_name: str | None
+
+    @classmethod
+    def from_dict(cls, raw: dict) -> 'CyclonedxRating':
+        return cls(
+            method=(raw.get('method') or ''),
+            score=raw.get('score'),
+            severity=(raw.get('severity') or ''),
+            vector=raw.get('vector'),
+            source_name=(raw.get('source') or {}).get('name'),
+        )
+
+
+@dataclasses.dataclass
+class CyclonedxComponent:
+    name: str
+    version: str
+    purl: str | None
+
+    @classmethod
+    def from_dict(cls, raw: dict) -> 'CyclonedxComponent':
+        return cls(
+            name=(raw.get('name') or ''),
+            version=(raw.get('version') or ''),
+            purl=raw.get('purl'),
+        )
 
 
 def _strip_cvss_prefix(vector: str) -> str:
     # "CVSS:3.1/AV:N/..." → "AV:N/..."  (CVSSV3.parse expects no prefix token)
-    if vector.startswith('CVSS:') and '/' in vector:
-        return vector.split('/', 1)[1]
-    return vector
+    return _CVSS_PREFIX_RE.sub('', vector)
 
 
-def _pick_rating(ratings: list[dict]) -> dict | None:
-    """
-    Return the best rating from a CycloneDX vulnerability's ratings array.
+def _pick_rating(ratings: list[CyclonedxRating]) -> CyclonedxRating | None:
+    """Return the best rating from a CycloneDX vulnerability's ratings array.
 
-    Preference order: nvd → redhat → ghsa → first CVSSv3 → first rating of any method.
-    Non-v3 ratings are accepted for their score; their vector will not be parsed.
+    Prefers CVSSv3 from trusted sources: nvd → redhat → ghsa → first CVSSv3 → first.
+    Non-v3 ratings are accepted for their score but their vector will not be parsed.
     """
     if not ratings:
         return None
 
-    cvssv3 = [r for r in ratings if 'v3' in (r.get('method') or '').lower()]
+    cvssv3 = [r for r in ratings if 'v3' in r.method.lower()]
 
     for source in _PREFERRED_SOURCES:
         for r in cvssv3:
-            raw = (r.get('source') or {}).get('name', '').lower()
+            raw = (r.source_name or '').lower()
             canonical = _SOURCE_ALIASES.get(raw, raw)
             if canonical == source:
                 return r
@@ -56,26 +83,24 @@ def _pick_rating(ratings: list[dict]) -> dict | None:
     return ratings[0]
 
 
-def parse_vulnerability_findings(
+def iter_vulnerability_findings(
     cyclonedx: dict,
     vulnerability_cfg: odg.findings.Finding,
 ) -> collections.abc.Generator[odg.model.VulnerabilityFinding, None, None]:
-    """
-    Parse a CycloneDX JSON document and yield one VulnerabilityFinding per affected component.
+    """Parse a CycloneDX JSON document and yield one VulnerabilityFinding per affected component.
 
-    A vulnerability that affects N components yields N findings (same CVE, different package).
-    Skips findings where categorise_finding() returns None (outside configured score ranges).
-    Falls back to _SEVERITY_FALLBACK when no numeric score is present.
-
-    cyclonedx: Parsed CycloneDX JSON document (as returned by the scanner CLI)
-    vulnerability_cfg: Finding config — determines score thresholds and label-based exclusions
+    - Resolves package_name / package_version / purl via bom-ref → component index.
+    - A vulnerability that affects N components yields N findings (same CVE, different package).
+    - Skips findings where categorise_finding() returns None (outside configured score ranges).
+    - Skips findings with no numeric CVSS score.
     """
-    components_by_ref: dict[str, dict] = {
-        c['bom-ref']: c for c in cyclonedx.get('components') or [] if c.get('bom-ref')
-    }
-    meta_component = cyclonedx.get('metadata', {}).get('component') or {}
-    if meta_ref := meta_component.get('bom-ref'):
-        components_by_ref.setdefault(meta_ref, meta_component)
+    cdx_components_by_ref: dict[str, CyclonedxComponent] = {}
+    for cdx_component in cyclonedx.get('components') or []:
+        if ref := cdx_component.get('bom-ref'):
+            cdx_components_by_ref[ref] = CyclonedxComponent.from_dict(cdx_component)
+    cdx_meta_component = cyclonedx.get('metadata', {}).get('component') or {}
+    if meta_ref := cdx_meta_component.get('bom-ref'):
+        cdx_components_by_ref.setdefault(meta_ref, CyclonedxComponent.from_dict(cdx_meta_component))
 
     for vuln in cyclonedx.get('vulnerabilities') or []:
         if not (cve := vuln.get('id')):
@@ -90,23 +115,19 @@ def parse_vulnerability_findings(
         recommendation = vuln.get('recommendation')
         urls = [a['url'] for a in (vuln.get('advisories') or []) if a.get('url')]
 
-        rating = _pick_rating(vuln.get('ratings') or [])
+        ratings = [CyclonedxRating.from_dict(r) for r in (vuln.get('ratings') or [])]
+        rating = _pick_rating(ratings)
         if rating:
-            cvss_score = rating.get('score')
-            raw_vector = rating.get('vector')
-            rating_source = (rating.get('source') or {}).get('name')
+            cvss_score = rating.score
+            raw_vector = rating.vector
+            rating_source = rating.source_name
         else:
             cvss_score = None
             raw_vector = None
             rating_source = (vuln.get('source') or {}).get('name')
 
-        # Fall back to severity string when no numeric score is available.
         if cvss_score is None:
-            severity_str = (rating or {}).get('severity', '')
-            cvss_score = _SEVERITY_FALLBACK.get(severity_str.lower())
-
-        if cvss_score is None:
-            logger.debug('skipping %s: no score and unrecognised severity', cve)
+            logger.debug('skipping %s: no numeric score available', cve)
             continue
 
         categorisation = odg.findings.categorise_finding(
@@ -117,10 +138,10 @@ def parse_vulnerability_findings(
             continue
 
         cvss: odg.cvss.CVSSV3 | None = None
-        if raw_vector and rating and 'v3' in (rating.get('method') or '').lower():
+        if raw_vector and rating and 'v3' in rating.method.lower():
             try:
                 cvss = odg.cvss.CVSSV3.parse(_strip_cvss_prefix(raw_vector))
-            except (ValueError, KeyError, IndexError):
+            except ValueError, KeyError, IndexError:
                 logger.debug('could not parse CVSS vector %r for %s', raw_vector, cve)
 
         affects = vuln.get('affects') or []
@@ -130,17 +151,17 @@ def parse_vulnerability_findings(
 
         for affect in affects:
             ref = affect.get('ref', '')
-            component = components_by_ref.get(ref, {})
-            if not (package_name := component.get('name')):
+            cdx_component = cdx_components_by_ref.get(ref)
+            if not cdx_component or not cdx_component.name:
                 raise ValueError(f'{cve}: component {ref!r} has no name')
-            if not (package_version := component.get('version')):
+            if not cdx_component.version:
                 raise ValueError(f'{cve}: component {ref!r} has no version')
             yield odg.model.VulnerabilityFinding(
                 severity=categorisation.id,
-                package_name=package_name,
-                package_version=package_version,
+                package_name=cdx_component.name,
+                package_version=cdx_component.version,
                 cve=cve,
-                purl=component.get('purl'),
+                purl=cdx_component.purl,
                 cvss_score=cvss_score,
                 cvss=cvss,
                 rating_source=rating_source,
