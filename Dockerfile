@@ -4,7 +4,7 @@ RUN apk add --no-cache git \
  && git clone --branch ${CBOMKIT_THEIA_VERSION} https://github.com/IBM/cbomkit-theia.git /cbomkit-theia \
  && cd /cbomkit-theia && go mod download && go build
 
-FROM python:3.12-alpine3.24
+FROM python:3.14-alpine3.24
 
 # uv from its official image — no pip, no --break-system-packages
 COPY --from=ghcr.io/astral-sh/uv:0.12.5 /uv /uvx /usr/local/bin/

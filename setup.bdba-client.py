@@ -22,6 +22,7 @@ setuptools.setup(
     name='bdba-client',
     version=str(bump_version()),
     package_dir={'': '.'},
+    python_requires='>=3.14',
     py_modules=[],
     packages=['bdba'],
     install_requires=requirements(),

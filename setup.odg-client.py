@@ -22,7 +22,7 @@ setuptools.setup(
     name='odg-client',
     version=str(bump_version()),
     description='Client library for the Open Delivery Gear',
-    python_requires='>=3.12',
+    python_requires='>=3.14',
     package_dir={'': '.'},
     py_modules=[],
     packages=[

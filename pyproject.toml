@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "odg-core-libs"
 description = "Mandatory system internals for the Open Delivery Gear"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dynamic = ["version"]
 dependencies = [
     "bdba-client",
