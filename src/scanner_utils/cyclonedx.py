@@ -141,7 +141,7 @@ def iter_vulnerability_findings(
         if raw_vector and rating and 'v3' in rating.method.lower():
             try:
                 cvss = odg.cvss.CVSSV3.parse(_strip_cvss_prefix(raw_vector))
-            except (ValueError, KeyError, IndexError):
+            except ValueError, KeyError, IndexError:
                 logger.debug('could not parse CVSS vector %r for %s', raw_vector, cve)
 
         affects = vuln.get('affects') or []
