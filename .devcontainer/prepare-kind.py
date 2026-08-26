@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/local/bin/uv run
 """
 Prepare the kind devcontainer cluster:
   1. Apply ODG custom CRDs from charts/delivery-service/crds and charts/extensions/crds
