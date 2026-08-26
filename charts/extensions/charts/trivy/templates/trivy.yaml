@@ -1,4 +1,6 @@
 {{- $podName := "trivy" }}
+{{- $cacheEnabled := (.Values.cache).enabled | default false }}
+{{- $nodeSelector := (.Values.deployment).nodeSelector }}
 
 apiVersion: apps/v1
 kind: Deployment
@@ -31,6 +33,10 @@ spec:
             matchLabels:
               app: {{ $podName }}
       terminationGracePeriodSeconds: 1800 # 30 min
+      {{- if $nodeSelector }}
+      nodeSelector:
+        {{- toYaml $nodeSelector | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ $podName }}
           image: {{ include "image" .Values.global.image }}
@@ -52,6 +58,10 @@ spec:
               value: /ocm_repo_mappings/ocm_repo_mappings
             - name: K8S_TARGET_NAMESPACE
               value: {{ .Values.target_namespace | default .Release.Namespace }}
+            {{- if $cacheEnabled }}
+            - name: TRIVY_CACHE_DIR
+              value: /cache/trivy
+            {{- end }}
           volumeMounts:
             - name: aws
               mountPath: /secrets/aws
@@ -63,6 +73,10 @@ spec:
               mountPath: /secrets/kubernetes
             - name: oci-registry
               mountPath: /secrets/oci-registry
+            {{- if $cacheEnabled }}
+            - name: trivy-cache
+              mountPath: /cache/trivy
+            {{- end }}
             - name: extensions-cfg
               mountPath: /extensions_cfg
             - name: findings-cfg
@@ -101,6 +115,11 @@ spec:
           secret:
             secretName: secret-factory-oci-registry
             optional: true # oci authentication is optional
+        {{- if $cacheEnabled }}
+        - name: trivy-cache
+          persistentVolumeClaim:
+            claimName: trivy-cache
+        {{- end }}
         - name: extensions-cfg
           configMap:
             name: extensions-cfg
@@ -124,3 +143,20 @@ spec:
     - Egress
   egress:
     - {}  # Allows all egress traffic to any destination and port
+{{- if $cacheEnabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: trivy-cache
+  namespace: {{ .Values.target_namespace | default .Release.Namespace }}
+spec:
+  accessModes:
+    - {{ (.Values.cache).accessMode | default "ReadWriteMany" }}
+  {{- if (.Values.cache).storageClass }}
+  storageClassName: {{ .Values.cache.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ (.Values.cache).size | default "10Gi" }}
+{{- end }}

@@ -173,6 +173,7 @@ sla-violation-profiler:
 trivy:
   deployment:
     annotations: []
+    nodeSelector: {} # to pin trivy pods to selected node(s)
     resources:
       requests:
         memory: 300Mi
@@ -180,3 +181,8 @@ trivy:
       limits:
         memory: 1Gi
   enabled: false
+  cache:
+    enabled: false
+    storageClass: "" # if empty default SC is used
+    size: 10Gi
+    accessMode: ReadWriteMany # use RWO when pinned to a single node
