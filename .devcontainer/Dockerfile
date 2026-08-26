@@ -1,7 +1,7 @@
 FROM mcr.microsoft.com/devcontainers/python:3-3.14-trixie
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends kubectl nodejs npm \
+    && apt-get install -y --no-install-recommends kubectl nodejs npm oras \
     && curl -sSfL https://get.anchore.io/syft | sudo sh -s -- -b /usr/local/bin \
 #    && npm install -g @anthropic-ai/claude-code \
     && echo 'alias k=kubectl' >> /etc/bash.bashrc \
