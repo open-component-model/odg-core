@@ -54,6 +54,7 @@ class Scanner(abc.ABC):
 
     `scan_ocm_resource` is a concrete dispatch method that handles all OCM/OCI access-type
     branching and blob-fetching. Subclasses implement the content-typed hooks below.
+    Never overwrite this function.
 
     The `*_stream` hooks have default implementations that write the blob to a temp file
     and call the corresponding `*_archive` / `scan_file` hook. Scanners that support streaming
@@ -86,7 +87,7 @@ class Scanner(abc.ABC):
 
         if access.type == ocm.AccessType.OCI_REGISTRY:
             logger.debug(f'scanning OCI image {access.imageReference!r}')
-            return self.scan_oci_image(access.imageReference)
+            return self.scan_oci_image(access.imageReference, secret_factory=secret_factory)
 
         try:
             blob_descriptors = ocm_util.iter_blob_descriptors(
@@ -118,13 +119,18 @@ class Scanner(abc.ABC):
             'check extension_cfg.is_supported() configuration',
         )
 
-    def scan_oci_image(self, image_reference: str) -> dict:
-        """Scan an OCI image by registry reference."""
+    def scan_oci_image(self, image_reference: str, secret_factory=None) -> dict:
+        """
+        Scan an OCI image by registry reference.
+        secret_factory: optional SecretFactory for private registry auth.
+        Returns a list of vulnerabilities in CycloneDX format as dict
+        """
         raise NotImplementedError(f'{type(self).__name__} does not support OCI image scanning')
 
     def scan_oci_image_archive_stream(self, blob: ocm_util.BlobDescriptor) -> dict:
         """
         Scan an OCI image archive (ASAF tar) from a blob stream.
+        Returns a list of vulnerabilities in CycloneDX format as dict
 
         Default: writes blob content to a temp file, calls scan_oci_image_archive(path, blob).
         Override to consume the stream directly (e.g. pipe to scanner stdin).
@@ -143,14 +149,21 @@ class Scanner(abc.ABC):
             os.unlink(tmp_path)
 
     def scan_oci_image_archive(self, path: str, blob: ocm_util.BlobDescriptor) -> dict:
-        """Scan an OCI image archive (ASAF tar) from a local file path."""
+        """
+        Scan an OCI image archive (ASAF tar) from a local file path.
+        blob.media_type has the mediaType.
+        Returns a list of vulnerabilities in CycloneDX format as dict
+        """
         raise NotImplementedError(
             f'{type(self).__name__} does not support OCI image archive scanning',
         )
 
     def scan_file_stream(self, blob: ocm_util.BlobDescriptor, is_tar: bool) -> dict:
         """
-        Scan an arbitrary file (binary, filesystem tar, etc.) from a blob stream.
+        Scans an arbitrary file (binary, filesystem tar, s3, oci blob, etc.) from a blob stream.
+        is_tar pre-computed by base class via ocm_util.is_tar_archive.
+        blob.media_type, blob.name, blob.digest available if needed.
+        Returns a list of vulnerabilities in CycloneDX format as dict
 
         Default: writes blob content to a temp file, calls scan_file(path, blob, is_tar).
         Override to consume the stream directly (e.g. pipe to scanner stdin).
@@ -165,12 +178,16 @@ class Scanner(abc.ABC):
             os.unlink(tmp_path)
 
     def scan_file(self, path: str, blob: ocm_util.BlobDescriptor, is_tar: bool) -> dict:
-        """Scan an arbitrary file (binary, filesystem tar, etc.) from a local file path."""
+        """
+        Scans an arbitrary file (binary, filesystem tar, s3, oci blob, etc.) from a local file path.
+        Returns a list of vulnerabilities in CycloneDX format as dict
+        """
         raise NotImplementedError(f'{type(self).__name__} does not support file scanning')
 
     def scan_sbom(self, data: dict) -> dict:
         """
-        Scan an existing SBOM (CycloneDX or SPDX) and return a new CycloneDX document.
+        Scan an existing SBOM (CycloneDX or SPDX) and return a new CycloneDX document
+        with a list of found vulnerabilities as dict.
 
         Called when scan_target is SBOM or SBOM_WITH_BINARY_FALLBACK (primary path),
         or when the resource itself is an SBOM OCI artefact.
@@ -187,14 +204,13 @@ def run_scan(
     oci_client,
     scanner: Scanner,
     datasource: odg.model.Datasource,
-    **kwargs,
 ) -> None:
     """
     Generic orchestration loop for a CycloneDX-based vulnerability scanner.
 
     artefact: The backlog item being processed — identifies the OCM component + resource
     extension_cfg: Scanner-specific configuration (e.g. `TrivyConfig`)
-    vulnerability_cfg: Determines which CVSS score ranges produce findings and label-based exclusion rules
+    vulnerability_cfg: Which CVSS score ranges produce findings and label-based exclusion rules
     component_descriptor_lookup: Resolve an OCM `ComponentIdentity` → `ComponentDescriptor`
     delivery_service_client: Client for the ODG delivery service API
     oci_client: Authenticated OCI client (`oci.client.Client`)
@@ -249,7 +265,7 @@ def run_scan(
     scan_target = extension_cfg.scan_target
     cyclonedx: dict | None = None
 
-    if cyclonedx is None and scan_target in (
+    if scan_target in (
         scanner_utils.model.ScanningMode.SBOM,
         scanner_utils.model.ScanningMode.SBOM_WITH_BINARY_FALLBACK,
     ):
@@ -278,7 +294,7 @@ def run_scan(
         )
 
     findings = list(
-        scanner_utils.cyclonedx.parse_vulnerability_findings(
+        scanner_utils.cyclonedx.iter_vulnerability_findings(
             cyclonedx=cyclonedx,
             vulnerability_cfg=vulnerability_cfg,
         ),
