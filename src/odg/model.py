@@ -70,7 +70,7 @@ class Datatype(enum.StrEnum):
             Datatype.MALWARE_FINDING: Datasource.CLAMAV,
             Datatype.OSID_FINDING: Datasource.OSID,
             Datatype.SAST_FINDING: Datasource.SAST,
-            Datatype.VULNERABILITY_FINDING: Datasource.TRIVY,
+            Datatype.VULNERABILITY_FINDING: Datasource.BDBA,
         }[self]
 
     def display_name(self) -> str:
