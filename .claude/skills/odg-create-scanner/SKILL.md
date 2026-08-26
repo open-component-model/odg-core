@@ -19,155 +19,83 @@ Then ask the user for:
 1. Scanner name (e.g. "trivy", "grype") — used for package names, class names, and the datasource key
 2. Scanner CLI install snippet for the Dockerfile (or "skip" if not needed yet)
 3. Which scanning modes to support: binary, sbom, sbom_with_binary_fallback (default: all three)
+4. Which OCM artefact types and access types to support (see list below)
+
+### OCM artefact & access types supported by ODG:
+
+Excerpt:
+
+- artefact_kinds: `odg.model.ArtefactKind.RESOURCE`
+- access_types: `ocm.AccessType.LOCAL_BLOB`, `.OCI_BLOB`, `.OCI_REGISTRY`, `.S3`, `.S3_V2`
+- artefact_types: `ocm.ArtefactType.BLOB`, `DIRECTORY_TREE`, `EXECUTABLE`, `OCI_ARTEFACT`, `OCI_IMAGE`, `SBOM`
+
+See `src/odg/model.py` for a full list.
+
+## Implementation
 
 Then implement the following, replacing SCANNER with the scanner name and SCANNER_NAME with its
 camelCase Services enum value:
 
-## 0. Deep research on Scanner CLI commands
+### 0. Deep research on Scanner CLI commands
 
 Do not assume how the commands are structured and how they work, research before you start implementing:
 
 - How to scan different artefact types?
 - How to output vulnerability findings in CycloneDX format?
+Ask clarifying questions as needed
 
-## 1. src/odg/model.py
+
+### 1. src/odg/model.py
 
 Add `SCANNER = 'scanner'` to the `Datasource` StrEnum (keep alphabetical order), and add
-`Datasource.SCANNER: (Datatype.VULNERABILITY_FINDING,)` to `Datasource.datatypes()`.
+`Datasource.SCANNER: (Datatype.VULNERABILITY_FINDING,)` to `Datasource.datatypes()`
 
-## 2. src/odg/extensions_cfg.py
+### 2. src/odg/extensions_cfg.py
 
 - Add `SCANNER_NAME = 'scannerName'` to `Services` StrEnum (keep alphabetical order)
 - Add `ScannerMapping(Mapping)` dataclass — inherits `prefix: str`; no extra fields unless needed
-- Add `ScannerConfig(BacklogItemMixins)`:
-
-  ```python
-  @dataclasses.dataclass(kw_only=True)
-  class ScannerConfig(BacklogItemMixins):
-      service: Services = Services.SCANNER_NAME
-      delivery_service_url: str
-      mappings: list[ScannerMapping] = dataclasses.field(default_factory=list)
-      interval: int = 60 * 60 * 24
-      on_unsupported: WarningVerbosities = WarningVerbosities.WARNING
-      scan_target: scanner_utils.model.ScanningMode = scanner_utils.model.ScanningMode.SBOM_WITH_BINARY_FALLBACK
-
-      def is_supported(self, artefact_kind=None, access_type=None, artefact_type=None) -> bool:
-          # Supported artefact_kind: ArtefactKind.RESOURCE
-          # Supported access_types: OCI_REGISTRY, LOCAL_BLOB, OCI_BLOB
-          # Supported artefact_types: BLOB, DIRECTORY_TREE, EXECUTABLE, OCI_ARTEFACT, OCI_IMAGE, SBOM
-          # Log warning or raise per on_unsupported for artefact_kind/access_type
-          # Log debug for unsupported artefact_type (not warning — these are silently skipped)
-  ```
-
+- Add `ScannerConfig(BacklogItemMixins)`, matching the types supported by the scanner. Please study the existing configs (e.g. BDBA, Trivy, Grype) and adjust to your scanner as needed.
 - Add `scanner: ScannerConfig | None = None` to `ExtensionsConfiguration`
 - Add `('scanner_name', self.scanner)` to the `vuln_scanners` list inside `__post_init__`
-- Add a `vulnerability_scanner_datasource` property to `ExtensionsConfiguration`:
+- Append to the `vulnerability_scanner_datasource` def in `ExtensionsConfiguration`, matching the existing logic.
 
-  ```python
-  @property
-  def vulnerability_scanner_datasource(self) -> odg.model.Datasource | None:
-      if self.bdba and self.bdba.enabled:
-          return odg.model.Datasource.BDBA
-      if self.scanner and self.scanner.enabled:
-          return odg.model.Datasource.SCANNER
-      return None
-  ```
-
-## 3. .devcontainer/Dockerfile
+### 3. .devcontainer/Dockerfile
 
 Add the CLI install snippet. For scanners distributed as a Docker image use a multi-stage COPY:
+
 ```dockerfile
 COPY --from=vendor/scanner:latest /usr/local/bin/scanner /usr/local/bin/scanner
 ```
 
-## 4. src/scanner_extension/__init__.py
+### 4. src/scanner_extension/__init__.py
 
 Empty file.
 
-## 5. src/scanner_extension/scanner.py
+### 5. src/scanner_extension/scanner.py + unit tests
 
-Inherit from `scanner_utils.orchestrator.Scanner` (`src/scanner_utils/orchestrator.py`)
-and override only the hooks you need. Never override `scan_ocm_resource`.
+1. Inherit from `scanner_utils.orchestrator.Scanner` (`src/scanner_utils/orchestrator.py`). Do not implement any functions yet.
+2. Then write `src/test/test_SCANNER_extension.py` with tests calling the scanner CLI with real data (failing tests first, no mocking yet)
+2. Implement `scanner.py` until all real-mode tests pass
+3. Trim one return value per subcommand to empty `components` + one CVE id, store in `_MOCK_STDOUT`.
+4. Add `SCANNER_USE_MOCK=true` (default): autouse fixture patches `_run_SCANNER` and any filesystem operations in `scanner.py`. Verify both modes pass.
 
-See `src/trivy_extension/scanner.py` for an example implementation with Trivy.
-
-### Unit tests
-
-After implementing the scanner, ask the user whether they want unit tests written. If yes,
-write `src/test/test_scanner_extension.py` covering the implemented methods, for example:
-
-- **`scan_sbom`** — pass a minimal CycloneDX dict (with at least one component that has a known
-  CVE purl) and assert the returned dict contains the expected vulnerability findings.
-- **`scan_file`** — call with different `blob.media_type` values, stored at a `tmp_path` fixture:
-  - an executable (`application/octet-stream`) with a known CVE
-  - a plain text file
-- **`scan_oci_image`** — pass a well-known public image reference with a known CVE
-- **`scan_oci_image_archive`** — write a minimal OCI image with a well-known CVE as tar to a `tmp_path` fixture
-
-First run these tests without mocking `_run_scanner` until the scanner produces the expected results. Then rewrite them to use `unittest.mock.patch` to mock `_run_scanner` (or `subprocess.run`) so tests do not require
-the scanner binary or actual artifact downloads. Keep fixtures minimal — a two-component CycloneDX dict is enough for SBOM
-tests.
-
-## 6. src/scanner_extension/__main__.py
-
-```python
-import functools
-
-import odg.extensions_cfg
-import odg.findings
-import odg.model
-import odg.util
-import paths
-import scanner_extension.scanner
-import scanner_utils.orchestrator
+See `src/trivy_extension/scanner.py` and `src/test/test_trivy_extension.py` for final implementations.
 
 
-def main():
-    parsed_arguments = odg.util.parse_args()
-    vulnerability_cfg = odg.findings.Finding.from_file(
-        path=parsed_arguments.findings_cfg_path or paths.findings_cfg_path(),
-        finding_type=odg.model.Datatype.VULNERABILITY_FINDING,
-    )
-    odg.util.process_backlog_items(
-        parsed_arguments=parsed_arguments,
-        service=odg.extensions_cfg.Services.SCANNER_NAME,
-        callback=functools.partial(
-            scanner_utils.orchestrator.run_scan,
-            scanner=scanner_extension.scanner.ScannerImpl(),
-            datasource=odg.model.Datasource.SCANNER,
-            vulnerability_cfg=vulnerability_cfg,
-        ),
-    )
-```
+### 6. src/scanner_extension/__main__.py
 
-## 7. src/artefact_enumerator.py
+Copy from `src/trivy_extension/__main__.py` and adjust for your scanner extension. This file is the entrypoint to your extension. It only wires config and calls `run_scan` — no orchestration logic
 
-In `_process_compliance_snapshot_of_artefact()`, add a block after the last scanner block:
 
-```python
-if (
-    extensions_cfg.scanner
-    and extensions_cfg.scanner.enabled
-    and extensions_cfg.scanner.is_supported(artefact_kind=artefact.artefact_kind)
-):
-    compliance_snapshot, uncommitted_backlog_item = _create_backlog_item_for_extension(
-        finding_cfgs=finding_cfgs,
-        finding_types=(odg.model.Datatype.VULNERABILITY_FINDING,),
-        artefact=artefact,
-        compliance_snapshot=compliance_snapshot,
-        service=odg.extensions_cfg.Services.SCANNER_NAME,
-        interval_seconds=extensions_cfg.scanner.interval,
-        now=now,
-    )
-    if uncommitted_backlog_item:
-        uncommitted_backlog_items.append(uncommitted_backlog_item)
-```
+### 7. src/artefact_enumerator.py
 
-## 8. .vscode/launch.json
+In `_process_compliance_snapshot_of_artefact()`, add a block after the last scanner block. Study the setup of prior scanners (e.g. BDBA, Trivy or Grype) and adjust to your implementation.
+
+### 8. .vscode/launch.json
 
 Add the new extension to the `options` list of the `extension` input (keep alphabetical order).
 
-## 9. Helm chart
+### 9. Helm chart
 
 Four touch-points in `charts/extensions/`:
 
@@ -179,7 +107,7 @@ version: 0.1.0
 ```
 
 **charts/extensions/charts/SCANNER/templates/SCANNER.yaml**
-Copy `charts/extensions/charts/bdba/templates/bdba.yaml` verbatim and substitute:
+Copy from `charts/extensions/charts/trivy/templates/trivy.yaml` and `charts/extensions/charts/trivy/templates/trivy.yaml` the relevant parts for your scanner extension and substitute:
 - `$podName` → `"SCANNER"`
 - Both `delivery-gear.gardener.cloud/service:` label values → `SCANNER`
 - `command` → `python3 -m SCANNER_extension`
@@ -194,34 +122,20 @@ Copy `charts/extensions/charts/bdba/templates/bdba.yaml` verbatim and substitute
   condition: SCANNER.enabled
 ```
 
-**charts/extensions/values.yaml** — add stanza (alphabetical):
-```yaml
-SCANNER:
-  deployment:
-    annotations: []
-    resources:
-      requests:
-        memory: 300Mi
-        cpu: 250m
-      limits:
-        memory: 1Gi
-  enabled: false
-```
+**charts/extensions/values.yaml** — append your values
 
 If finished, lint the Helm chart with `helm lint`
 
 If the CVE scanner (e.g. Trivy) downloads their CVE database on startup, ensure
-the signatures during Pods restarts are cached at least per Node (e.g. `emptyDir`).
+the signatures during Pods restarts can be cached
 
 ## Key rules
 
 - Emit `odg.model.VulnerabilityFinding` — NOT `BDBAVulnerabilityFinding`
-- `scanner.py` only runs subprocesses — all finding logic is in `scanner_utils`
+- `scanner.py` only runs subprocesses or API/lib calls — all finding logic is in `scanner_utils`
 - `__main__.py` only wires config and calls `run_scan` — no orchestration logic
 - Do NOT emit RESCORING or SCANNER_WRITEBACK records
 - Always pass `datasource` explicitly — never use `Datatype.datasource()`
-- Only one vulnerability scanner may be enabled at a time
 - Never override `scan_ocm_resource` — it is the base class dispatch method
 - Blob fetching (OCI, LOCAL_BLOB, S3) is handled by `ocm_util.iter_blob_descriptors` inside `scan_ocm_resource`; hooks only receive an already-fetched path or blob descriptor
-
-After creating all files, run `uv run python -m pytest src/test/ -q` and fix any failures.
+- After creating all files, run `uv run python -m pytest src/test/ -q` and fix any failures
