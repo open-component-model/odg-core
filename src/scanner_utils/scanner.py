@@ -34,6 +34,16 @@ _OCI_IMAGE_ACCESS_MEDIA_TYPES = frozenset(
     },
 )
 
+# Media types to detect a supported SBOM layer
+_SBOM_LAYER_MEDIA_TYPES = frozenset(
+    {
+        'application/vnd.cyclonedx+json',
+        'application/spdx+json',
+        'text/spdx',
+        'text/spdx+json',
+    },
+)
+
 
 class Scanner(abc.ABC):
     """
@@ -252,9 +262,17 @@ def _fetch_oci_sbom(
     except Exception as e:
         logger.warning(f'failed to fetch OCI SBOM manifest for {access.imageReference!r}: {e}')
         return None
-    if not manifest.layers:
+    layer = None
+    for candidate in manifest.layers:
+        if candidate.mediaType in _SBOM_LAYER_MEDIA_TYPES:
+            layer = candidate
+            break
+    if layer is None:
+        logger.warning(
+            f'no SBOM layer found in manifest for {access.imageReference!r} '
+            f'(layers: {[layer.mediaType for layer in manifest.layers]})',
+        )
         return None
-    layer = manifest.layers[0]
     blob = oci_client.blob(
         image_reference=access.imageReference,
         digest=layer.digest,
