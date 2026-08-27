@@ -1415,17 +1415,6 @@ class ExtensionsConfiguration:
                 f'got: {vuln_scanners}. Disable all but one.',
             )
 
-    @property
-    def vulnerability_scanner_datasource(self) -> odg.model.Datasource | None:
-        """
-        Utility function to return the currently enabled vulnerability scanner as datasource
-        """
-        if self.bdba and self.bdba.enabled:
-            return odg.model.Datasource.BDBA
-        if self.trivy and self.trivy.enabled:
-            return odg.model.Datasource.TRIVY
-        return None
-
     @staticmethod
     def from_dict(extensions_cfg_raw: dict) -> typing.Self:
         """
