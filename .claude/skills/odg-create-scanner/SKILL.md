@@ -84,7 +84,7 @@ See `src/trivy_extension/scanner.py` and `src/test/test_trivy_extension.py` for 
 
 ### 6. src/scanner_extension/__main__.py
 
-Copy from `src/trivy_extension/__main__.py` and adjust for your scanner extension. This file is the entrypoint to your extension. It only wires config and calls `run_scan` — no orchestration logic
+Copy from `src/trivy_extension/__main__.py` and adjust for your scanner extension. This file is the entrypoint to your extension. It only wires config to call `run_scan` — no orchestration logic
 
 
 ### 7. src/artefact_enumerator.py
