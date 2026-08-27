@@ -4,8 +4,9 @@ import json
 import logging
 
 import cnudie.retrieve
-import k8s.util
 import oci.client
+
+import k8s.util
 import odg.extensions_cfg
 import odg.findings
 import odg.labels
@@ -124,7 +125,7 @@ def run_scan(
                 logger.warning(
                     f'[{datasource}] {artefact} no SBOM available, raising SbomNotAvailable',
                 )
-                raise scanner_utils.scanner.SbomNotAvailable(artefact)
+                raise scanner_utils.model.SbomNotAvailable(artefact)
             logger.info(
                 f'[{datasource}] {artefact} no SBOM available, falling back to binary scan',
             )

@@ -32,7 +32,7 @@ class TrivyScanner(scanner_utils.scanner.Scanner):
     def scan_oci_image_archive(self, path: str, blob: ocm_util.BlobDescriptor) -> dict:
         try:
             return _run_trivy('image', ['--input', path])
-        except scanner_utils.scanner.ScanError as e:
+        except scanner_utils.model.ScanError as e:
             if 'unable to initialize archive image' in e.details:
                 e.fallback_to_file_scan = True
             raise
@@ -92,7 +92,7 @@ def _run_trivy(
     stderr = result.stderr.decode()
     if result.returncode != 0:
         logger.error(f'trivy {subcommand} failed (exit {result.returncode}):\n{stderr}')
-        raise scanner_utils.scanner.ScanError(
+        raise scanner_utils.model.ScanError(
             f'trivy {subcommand} failed (exit {result.returncode})',
             details=stderr,
         )
