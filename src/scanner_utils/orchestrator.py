@@ -102,7 +102,9 @@ def run_scan(
                 'adjust filter configuration to exclude this access type',
             )
         logger.info(
-            f'[{datasource}] {artefact} skipped: access_type={access.type!r} not supported',
+            f'[{datasource}] {artefact} skipped: '
+            f'access_type={access.type!r} or '
+            f'artefact_type={resource_node.resource.type!r} not supported',
         )
         return
 
@@ -165,7 +167,7 @@ def run_scan(
     }
 
     now = datetime.datetime.now(tz=datetime.timezone.utc)
-    ams = [
+    artefact_metadatas = [
         odg.model.ArtefactMetadata(
             artefact=finding_artefact_ref,
             meta=odg.model.Metadata(
@@ -184,10 +186,10 @@ def run_scan(
         datasource=datasource,
     )
 
-    delivery_service_client.update_metadata(data=[scan_info] + ams)
+    delivery_service_client.update_metadata(data=[scan_info] + artefact_metadatas)
     scanner_utils.findings.delete_stale_findings(
         existing_findings_by_key=existing,
-        current_findings=ams,
+        current_findings=artefact_metadatas,
         delivery_service_client=delivery_service_client,
     )
 
