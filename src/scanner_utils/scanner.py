@@ -30,8 +30,8 @@ _OCI_IMAGE_ARCHIVE_MEDIA_TYPES = frozenset(
 # (the blob_media_type will be an individual layer, not the archive container format)
 _OCI_IMAGE_ACCESS_MEDIA_TYPES = frozenset(
     {
-        'application/vnd.oci.image.index.v1+json',
-        'application/vnd.oci.image.manifest.v1+json',
+        oci.model.OCI_IMAGE_INDEX_MIME,  # 'application/vnd.oci.image.index.v1+json'
+        oci.model.OCI_MANIFEST_SCHEMA_V2_MIME,  # 'application/vnd.oci.image.manifest.v1+json'
     },
 )
 
