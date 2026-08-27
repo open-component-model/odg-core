@@ -1398,6 +1398,7 @@ class ExtensionsConfiguration:
     )  # noqa: E501
 
     def __post_init__(self):
+        # Ensure that only one vulnerability scanner is enabled at a time
         vuln_scanners = [
             name
             for name, cfg in [
@@ -1414,6 +1415,9 @@ class ExtensionsConfiguration:
 
     @property
     def vulnerability_scanner_datasource(self) -> odg.model.Datasource | None:
+        """
+        Utility function to return the currently enabled vulnerability scanner as datasource
+        """
         if self.bdba and self.bdba.enabled:
             return odg.model.Datasource.BDBA
         if self.trivy and self.trivy.enabled:
