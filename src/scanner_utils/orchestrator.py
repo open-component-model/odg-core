@@ -119,7 +119,7 @@ def run_scan(
     ):
         if extension_cfg.on_unsupported is odg.extensions_cfg.WarningVerbosities.FAIL:
             raise TypeError(
-                f'{access.type} is not supported by {datasource}, '
+                f'{access.type} {resource_node.resource.type} is not supported by {datasource}, '
                 'adjust filter configuration to exclude this access type',
             )
         logger.info(
