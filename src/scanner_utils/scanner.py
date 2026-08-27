@@ -276,6 +276,5 @@ def _fetch_oci_sbom(
     blob = oci_client.blob(
         image_reference=access.imageReference,
         digest=layer.digest,
-        stream=True,
     )
-    return json.loads(b''.join(blob.iter_content(chunk_size=4096)))
+    return json.loads(blob.content)
