@@ -175,10 +175,11 @@ def run_scan(
                 type=odg.model.Datatype.VULNERABILITY_FINDING,
                 creation_date=now,
             ),
-            data=f,
+            data=finding,
             discovery_date=now.date(),
+            allowed_processing_time=categorisation.allowed_processing_time_raw,
         )
-        for f in findings
+        for finding, categorisation in findings
     ]
 
     scan_info = scanner_utils.findings.make_artefact_scan_info(

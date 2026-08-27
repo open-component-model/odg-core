@@ -86,8 +86,15 @@ def _pick_rating(ratings: list[CyclonedxRating]) -> CyclonedxRating | None:
 def iter_vulnerability_findings(
     cyclonedx: dict,
     vulnerability_cfg: odg.findings.Finding,
-) -> collections.abc.Generator[odg.model.VulnerabilityFinding, None, None]:
+) -> collections.abc.Generator[
+    tuple[odg.model.VulnerabilityFinding, odg.findings.FindingCategorisation],
+    None,
+    None,
+]:
     """Parse a CycloneDX JSON document and yield one VulnerabilityFinding per affected component.
+
+    Yields (VulnerabilityFinding, FindingCategorisation) tuples so callers can access the
+    categorisation's allowed_processing_time_raw when building ArtefactMetadata.
 
     - Resolves package_name / package_version / purl via bom-ref → component index.
     - A vulnerability that affects N components yields N findings (same CVE, different package).
@@ -156,16 +163,19 @@ def iter_vulnerability_findings(
                 raise ValueError(f'{cve}: component {ref!r} has no name')
             if not cdx_component.version:
                 raise ValueError(f'{cve}: component {ref!r} has no version')
-            yield odg.model.VulnerabilityFinding(
-                severity=categorisation.id,
-                package_name=cdx_component.name,
-                package_version=cdx_component.version,
-                cve=cve,
-                purl=cdx_component.purl,
-                cvss_score=cvss_score,
-                cvss=cvss,
-                rating_source=rating_source,
-                summary=description,
-                recommendation=recommendation,
-                urls=list(urls),
+            yield (
+                odg.model.VulnerabilityFinding(
+                    severity=categorisation.id,
+                    package_name=cdx_component.name,
+                    package_version=cdx_component.version,
+                    cve=cve,
+                    purl=cdx_component.purl,
+                    cvss_score=cvss_score,
+                    cvss=cvss,
+                    rating_source=rating_source,
+                    summary=description,
+                    recommendation=recommendation,
+                    urls=list(urls),
+                ),
+                categorisation,
             )

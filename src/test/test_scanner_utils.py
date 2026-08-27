@@ -629,16 +629,27 @@ class TestIterVulnerabilityFindings:
             'vulnerabilities': [vuln],
         }
 
-    def test_basic_finding_fields(self, vulnerability_cfg):
-        findings = list(
-            scanner_utils.cyclonedx.iter_vulnerability_findings(
-                self._make_cyclonedx(
-                    description='A test vulnerability',
-                    recommendation='Update to 8.1.0',
-                    advisory_urls=['https://example.com/advisory'],
-                ),
+    @staticmethod
+    def _iter_findings(
+        cyclonedx: dict,
+        vulnerability_cfg: odg.findings.Finding,
+    ) -> list[odg.model.VulnerabilityFinding]:
+        return [
+            f
+            for f, _ in scanner_utils.cyclonedx.iter_vulnerability_findings(
+                cyclonedx,
                 vulnerability_cfg,
+            )
+        ]
+
+    def test_basic_finding_fields(self, vulnerability_cfg):
+        findings = self._iter_findings(
+            self._make_cyclonedx(
+                description='A test vulnerability',
+                recommendation='Update to 8.1.0',
+                advisory_urls=['https://example.com/advisory'],
             ),
+            vulnerability_cfg,
         )
         assert len(findings) == 1
         f = findings[0]
@@ -653,12 +664,7 @@ class TestIterVulnerabilityFindings:
         assert 'https://example.com/advisory' in f.urls
 
     def test_cvss_vector_parsed(self, vulnerability_cfg):
-        findings = list(
-            scanner_utils.cyclonedx.iter_vulnerability_findings(
-                self._make_cyclonedx(),
-                vulnerability_cfg,
-            ),
-        )
+        findings = self._iter_findings(self._make_cyclonedx(), vulnerability_cfg)
         assert findings[0].cvss is not None
 
     def test_nvd_preferred_over_ghsa(self, vulnerability_cfg):
@@ -683,12 +689,7 @@ class TestIterVulnerabilityFindings:
                 },
             ],
         }
-        findings = list(
-            scanner_utils.cyclonedx.iter_vulnerability_findings(
-                doc,
-                vulnerability_cfg,
-            ),
-        )
+        findings = self._iter_findings(doc, vulnerability_cfg)
         assert findings[0].cvss_score == 5.5  # NVD wins over GHSA 6.0
         assert findings[0].rating_source == 'NVD'
 
@@ -723,9 +724,7 @@ class TestIterVulnerabilityFindings:
                 },
             ],
         }
-        findings = list(
-            scanner_utils.cyclonedx.iter_vulnerability_findings(doc, vulnerability_cfg),
-        )
+        findings = self._iter_findings(doc, vulnerability_cfg)
         assert len(findings) == 1
         assert findings[0].package_name == 'my-image'
         assert findings[0].package_version == '1.2.3'
@@ -753,67 +752,47 @@ class TestIterVulnerabilityFindings:
                 },
             ],
         }
-        findings = list(
-            scanner_utils.cyclonedx.iter_vulnerability_findings(
-                doc,
-                vulnerability_cfg,
-            ),
-        )
+        findings = self._iter_findings(doc, vulnerability_cfg)
         assert findings[0].cvss_score == 5.5  # NVD alias wins over GHSA 6.0
         assert findings[0].rating_source == 'National Vulnerability Database'
 
     def test_below_threshold_is_skipped(self, vulnerability_cfg):
         # score=1.0 is below MEDIUM minimum (4.0) → categorise_finding returns None → skip
-        findings = list(
-            scanner_utils.cyclonedx.iter_vulnerability_findings(
+        assert (
+            self._iter_findings(
                 self._make_cyclonedx(score=1.0, vector=None),
                 vulnerability_cfg,
-            ),
+            )
+            == []
         )
-        assert findings == []
 
     def test_no_numeric_score_is_skipped(self, vulnerability_cfg):
         # Severity-only ratings (no numeric score) must be skipped entirely.
-        findings = list(
-            scanner_utils.cyclonedx.iter_vulnerability_findings(
+        assert (
+            self._iter_findings(
                 self._make_cyclonedx(score=None, vector=None),
                 vulnerability_cfg,
-            ),
+            )
+            == []
         )
-        assert findings == []
 
     def test_multi_affect_yields_one_finding_per_component(self, vulnerability_cfg):
         doc = self._make_cyclonedx(
             extra_components=[{'bom-ref': 'ref-b', 'name': 'lib-b', 'version': '2.0'}],
             extra_affects=[{'ref': 'ref-b'}],
         )
-        findings = list(
-            scanner_utils.cyclonedx.iter_vulnerability_findings(
-                doc,
-                vulnerability_cfg,
-            ),
-        )
+        findings = self._iter_findings(doc, vulnerability_cfg)
         assert len(findings) == 2
         assert {f.package_name for f in findings} == {'curl', 'lib-b'}
 
     def test_empty_document_yields_nothing(self, vulnerability_cfg):
-        assert (
-            list(
-                scanner_utils.cyclonedx.iter_vulnerability_findings(
-                    {},
-                    vulnerability_cfg,
-                ),
-            )
-            == []
-        )
+        assert self._iter_findings({}, vulnerability_cfg) == []
 
     def test_no_vulnerabilities_key(self, vulnerability_cfg):
         assert (
-            list(
-                scanner_utils.cyclonedx.iter_vulnerability_findings(
-                    {'bomFormat': 'CycloneDX', 'components': []},
-                    vulnerability_cfg,
-                ),
+            self._iter_findings(
+                {'bomFormat': 'CycloneDX', 'components': []},
+                vulnerability_cfg,
             )
             == []
         )
@@ -821,24 +800,13 @@ class TestIterVulnerabilityFindings:
     def test_severity_comes_from_categorisation_not_cyclonedx(self, vulnerability_cfg):
         # The CycloneDX rating says 'medium' but severity on VulnerabilityFinding must be
         # the categorisation.id (configured in vulnerability_cfg), not the raw string.
-        findings = list(
-            scanner_utils.cyclonedx.iter_vulnerability_findings(
-                self._make_cyclonedx(),
-                vulnerability_cfg,
-            ),
-        )
+        findings = self._iter_findings(self._make_cyclonedx(), vulnerability_cfg)
         assert findings[0].severity == 'MEDIUM'
 
     def test_no_affects_is_skipped(self, vulnerability_cfg):
         doc = self._make_cyclonedx()
         doc['vulnerabilities'][0]['affects'] = []
-        findings = list(
-            scanner_utils.cyclonedx.iter_vulnerability_findings(
-                doc,
-                vulnerability_cfg,
-            ),
-        )
-        assert findings == []
+        assert self._iter_findings(doc, vulnerability_cfg) == []
 
     def test_cvssv2_only_rating_yields_finding_without_parsed_vector(self, vulnerability_cfg):
         ref = 'pkg:apk/alpine/curl@8.0.0'
@@ -862,12 +830,7 @@ class TestIterVulnerabilityFindings:
             ],
         }
         # Score is used as-is; vector is not parsed (v2 vector format not supported).
-        findings = list(
-            scanner_utils.cyclonedx.iter_vulnerability_findings(
-                doc,
-                vulnerability_cfg,
-            ),
-        )
+        findings = self._iter_findings(doc, vulnerability_cfg)
         assert len(findings) == 1
         assert findings[0].cvss_score == 5.0
         assert findings[0].cvss is None
@@ -895,12 +858,7 @@ class TestIterVulnerabilityFindings:
             ],
         }
         # Score is used as-is; vector is not parsed (v4 vector format not supported).
-        findings = list(
-            scanner_utils.cyclonedx.iter_vulnerability_findings(
-                doc,
-                vulnerability_cfg,
-            ),
-        )
+        findings = self._iter_findings(doc, vulnerability_cfg)
         assert len(findings) == 1
         assert findings[0].cvss_score == 6.5
         assert findings[0].cvss is None
@@ -924,10 +882,7 @@ class TestIterVulnerabilityFindings:
         # even when it has a valid rating (score in MEDIUM range) and an affected ref.
         doc = self._make_cyclonedx(score=5.3, vector='CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N')
         doc['vulnerabilities'][0]['analysis'] = {'state': 'not_affected'}
-        findings = list(
-            scanner_utils.cyclonedx.iter_vulnerability_findings(doc, vulnerability_cfg),
-        )
-        assert findings == []
+        assert self._iter_findings(doc, vulnerability_cfg) == []
 
     def test_malformed_cvssv3_vector_yields_finding_with_cvss_none(self, vulnerability_cfg):
         # A CVSSv3 rating with an unparseable vector string must still yield a finding
@@ -936,9 +891,7 @@ class TestIterVulnerabilityFindings:
             score=5.3,
             vector='CVSS:3.1/AV:INVALID/broken',
         )
-        findings = list(
-            scanner_utils.cyclonedx.iter_vulnerability_findings(doc, vulnerability_cfg),
-        )
+        findings = self._iter_findings(doc, vulnerability_cfg)
         assert len(findings) == 1
         assert findings[0].cvss_score == 5.3
         assert findings[0].cvss is None
