@@ -1,7 +1,5 @@
 import abc
 import collections.abc
-import dataclasses
-import enum
 import json
 import logging
 import os
@@ -13,6 +11,7 @@ import ocm
 import ocm.iter
 
 import ocm_util
+import scanner_utils.model
 import secret_mgmt
 
 logger = logging.getLogger(__name__)
@@ -36,56 +35,6 @@ _OCI_IMAGE_ACCESS_MEDIA_TYPES = frozenset(
 )
 
 
-class ScanTarget(enum.Enum):
-    SBOM = 'sbom'
-    OCI_IMAGE = 'oci_image'
-    OCI_IMAGE_ARCHIVE = 'oci_image_archive'
-    FILE = 'file'
-
-
-@dataclasses.dataclass
-class RouteEvidence:
-    """
-    All observable facts about an OCM resource used to decide how to scan it.
-
-    Fields are populated progressively: access/resource/manifest fields are set before
-    the first `decide_route` call; blob fields are filled in inside the blob loop.
-    """
-
-    access_type: ocm.AccessType | None = None
-    access_media_type: str | None = None  # mediaType on LocalBlobAccess / OciBlobAccess
-    artefact_type: ocm.ArtefactType | None = None
-    manifest_class_type: type | None = None  # Python class of the fetched OCI manifest
-    manifest_media_type: str | None = None
-    manifest_artifact_type: str | None = None  # None for container images, set for ORAS artifacts
-    blob_media_type: str | None = None  # mediaType of the current blob layer
-    is_tar: bool | None = None  # whether the blob is a tar archive
-
-
-class SbomNotAvailable(Exception):
-    """
-    Raised when the scanner requires an SBOM (scan_target=SBOM or SBOM_WITH_BINARY_FALLBACK)
-    but none has been generated yet for this artefact.
-
-    Callers should requeue the backlog item with a delay to allow the sbom_generator job
-    to complete before retrying.
-    """
-
-
-class ScanError(Exception):
-    """
-    Raised by a scan hook to signal a scan failure.
-
-    fallback_to_file_scan: if True, scan_ocm_resource will retry the current blob
-    as a file scan instead of propagating the error.
-    """
-
-    def __init__(self, message: str, details: str = '', fallback_to_file_scan: bool = False):
-        super().__init__(message)
-        self.details = details
-        self.fallback_to_file_scan = fallback_to_file_scan
-
-
 class Scanner(abc.ABC):
     """
     Interface that a scanner extension must implement.
@@ -98,25 +47,28 @@ class Scanner(abc.ABC):
     input can override the `*_stream` hooks directly to avoid writing to disk.
     """
 
-    def decide_route(self, evidence: RouteEvidence) -> ScanTarget:
+    def decide_route(
+        self,
+        evidence: scanner_utils.model.RouteEvidence,
+    ) -> scanner_utils.model.ScanTarget:
         """
         Decide which scan hook to invoke based on gathered evidence.
 
         Override to customise routing for a specific scanner.
         """
         if evidence.artefact_type == ocm.ArtefactType.SBOM:
-            return ScanTarget.SBOM
+            return scanner_utils.model.ScanTarget.SBOM
         if evidence.manifest_class_type is not None:
             if evidence.manifest_class_type is oci.model.OciImageManifestList or (
                 evidence.manifest_class_type is oci.model.OciImageManifest
                 and evidence.manifest_artifact_type is None
             ):
-                return ScanTarget.OCI_IMAGE
+                return scanner_utils.model.ScanTarget.OCI_IMAGE
         if evidence.blob_media_type in _OCI_IMAGE_ARCHIVE_MEDIA_TYPES:
-            return ScanTarget.OCI_IMAGE_ARCHIVE
+            return scanner_utils.model.ScanTarget.OCI_IMAGE_ARCHIVE
         if evidence.access_media_type in _OCI_IMAGE_ACCESS_MEDIA_TYPES:
-            return ScanTarget.OCI_IMAGE_ARCHIVE
-        return ScanTarget.FILE
+            return scanner_utils.model.ScanTarget.OCI_IMAGE_ARCHIVE
+        return scanner_utils.model.ScanTarget.FILE
 
     def scan_ocm_resource(
         self,
@@ -130,7 +82,7 @@ class Scanner(abc.ABC):
         See `decide_route` for the default routing rules.
         """
         access = resource_node.resource.access
-        evidence = RouteEvidence(
+        evidence = scanner_utils.model.RouteEvidence(
             access_type=access.type,
             access_media_type=getattr(access, 'mediaType', None),
             artefact_type=resource_node.resource.type,
@@ -147,13 +99,13 @@ class Scanner(abc.ABC):
 
         target = self.decide_route(evidence)
 
-        if target is ScanTarget.SBOM:
+        if target is scanner_utils.model.ScanTarget.SBOM:
             logger.info(f'scan route: target={target.value!r} evidence={evidence}')
             sbom = _fetch_oci_sbom(resource_node=resource_node, oci_client=oci_client)
             if sbom is not None:
                 return self.scan_sbom(sbom)
 
-        if target is ScanTarget.OCI_IMAGE:
+        if target is scanner_utils.model.ScanTarget.OCI_IMAGE:
             logger.info(f'scan route: target={target.value!r} evidence={evidence}')
             return self.scan_oci_image(access.imageReference, secret_factory=secret_factory)
 
@@ -179,9 +131,9 @@ class Scanner(abc.ABC):
             evidence.is_tar = ocm_util.is_tar_archive(blob_descriptor, resource_node.resource)
             target = self.decide_route(evidence)
             logger.info(f'scan route: target={target.value!r} evidence={evidence}')
-            if target is ScanTarget.OCI_IMAGE_ARCHIVE:
+            if target is scanner_utils.model.ScanTarget.OCI_IMAGE_ARCHIVE:
                 return self.scan_oci_image_archive_stream(blob_descriptor, is_tar=evidence.is_tar)
-            if target is ScanTarget.FILE:
+            if target is scanner_utils.model.ScanTarget.FILE:
                 return self.scan_file_stream(blob_descriptor, is_tar=evidence.is_tar)
             logger.error(f'unexpected scan target {target!r} from decide_route, evidence={evidence}')
             raise ValueError(f'unexpected scan target {target!r} returned by decide_route')
@@ -225,7 +177,7 @@ class Scanner(abc.ABC):
             _chunks_to_file(blob.content, tmp_path)
             logger.debug(f'scanning OCI image archive {tmp_path!r} (mediaType={media_type!r})')
             return self.scan_oci_image_archive(tmp_path, blob)
-        except ScanError as e:
+        except scanner_utils.model.ScanError as e:
             if not e.fallback_to_file_scan:
                 raise
             logger.info('scan_oci_image_archive failed, falling back to file scan')
@@ -274,7 +226,8 @@ class Scanner(abc.ABC):
         Scan an existing SBOM (CycloneDX or SPDX) and return a new CycloneDX document
         with a list of found vulnerabilities as dict.
 
-        Called when `decide_route` returns `ScanTarget.SBOM` (resource type is SBOM artefact),
+        Called when `decide_route` returns `scanner_utils.model.ScanTarget.SBOM`
+        (resource type is SBOM artefact),
         or directly by `run_scan` when an SBOM is available from the delivery service.
         """
         raise NotImplementedError(f'{type(self).__name__} does not support SBOM scanning')

@@ -11,6 +11,7 @@ import odg.labels
 import odg.model
 import scanner_utils.cyclonedx
 import scanner_utils.findings
+import scanner_utils.model
 import scanner_utils.rescore
 import scanner_utils.scanner
 
@@ -908,8 +909,8 @@ class TestScannerDecideRoute:
 
     _s = _Scanner()
 
-    def _e(self, **kwargs) -> scanner_utils.scanner.RouteEvidence:
-        return scanner_utils.scanner.RouteEvidence(**kwargs)
+    def _e(self, **kwargs) -> scanner_utils.model.RouteEvidence:
+        return scanner_utils.model.RouteEvidence(**kwargs)
 
     def test_sbom_artefact_type(self):
         # type: sbom, access: ociArtifact/v1 — artefact_type SBOM wins regardless of manifest/artifactType
@@ -919,7 +920,7 @@ class TestScannerDecideRoute:
             manifest_class_type=oci.model.OciImageManifest,
             manifest_artifact_type='application/vnd.unknown.artifact.v1',
         )
-        assert self._s.decide_route(e) is scanner_utils.scanner.ScanTarget.SBOM
+        assert self._s.decide_route(e) is scanner_utils.model.ScanTarget.SBOM
 
     def test_manifest_list_routes_to_oci_image(self):
         # type: ociImage, access: ociArtifact/v1, multi-arch (manifest list)
@@ -928,7 +929,7 @@ class TestScannerDecideRoute:
             artefact_type=ocm.ArtefactType.OCI_IMAGE,
             manifest_class_type=oci.model.OciImageManifestList,
         )
-        assert self._s.decide_route(e) is scanner_utils.scanner.ScanTarget.OCI_IMAGE
+        assert self._s.decide_route(e) is scanner_utils.model.ScanTarget.OCI_IMAGE
 
     def test_manifest_without_artifact_type_routes_to_oci_image(self):
         # type: ociImage, access: ociArtifact/v1, single-arch (no artifactType on manifest)
@@ -938,7 +939,7 @@ class TestScannerDecideRoute:
             manifest_class_type=oci.model.OciImageManifest,
             manifest_artifact_type=None,
         )
-        assert self._s.decide_route(e) is scanner_utils.scanner.ScanTarget.OCI_IMAGE
+        assert self._s.decide_route(e) is scanner_utils.model.ScanTarget.OCI_IMAGE
 
     def test_oras_artifact_falls_through_to_file(self):
         # type: directoryTree, access: ociArtifact/v1
@@ -951,7 +952,7 @@ class TestScannerDecideRoute:
             blob_media_type='application/vnd.oci.image.layer.v1.tar+gzip',
             is_tar=True,
         )
-        assert self._s.decide_route(e) is scanner_utils.scanner.ScanTarget.FILE
+        assert self._s.decide_route(e) is scanner_utils.model.ScanTarget.FILE
 
     def test_local_compressed_dir_routes_to_file(self):
         # type: blob, relation: local, input: type: Dir/v1, compress: true
@@ -963,7 +964,7 @@ class TestScannerDecideRoute:
             blob_media_type='application/x-tar+gzip',
             is_tar=True,
         )
-        assert self._s.decide_route(e) is scanner_utils.scanner.ScanTarget.FILE
+        assert self._s.decide_route(e) is scanner_utils.model.ScanTarget.FILE
 
     @pytest.mark.parametrize(
         'media_type',
@@ -978,7 +979,7 @@ class TestScannerDecideRoute:
         # LOCAL_BLOB where the blob itself is an OCI image archive container format
         assert (
             self._s.decide_route(self._e(blob_media_type=media_type))
-            is scanner_utils.scanner.ScanTarget.OCI_IMAGE_ARCHIVE
+            is scanner_utils.model.ScanTarget.OCI_IMAGE_ARCHIVE
         )
 
     def test_local_oci_layout_routes_to_oci_image_archive(self):
@@ -992,7 +993,7 @@ class TestScannerDecideRoute:
             blob_media_type='application/vnd.oci.image.layer.v1.tar+gzip',
             is_tar=True,
         )
-        assert self._s.decide_route(e) is scanner_utils.scanner.ScanTarget.OCI_IMAGE_ARCHIVE
+        assert self._s.decide_route(e) is scanner_utils.model.ScanTarget.OCI_IMAGE_ARCHIVE
 
     def test_executable_local_blob_routes_to_file(self):
         # type: executable, relation: local, input: type: File/v1, mediaType: application/octet-stream
@@ -1003,7 +1004,7 @@ class TestScannerDecideRoute:
             blob_media_type='application/octet-stream',
             is_tar=False,
         )
-        assert self._s.decide_route(e) is scanner_utils.scanner.ScanTarget.FILE
+        assert self._s.decide_route(e) is scanner_utils.model.ScanTarget.FILE
 
     def test_empty_evidence_routes_to_file(self):
-        assert self._s.decide_route(self._e()) is scanner_utils.scanner.ScanTarget.FILE
+        assert self._s.decide_route(self._e()) is scanner_utils.model.ScanTarget.FILE
