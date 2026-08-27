@@ -3,7 +3,9 @@ import datetime
 import json
 import logging
 
+import cnudie.retrieve
 import k8s.util
+import oci.client
 import odg.extensions_cfg
 import odg.findings
 import odg.labels
@@ -13,6 +15,7 @@ import scanner_utils.cyclonedx
 import scanner_utils.findings
 import scanner_utils.model
 import scanner_utils.scanner
+import secret_mgmt
 
 logger = logging.getLogger(__name__)
 
@@ -37,14 +40,14 @@ def _fetch_sbom(
 
 def run_scan(
     artefact: odg.model.ComponentArtefactId,
-    extension_cfg,
+    extension_cfg: odg.extensions_cfg.BacklogItemMixins,
     vulnerability_cfg: odg.findings.Finding | None,
-    component_descriptor_lookup,
+    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
     delivery_service_client: odg_client.DeliveryServiceClient,
-    oci_client,
+    oci_client: oci.client.Client,
     scanner: scanner_utils.scanner.Scanner,
     datasource: odg.model.Datasource,
-    secret_factory=None,
+    secret_factory: secret_mgmt.SecretFactory | None = None,
 ) -> None:
     """
     Generic orchestration loop for a CycloneDX-based vulnerability scanner.

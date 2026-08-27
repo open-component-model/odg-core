@@ -1,4 +1,5 @@
 import abc
+import collections.abc
 import dataclasses
 import enum
 import json
@@ -6,11 +7,13 @@ import logging
 import os
 import tempfile
 
+import oci.client
 import oci.model
 import ocm
 import ocm.iter
 
 import ocm_util
+import secret_mgmt
 
 logger = logging.getLogger(__name__)
 
@@ -118,8 +121,8 @@ class Scanner(abc.ABC):
     def scan_ocm_resource(
         self,
         resource_node: ocm.iter.ResourceNode,
-        oci_client: object,
-        secret_factory=None,
+        oci_client: oci.client.Client,
+        secret_factory: secret_mgmt.SecretFactory | None = None,
         aws_secret_name: str | None = None,
     ) -> dict:
         """
@@ -191,7 +194,9 @@ class Scanner(abc.ABC):
             'check extension_cfg.is_supported() configuration',
         )
 
-    def scan_oci_image(self, image_reference: str, secret_factory=None) -> dict:
+    def scan_oci_image(
+        self, image_reference: str, secret_factory: secret_mgmt.SecretFactory | None = None,
+    ) -> dict:
         """
         Scan an OCI image by registry reference.
         secret_factory: optional SecretFactory for private registry auth.
@@ -273,7 +278,7 @@ class Scanner(abc.ABC):
         raise NotImplementedError(f'{type(self).__name__} does not support SBOM scanning')
 
 
-def _chunks_to_file(chunks, path: str) -> None:
+def _chunks_to_file(chunks: collections.abc.Iterable[bytes], path: str) -> None:
     with open(path, 'wb') as f:
         for chunk in chunks:
             f.write(chunk)
@@ -281,7 +286,7 @@ def _chunks_to_file(chunks, path: str) -> None:
 
 def _fetch_oci_sbom(
     resource_node: ocm.iter.ResourceNode,
-    oci_client,
+    oci_client: oci.client.Client,
 ) -> dict | None:
     access = resource_node.resource.access
     try:
