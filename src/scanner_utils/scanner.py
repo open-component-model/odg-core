@@ -195,7 +195,9 @@ class Scanner(abc.ABC):
         )
 
     def scan_oci_image(
-        self, image_reference: str, secret_factory: secret_mgmt.SecretFactory | None = None,
+        self,
+        image_reference: str,
+        secret_factory: secret_mgmt.SecretFactory | None = None,
     ) -> dict:
         """
         Scan an OCI image by registry reference.

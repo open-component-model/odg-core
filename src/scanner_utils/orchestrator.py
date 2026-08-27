@@ -67,11 +67,7 @@ def run_scan(
         Used as the primary key namespace for all DB records written by this scanner
     """
     if not vulnerability_cfg or not vulnerability_cfg.matches(artefact):
-        logger.info(
-            f'[{datasource}] {artefact.component_name}:{artefact.component_version} '
-            f'resource={artefact.artefact.artefact_name!r} '
-            f'skipped: vulnerability_cfg does not match',
-        )
+        logger.info(f'[{datasource}] {artefact} skipped: vulnerability_cfg does not match')
         return
 
     if not extension_cfg.is_supported(artefact_kind=artefact.artefact_kind):
@@ -81,9 +77,8 @@ def run_scan(
                 'adjust filter configuration to exclude this artefact kind',
             )
         logger.info(
-            f'[{datasource}] {artefact.component_name}:{artefact.component_version} '
-            f'resource={artefact.artefact.artefact_name!r} '
-            f'skipped: artefact_kind={artefact.artefact_kind!r} not supported',
+            f'[{datasource}] {artefact} skipped: artefact_kind={artefact.artefact_kind!r} '
+            f'not supported',
         )
         return
 
@@ -94,11 +89,7 @@ def run_scan(
     access = resource_node.resource.access
 
     if odg.labels.is_binary_scan_skipped(resource_node.resource):
-        logger.info(
-            f'[{datasource}] {artefact.component_name}:{artefact.component_version} '
-            f'resource={artefact.artefact.artefact_name!r} '
-            f'skipped: binary-scan-policy=skip',
-        )
+        logger.info(f'[{datasource}] {artefact} skipped: binary-scan-policy=skip')
         return
 
     if not extension_cfg.is_supported(
@@ -110,11 +101,8 @@ def run_scan(
                 f'{access.type} is not supported by {datasource}, '
                 'adjust filter configuration to exclude this access type',
             )
-        resource = resource_node.resource
         logger.info(
-            f'[{datasource}] {artefact.component_name}:{artefact.component_version} '
-            f'resource={resource.name!r} type={resource.type!r} '
-            f'access_type={access.type!r} skipped: not supported',
+            f'[{datasource}] {artefact} skipped: access_type={access.type!r} not supported',
         )
         return
 
@@ -132,15 +120,11 @@ def run_scan(
         if sbom is None:
             if scan_target is scanner_utils.model.ScanningMode.SBOM:
                 logger.warning(
-                    f'[{datasource}] {artefact.component_name}:{artefact.component_version} '
-                    f'resource={artefact.artefact.artefact_name!r} '
-                    f'no SBOM available, raising SbomNotAvailable',
+                    f'[{datasource}] {artefact} no SBOM available, raising SbomNotAvailable',
                 )
                 raise scanner_utils.scanner.SbomNotAvailable(artefact)
             logger.info(
-                f'[{datasource}] {artefact.component_name}:{artefact.component_version} '
-                f'resource={artefact.artefact.artefact_name!r} '
-                f'no SBOM available, falling back to binary scan',
+                f'[{datasource}] {artefact} no SBOM available, falling back to binary scan',
             )
 
     if cyclonedx is None:
@@ -157,10 +141,8 @@ def run_scan(
         ),
     )
 
-    resource = resource_node.resource
     logger.info(
-        f'[{datasource}] {artefact.component_name}:{artefact.component_version} '
-        f'resource={resource.name!r} type={resource.type!r} '
+        f'[{datasource}] {artefact} '
         f'scan_target={scan_target} '
         f'raw_cves={len(cyclonedx.get("vulnerabilities") or [])} '
         f'findings_after_cfg={len(findings)}',
@@ -209,4 +191,4 @@ def run_scan(
         delivery_service_client=delivery_service_client,
     )
 
-    logger.debug(f'[{datasource}] {artefact.component_name}:{artefact.component_version} finished')
+    logger.debug(f'[{datasource}] {artefact} finished')
