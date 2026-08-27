@@ -21,6 +21,18 @@ import secret_mgmt
 logger = logging.getLogger(__name__)
 
 
+def _is_supported_sbom_format(sbom: dict) -> bool:
+    if sbom.get('bomFormat') == 'CycloneDX':
+        return True
+    spdx_version = sbom.get('spdxVersion')
+    if isinstance(spdx_version, str) and spdx_version.startswith('SPDX-'):
+        return True
+    context = sbom.get('@context', '')
+    if isinstance(context, str) and 'spdx.org/rdf/' in context:
+        return True
+    return False
+
+
 def _fetch_sbom(
     delivery_service_client: odg_client.DeliveryServiceClient,
     artefact: odg.model.ComponentArtefactId,
@@ -30,13 +42,21 @@ def _fetch_sbom(
         type=odg.model.Datatype.ARTEFACT_SCAN_INFO,
         datasource=odg.model.Datasource.SBOM_GENERATOR,
     )
-    if not entries:
-        return None
-    digest = entries[0].get('data', {}).get('digest')
-    if not digest:
-        return None
-    sbom_bytes = delivery_service_client.get_blob(digest=digest)
-    return json.loads(sbom_bytes)
+    for entry in entries:
+        digest = entry.get('data', {}).get('digest')
+        if not digest:
+            continue
+        sbom_bytes = delivery_service_client.get_blob(digest=digest)
+        try:
+            sbom = json.loads(sbom_bytes)
+        except json.JSONDecodeError:
+            logger.info(f'SBOM for {artefact} is not valid JSON, ignoring')
+            continue
+        if not isinstance(sbom, dict) or not _is_supported_sbom_format(sbom):
+            logger.info(f'SBOM for {artefact} has unsupported format, ignoring')
+            continue
+        return sbom
+    return None
 
 
 def run_scan(
