@@ -130,6 +130,13 @@ def deserialise_label(
     )
 
 
+def is_binary_scan_skipped(artefact: ocm.Artifact) -> bool:
+    for name in get_label_names_with_aliases(BinaryScanPolicyLabel):
+        if label := artefact.find_label(name=name):
+            return deserialise_label(label).value.policy is ScanPolicy.SKIP
+    return False
+
+
 def find_source_scan_policy(
     snode: ocm.iter.SourceNode,
 ) -> ScanPolicy | None:

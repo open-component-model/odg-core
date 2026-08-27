@@ -1,5 +1,6 @@
 import unittest.mock
 
+import oci.model
 import ocm
 import ocm.iter
 import pytest
@@ -11,6 +12,7 @@ import odg.model
 import scanner_utils.cyclonedx
 import scanner_utils.findings
 import scanner_utils.rescore
+import scanner_utils.scanner
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -940,3 +942,115 @@ class TestIterVulnerabilityFindings:
         assert len(findings) == 1
         assert findings[0].cvss_score == 5.3
         assert findings[0].cvss is None
+
+
+# ---------------------------------------------------------------------------
+# Tests — scanner routing
+# ---------------------------------------------------------------------------
+
+
+class TestScannerDecideRoute:
+    class _Scanner(scanner_utils.scanner.Scanner):
+        pass
+
+    _s = _Scanner()
+
+    def _e(self, **kwargs) -> scanner_utils.scanner.RouteEvidence:
+        return scanner_utils.scanner.RouteEvidence(**kwargs)
+
+    def test_sbom_artefact_type(self):
+        # type: sbom, access: ociArtifact/v1 — artefact_type SBOM wins regardless of manifest/artifactType
+        e = self._e(
+            access_type=ocm.AccessType.OCI_REGISTRY,
+            artefact_type=ocm.ArtefactType.SBOM,
+            manifest_class_type=oci.model.OciImageManifest,
+            manifest_artifact_type='application/vnd.unknown.artifact.v1',
+        )
+        assert self._s.decide_route(e) is scanner_utils.scanner.ScanTarget.SBOM
+
+    def test_manifest_list_routes_to_oci_image(self):
+        # type: ociImage, access: ociArtifact/v1, multi-arch (manifest list)
+        e = self._e(
+            access_type=ocm.AccessType.OCI_REGISTRY,
+            artefact_type=ocm.ArtefactType.OCI_IMAGE,
+            manifest_class_type=oci.model.OciImageManifestList,
+        )
+        assert self._s.decide_route(e) is scanner_utils.scanner.ScanTarget.OCI_IMAGE
+
+    def test_manifest_without_artifact_type_routes_to_oci_image(self):
+        # type: ociImage, access: ociArtifact/v1, single-arch (no artifactType on manifest)
+        e = self._e(
+            access_type=ocm.AccessType.OCI_REGISTRY,
+            artefact_type=ocm.ArtefactType.OCI_IMAGE,
+            manifest_class_type=oci.model.OciImageManifest,
+            manifest_artifact_type=None,
+        )
+        assert self._s.decide_route(e) is scanner_utils.scanner.ScanTarget.OCI_IMAGE
+
+    def test_oras_artifact_falls_through_to_file(self):
+        # type: directoryTree, access: ociArtifact/v1
+        # OciImageManifest with artifactType set → ORAS artifact → blob path → scan_file
+        e = self._e(
+            access_type=ocm.AccessType.OCI_REGISTRY,
+            artefact_type=ocm.ArtefactType.DIRECTORY_TREE,
+            manifest_class_type=oci.model.OciImageManifest,
+            manifest_artifact_type='application/vnd.unknown.artifact.v1',
+            blob_media_type='application/vnd.oci.image.layer.v1.tar+gzip',
+            is_tar=True,
+        )
+        assert self._s.decide_route(e) is scanner_utils.scanner.ScanTarget.FILE
+
+    def test_local_compressed_dir_routes_to_file(self):
+        # type: blob, relation: local, input: type: Dir/v1, compress: true
+        # access_media_type and blob_media_type are both application/x-tar+gzip
+        e = self._e(
+            access_type=ocm.AccessType.LOCAL_BLOB,
+            access_media_type='application/x-tar+gzip',
+            artefact_type=ocm.ArtefactType.BLOB,
+            blob_media_type='application/x-tar+gzip',
+            is_tar=True,
+        )
+        assert self._s.decide_route(e) is scanner_utils.scanner.ScanTarget.FILE
+
+    @pytest.mark.parametrize(
+        'media_type',
+        [
+            'application/vnd.oci.image.manifest.v1+tar',
+            'application/vnd.oci.image.manifest.v1+tar+gzip',
+            'application/vnd.oci.image.index.v1+tar.gzip',
+            'application/vnd.ocm.software.oci.layout.v1+tar',
+        ],
+    )
+    def test_archive_blob_media_types_route_to_oci_image_archive(self, media_type):
+        # LOCAL_BLOB where the blob itself is an OCI image archive container format
+        assert (
+            self._s.decide_route(self._e(blob_media_type=media_type))
+            is scanner_utils.scanner.ScanTarget.OCI_IMAGE_ARCHIVE
+        )
+
+    def test_local_oci_layout_routes_to_oci_image_archive(self):
+        # type: ociArtifact, relation: local, input: type: dir/v1
+        # access_media_type identifies the blob as an OCI image index;
+        # blob_media_type seen in the loop is just an individual layer
+        e = self._e(
+            access_type=ocm.AccessType.LOCAL_BLOB,
+            access_media_type='application/vnd.oci.image.index.v1+json',
+            artefact_type=ocm.ArtefactType.OCI_ARTEFACT,
+            blob_media_type='application/vnd.oci.image.layer.v1.tar+gzip',
+            is_tar=True,
+        )
+        assert self._s.decide_route(e) is scanner_utils.scanner.ScanTarget.OCI_IMAGE_ARCHIVE
+
+    def test_executable_local_blob_routes_to_file(self):
+        # type: executable, relation: local, input: type: File/v1, mediaType: application/octet-stream
+        e = self._e(
+            access_type=ocm.AccessType.LOCAL_BLOB,
+            access_media_type='application/octet-stream',
+            artefact_type=ocm.ArtefactType.EXECUTABLE,
+            blob_media_type='application/octet-stream',
+            is_tar=False,
+        )
+        assert self._s.decide_route(e) is scanner_utils.scanner.ScanTarget.FILE
+
+    def test_empty_evidence_routes_to_file(self):
+        assert self._s.decide_route(self._e()) is scanner_utils.scanner.ScanTarget.FILE
