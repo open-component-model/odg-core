@@ -396,9 +396,11 @@ class TrivyConfig(BacklogItemMixins):
 
         if artefact_type and artefact_type not in supported_artefact_types:
             is_supported = False
-            logger.debug(
-                f'{artefact_type=} is not supported for Trivy scans, {supported_artefact_types=}',
-            )
+            if self.on_unsupported is WarningVerbosities.WARNING:
+                logger.warning(
+                    f'{artefact_type=} is not supported for Trivy scans, '
+                    f'{supported_artefact_types=}',
+                )
 
         return is_supported
 
