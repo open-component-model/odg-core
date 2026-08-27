@@ -102,8 +102,11 @@ class Scanner(abc.ABC):
         if target is scanner_utils.model.ScanTarget.SBOM:
             logger.info(f'scan route: target={target.value!r} evidence={evidence}')
             sbom = _fetch_oci_sbom(resource_node=resource_node, oci_client=oci_client)
-            if sbom is not None:
-                return self.scan_sbom(sbom)
+            if sbom is None:
+                raise scanner_utils.model.SbomNotAvailable(
+                    f'no SBOM blob available for {access.imageReference!r}',
+                )
+            return self.scan_sbom(sbom)
 
         if target is scanner_utils.model.ScanTarget.OCI_IMAGE:
             logger.info(f'scan route: target={target.value!r} evidence={evidence}')
