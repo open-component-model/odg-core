@@ -12,6 +12,7 @@ import odg_client
 import scanner_utils.cyclonedx
 import scanner_utils.findings
 import scanner_utils.model
+import scanner_utils.scanner
 
 logger = logging.getLogger(__name__)
 
