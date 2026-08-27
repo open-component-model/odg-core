@@ -49,7 +49,7 @@ def _fetch_sbom(
         sbom_bytes = delivery_service_client.get_blob(digest=digest)
         try:
             sbom = json.loads(sbom_bytes)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError, UnicodeDecodeError:
             logger.info(f'SBOM for {artefact} is not valid JSON, ignoring')
             continue
         if not isinstance(sbom, dict) or not _is_supported_sbom_format(sbom):
