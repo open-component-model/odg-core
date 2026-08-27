@@ -354,7 +354,7 @@ class TrivyConfig(BacklogItemMixins):
     on_unsupported: WarningVerbosities = WarningVerbosities.WARNING
     scan_target: scanner_utils.model.ScanningMode = (
         scanner_utils.model.ScanningMode.SBOM_WITH_BINARY_FALLBACK
-    )  # noqa: E501
+    )
 
     def is_supported(
         self,
