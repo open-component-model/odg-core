@@ -1,1 +1,1 @@
-/workspaces/odg-core/AGENTS.md
+../AGENTS.md
