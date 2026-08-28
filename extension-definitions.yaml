@@ -510,6 +510,37 @@ outputs: []
 ---
 dependencies:
 - delivery-service
+- delivery-db
+installation:
+  ocm_references:
+  - artefact:
+      name: extensions
+      version: 0.1370.0-dev
+    helm_chart_name: extensions
+    mappings:
+    - artefact_type: helmchart-imagemap
+      name: extensions
+      version: 0.1370.0-dev
+    name: ocm.software/open-delivery-gear/core
+    version: 0.1370.0-dev
+  value_templates:
+  - helm_attribute: trivy.target_namespace
+    helm_chart_name: extensions
+    value: ${target_namespace}
+    value_type: python-string-template
+  - helm_attribute: trivy.enabled
+    helm_chart_name: extensions
+    value: true
+    value_type: literal
+  - helm_attribute: trivy.deployment.annotations."resources.gardener.cloud/preserve-replicas"
+    helm_chart_name: extensions
+    value: '"true"'
+    value_type: literal
+name: trivy
+outputs: []
+---
+dependencies:
+- delivery-service
 installation:
   ocm_references:
   - artefact:

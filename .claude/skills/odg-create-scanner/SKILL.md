@@ -57,7 +57,6 @@ Add `SCANNER = 'scanner'` to the `Datasource` StrEnum (keep alphabetical order),
 - Add `ScannerConfig(BacklogItemMixins)`, matching the types supported by the scanner. Please study the existing configs (e.g. BDBA, Trivy, Grype) and adjust to your scanner as needed.
 - Add `scanner: ScannerConfig | None = None` to `ExtensionsConfiguration`
 - Add `('scanner_name', self.scanner)` to the `vuln_scanners` list inside `__post_init__`
-- Append to the `vulnerability_scanner_datasource` def in `ExtensionsConfiguration`, matching the existing logic.
 
 ### 3. .devcontainer/Dockerfile
 
@@ -95,7 +94,11 @@ In `_process_compliance_snapshot_of_artefact()`, add a block after the last scan
 
 Add the new extension to the `options` list of the `extension` input (keep alphabetical order).
 
-### 9. Helm chart
+### 9. extension-definitions.yaml
+
+Add an entry to `extension-definitions.yaml` (root of the repo) for the new scanner, following the pattern of existing scanner entries (e.g. `bdba`). Use `delivery-service` and `delivery-db` as dependencies, set `SCANNER.enabled: true` and `SCANNER.target_namespace: ${target_namespace}`, and add `SCANNER.deployment.annotations."resources.gardener.cloud/preserve-replicas": '"true"'`.
+
+### 10. Helm chart
 
 Four touch-points in `charts/extensions/`:
 
