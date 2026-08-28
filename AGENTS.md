@@ -2,7 +2,7 @@
 
 These are Python 3.14 backend services of *Open Delivery Gear*. ODG integrates compliance into the software
 lifecycle through automated scanning, tracking, and reporting of security findings, vulnerabilities,
-and compliance issues for your [OCM](ocm.software) components.
+and compliance issues for your [OCM](https://ocm.software) components.
 
 ODG is built as a collection of independent extensions, each running as its own process and implementing a
 specific capability (scanning, reporting, replication, etc.); extensions share common infrastructure from `src/`
