@@ -98,7 +98,7 @@ class Scanner(abc.ABC):
             artefact_type=resource_node.resource.type,
         )
 
-        if access.type == ocm.AccessType.OCI_REGISTRY:
+        if access.type is ocm.AccessType.OCI_REGISTRY:
             manifest = oci_client.manifest(
                 image_reference=access.imageReference,
                 accept=oci.model.MimeTypes.prefer_multiarch,
@@ -110,8 +110,8 @@ class Scanner(abc.ABC):
         target = self.decide_route(evidence)
 
         if target is scanner_utils.model.ScanTarget.SBOM:
-            logger.info(f'scan route: target={target.value!r} evidence={evidence}')
-            sbom = _fetch_oci_sbom(resource_node=resource_node, oci_client=oci_client)
+            logger.info(f'scan route: target={target.value!r} {evidence=}')
+            sbom = _fetch_oci_sbom(access=access, oci_client=oci_client)
             if sbom is None:
                 raise scanner_utils.model.SbomNotAvailable(
                     f'no SBOM blob available for {access.imageReference!r}',
@@ -119,7 +119,7 @@ class Scanner(abc.ABC):
             return self.scan_sbom(sbom)
 
         if target is scanner_utils.model.ScanTarget.OCI_IMAGE:
-            logger.info(f'scan route: target={target.value!r} evidence={evidence}')
+            logger.info(f'scan route: target={target.value!r} {evidence=}')
             return self.scan_oci_image(access.imageReference, secret_factory=secret_factory)
 
         try:
@@ -132,7 +132,7 @@ class Scanner(abc.ABC):
             )
         except RuntimeError as e:
             logger.error(
-                f'unsupported access type in scan_ocm_resource, evidence={evidence}',
+                f'unsupported access type in scan_ocm_resource, {evidence=}',
             )
             raise ValueError(
                 f'unsupported access type {access.type!r} in scan_ocm_resource; '
@@ -140,19 +140,19 @@ class Scanner(abc.ABC):
             ) from e
 
         for blob_descriptor in blob_descriptors:
-            evidence.blob_media_type = blob_descriptor.media_type or ''
+            evidence.blob_media_type = blob_descriptor.media_type
             evidence.is_tar = ocm_util.is_tar_archive(blob_descriptor, resource_node.resource)
             target = self.decide_route(evidence)
-            logger.info(f'scan route: target={target.value!r} evidence={evidence}')
+            logger.info(f'scan route: target={target.value!r} {evidence=}')
             if target is scanner_utils.model.ScanTarget.OCI_IMAGE_ARCHIVE:
                 return self.scan_oci_image_archive_stream(blob_descriptor, is_tar=evidence.is_tar)
             if target is scanner_utils.model.ScanTarget.FILE:
                 return self.scan_file_stream(blob_descriptor, is_tar=evidence.is_tar)
-            logger.error(f'unexpected scan target {target!r} from decide_route, evidence={evidence}')
+            logger.error(f'unexpected scan target {target!r} from decide_route, {evidence=}')
             raise ValueError(f'unexpected scan target {target!r} returned by decide_route')
 
         logger.error(
-            f'no blob descriptors yielded for access type {access.type!r}, evidence={evidence}',
+            f'no blob descriptors yielded for access type {access.type!r}, {evidence=}',
         )
         raise ValueError(
             f'unsupported access type {access.type!r} in scan_ocm_resource; '
@@ -180,7 +180,7 @@ class Scanner(abc.ABC):
         If there are errors, it recovers by calling scan_file on the data file
         Override to consume the stream directly (e.g. pipe to scanner stdin).
         """
-        media_type = blob.media_type or ''
+        media_type = blob.media_type
         suffix = (
             '.tar.gz' if media_type.endswith('+gzip') or media_type.endswith('.gzip') else '.tar'
         )
@@ -253,10 +253,11 @@ def _chunks_to_file(chunks: collections.abc.Iterable[bytes], path: str) -> None:
 
 
 def _fetch_oci_sbom(
-    resource_node: ocm.iter.ResourceNode,
+    access: ocm.Access,
     oci_client: oci.client.Client,
 ) -> dict | None:
-    access = resource_node.resource.access
+    if not isinstance(access, ocm.OciAccess):
+        return None
     try:
         manifest = oci_client.manifest(image_reference=access.imageReference)
     except Exception as e:

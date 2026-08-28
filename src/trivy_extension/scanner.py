@@ -38,7 +38,7 @@ class TrivyScanner(scanner_utils.scanner.Scanner):
             raise
 
     def scan_file(self, path: str, blob: ocm_util.BlobDescriptor, is_tar: bool) -> dict:
-        logger.debug(f'Preparing file scan {path!r} (is_tar={is_tar})')
+        logger.debug(f'Preparing file scan {path!r} ({is_tar=})')
         media_type = blob.media_type or ''
         if is_tar:
             with tempfile.TemporaryDirectory() as tmp_dir:
