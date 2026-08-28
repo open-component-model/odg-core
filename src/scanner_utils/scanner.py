@@ -180,7 +180,7 @@ class Scanner(abc.ABC):
         If there are errors, it recovers by calling scan_file on the data file
         Override to consume the stream directly (e.g. pipe to scanner stdin).
         """
-        media_type = blob.media_type
+        media_type = blob.media_type or ''
         suffix = (
             '.tar.gz' if media_type.endswith('+gzip') or media_type.endswith('.gzip') else '.tar'
         )
