@@ -8,19 +8,11 @@ and compliance issues for your [OCM](ocm.software) components.
 
 * Multi-package repo using `uv` and `setuptools`
 * Use `uv ...` to run Python commands
-* Run tests with `make test`
-* Lint/format with `make lint && make format`
 * Project structure:
     * `src/` app source code
     * `src/tests/` tests
     * `packages` built `bdba-client` & `odg-client` packages from `src`
     * `charts` Helm charts for deployment
-
-## Setup commands
-
-* Initial setup: `make setup`
-* Run tests: `make test`
-* Lint/format: `make lint && make format`
 
 ## Conventions
 
@@ -33,6 +25,15 @@ and compliance issues for your [OCM](ocm.software) components.
     * Many classes implement `__str__`
 * Prefer `is` over `==` when comparing enum values
 * Be conscise, specific and value dense
+
+## After you finished
+
+* Run tests with `make test`
+* Lint/format with `make lint && make format` after the feature is ready
+* Update documentation as needed:
+  * Check for breaking changes in `README.md`
+  * For extension specific configuration: `charts/bootstrapping/values.documentation.yaml`
+  * For API changes: `src/swagger/swagger.yaml`
 
 ## Boundaries
 
