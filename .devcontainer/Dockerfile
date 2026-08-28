@@ -1,7 +1,8 @@
 FROM mcr.microsoft.com/devcontainers/python:3-3.14-trixie
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends kubectl nodejs npm \
+    && apt-get install -y --no-install-recommends kubectl nodejs npm oras \
+    && curl -sSfL https://get.anchore.io/syft | sudo sh -s -- -b /usr/local/bin \
 #    && npm install -g @anthropic-ai/claude-code \
     && echo 'alias k=kubectl' >> /etc/bash.bashrc \
     && echo 'alias kgp="kubectl get pods"' >> /etc/bash.bashrc \
@@ -14,3 +15,5 @@ RUN apt-get update \
 RUN mkdir -p /home/vscode/.kube && chown vscode /home/vscode/.kube
 
 RUN pip3 install uv==0.12.3
+
+COPY --from=aquasec/trivy:latest /usr/local/bin/trivy /usr/local/bin/trivy

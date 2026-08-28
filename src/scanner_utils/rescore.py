@@ -6,7 +6,6 @@ import odg.cvss
 import odg.findings
 import rescore.utility as ru
 
-
 logger = logging.getLogger(__name__)
 
 

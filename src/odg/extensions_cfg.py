@@ -10,9 +10,8 @@ import typing
 import cachetools
 import dacite
 import github3.repos
-import yaml
-
 import ocm
+import yaml
 
 import bdba.model
 import crypto_extension.config
@@ -22,6 +21,7 @@ import odg.model
 import odg.shared_cfg
 import responsibles_extension.filters as ref
 import responsibles_extension.strategies as res
+import scanner_utils.model
 import sprints.model as sm
 
 logger = logging.getLogger(__name__)
@@ -48,6 +48,7 @@ class Services(enum.StrEnum):
     SAST = 'sast'
     SBOM_GENERATOR = 'sbomGenerator'
     SLA_VIOLATION_PROFILER = 'slaViolationProfiler'
+    TRIVY = 'trivy'
 
 
 class VersionAliases(enum.StrEnum):
@@ -339,6 +340,66 @@ class BDBAConfig(BacklogItemMixins):
             if self.on_unsupported is WarningVerbosities.WARNING:
                 logger.warning(
                     f'{access_type=} is not supported for BDBA scans, {supported_access_types=}',
+                )
+
+        return is_supported
+
+
+@dataclasses.dataclass(kw_only=True)
+class TrivyConfig(BacklogItemMixins):
+    service: Services = Services.TRIVY
+    delivery_service_url: str
+    mappings: list[Mapping] = dataclasses.field(default_factory=list)
+    interval: int = 60 * 60 * 24  # 24h
+    on_unsupported: WarningVerbosities = WarningVerbosities.WARNING
+    scan_target: scanner_utils.model.ScanningMode = (
+        scanner_utils.model.ScanningMode.SBOM_WITH_BINARY_FALLBACK
+    )
+
+    def is_supported(
+        self,
+        artefact_kind: odg.model.ArtefactKind | None = None,
+        access_type: ocm.AccessType | None = None,
+        artefact_type: ocm.ArtefactType | str | None = None,
+    ) -> bool:
+        supported_artefact_kinds = (odg.model.ArtefactKind.RESOURCE,)
+        supported_access_types = (
+            ocm.AccessType.LOCAL_BLOB,
+            ocm.AccessType.OCI_BLOB,
+            ocm.AccessType.OCI_REGISTRY,
+        )
+        supported_artefact_types = (
+            ocm.ArtefactType.BLOB,
+            ocm.ArtefactType.DIRECTORY_TREE,
+            ocm.ArtefactType.EXECUTABLE,
+            ocm.ArtefactType.OCI_ARTEFACT,
+            ocm.ArtefactType.OCI_IMAGE,
+            ocm.ArtefactType.SBOM,
+        )
+
+        is_supported = True
+
+        if artefact_kind and artefact_kind not in supported_artefact_kinds:
+            is_supported = False
+            if self.on_unsupported is WarningVerbosities.WARNING:
+                logger.warning(
+                    f'{artefact_kind=} is not supported for Trivy scans, '
+                    f'{supported_artefact_kinds=}',
+                )
+
+        if access_type and access_type not in supported_access_types:
+            is_supported = False
+            if self.on_unsupported is WarningVerbosities.WARNING:
+                logger.warning(
+                    f'{access_type=} is not supported for Trivy scans, {supported_access_types=}',
+                )
+
+        if artefact_type and artefact_type not in supported_artefact_types:
+            is_supported = False
+            if self.on_unsupported is WarningVerbosities.WARNING:
+                logger.warning(
+                    f'{artefact_type=} is not supported for Trivy scans, '
+                    f'{supported_artefact_types=}',
                 )
 
         return is_supported
@@ -1333,9 +1394,26 @@ class ExtensionsConfiguration:
     sast: SASTConfig | None
     sbom_generator: SBOMGeneratorConfig | None
     sla_violation_profiler: SlaViolationProfilerConfig | None
+    trivy: TrivyConfig | None = None
     backlog_controller: BacklogControllerConfig = dataclasses.field(
         default_factory=BacklogControllerConfig,
     )  # noqa: E501
+
+    def __post_init__(self):
+        # Ensure that only one vulnerability scanner is enabled at a time
+        vuln_scanners = [
+            name
+            for name, cfg in [
+                ('bdba', self.bdba),
+                ('trivy', self.trivy),
+            ]
+            if cfg is not None and cfg.enabled
+        ]
+        if len(vuln_scanners) > 1:
+            raise ValueError(
+                f'Only one vulnerability scanner may be enabled at a time, '
+                f'got: {vuln_scanners}. Disable all but one.',
+            )
 
     @staticmethod
     def from_dict(extensions_cfg_raw: dict) -> typing.Self:

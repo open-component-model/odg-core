@@ -53,3 +53,6 @@ dependencies:
   - name: sbom-generator
     repository: file://charts/sbom-generator
     condition: sbom-generator.enabled
+  - name: trivy
+    repository: file://charts/trivy
+    condition: trivy.enabled

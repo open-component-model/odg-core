@@ -394,3 +394,44 @@ def test_find_source_scan_policy_new_source_beats_legacy_component():
     )
     node = _make_source_node(source_labels=[source_label], component_labels=[component_label])
     assert odg.labels.find_source_scan_policy(node) is odg.labels.ScanPolicy.SKIP
+
+
+# ---------------------------------------------------------------------------
+# is_binary_scan_skipped
+# ---------------------------------------------------------------------------
+
+
+class TestIsBinaryScanSkipped:
+    def _make_resource(self, label: ocm.Label | None) -> ocm.Resource:
+        return ocm.Resource(
+            name='test-resource',
+            version='1.0.0',
+            type='ociImage',
+            access=None,
+            labels=[label] if label else [],
+        )
+
+    def test_no_label(self):
+        assert odg.labels.is_binary_scan_skipped(self._make_resource(None)) is False
+
+    def test_policy_skip(self):
+        label = ocm.Label(name='odg.ocm.software/binary-scan-policy', value={'policy': 'skip'})
+        assert odg.labels.is_binary_scan_skipped(self._make_resource(label)) is True
+
+    def test_policy_scan(self):
+        label = ocm.Label(name='odg.ocm.software/binary-scan-policy', value={'policy': 'scan'})
+        assert odg.labels.is_binary_scan_skipped(self._make_resource(label)) is False
+
+    def test_legacy_skip(self):
+        label = ocm.Label(
+            name='cloud.gardener.cnudie/dso/scanning-hints/binary_id/v1',
+            value={'policy': 'skip'},
+        )
+        assert odg.labels.is_binary_scan_skipped(self._make_resource(label)) is True
+
+    def test_legacy_scan(self):
+        label = ocm.Label(
+            name='cloud.gardener.cnudie/dso/scanning-hints/binary_id/v1',
+            value={'policy': 'scan'},
+        )
+        assert odg.labels.is_binary_scan_skipped(self._make_resource(label)) is False

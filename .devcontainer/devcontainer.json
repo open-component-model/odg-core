@@ -30,6 +30,7 @@
 					}
 				},
 				"python.defaultInterpreterPath": "/workspaces/odg-core/.venv/bin/python",
+				"ruff.path": ["/workspaces/odg-core/.venv/bin/ruff"],
 				"python.testing.pytestArgs": ["src"],
 				"python.testing.unittestEnabled": false,
 				"python.testing.pytestEnabled": true,
