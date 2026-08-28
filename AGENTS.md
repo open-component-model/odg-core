@@ -11,7 +11,7 @@ and compliance issues for your [OCM](ocm.software) components.
 * Run tests with `make test`
 * Lint/format with `make lint && make format`
 * Project structure:
-    * `src/` app spirce code
+    * `src/` app source code
     * `src/tests/` tests
     * `packages` built `bdba-client` & `odg-client` packages from `src`
     * `charts` Helm charts for deployment
