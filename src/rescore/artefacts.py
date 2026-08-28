@@ -58,7 +58,9 @@ class VulnerabilityFinding(odg.model.Finding):
     cvss_score: float | None
     cvss_v3_score: float | None  # keep for backwards compatibility, `cvss_score` is prefered
     cvss: str | None
+    rating_source: str | None
     summary: str | None
+    recommendation: str | None
     urls: list[str]
     filesystem_paths: list[odg.model.FilesystemPath]
 
@@ -503,7 +505,9 @@ async def _iter_rescoring_proposals(
                             'cvss_score': cvss_score,
                             'cvss_v3_score': cvss_score,
                             'cvss': f'{cvss}' if cvss is not None else None,
+                            'rating_source': am.data.rating_source,
                             'summary': am.data.summary,
+                            'recommendation': am.data.recommendation,
                             'urls': am.data.urls,
                             'filesystem_paths': filesystem_paths,
                         },
