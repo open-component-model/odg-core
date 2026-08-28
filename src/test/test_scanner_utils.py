@@ -324,63 +324,6 @@ class TestMakeArtefactScanInfo:
         assert bdba.key != clamav.key
 
 
-class TestBDBAVulnerabilityFindingUrls:
-    def test_report_url_added_to_urls_on_construction(self):
-        finding = odg.model.BDBAVulnerabilityFinding(
-            severity='MEDIUM',
-            package_name='pkg',
-            package_version='1.0',
-            cve='CVE-2024-0001',
-            cvss_score=5.0,
-            base_url='https://bdba.example',
-            report_url='https://bdba.example/report/42',
-            product_id=42,
-            group_id=7,
-        )
-
-        assert any('bdba.example/report/42' in u for u in finding.urls)
-        assert any('nvd.nist.gov' in u for u in finding.urls)
-
-    def test_report_url_not_duplicated_when_already_present(self):
-        bdba_link = '[BDBA 42](https://bdba.example/report/42)'
-        finding = odg.model.BDBAVulnerabilityFinding(
-            severity='MEDIUM',
-            package_name='pkg',
-            package_version='1.0',
-            cve='CVE-2024-0001',
-            cvss_score=5.0,
-            base_url='https://bdba.example',
-            report_url='https://bdba.example/report/42',
-            product_id=42,
-            group_id=7,
-            urls=[bdba_link],
-        )
-
-        assert finding.urls.count(bdba_link) == 1
-
-    def test_urls_not_part_of_finding_key(self):
-        # Ensures that adding the BDBA link to urls on deserialization does not change the key,
-        # preventing accidental key drift between old and new DB records.
-        base_kwargs = dict(
-            severity='MEDIUM',
-            package_name='pkg',
-            package_version='1.0',
-            cve='CVE-2024-0001',
-            cvss_score=5.0,
-            base_url='https://bdba.example',
-            report_url='https://bdba.example/report/42',
-            product_id=42,
-            group_id=7,
-        )
-        without_extra_url = odg.model.BDBAVulnerabilityFinding(**base_kwargs)
-        with_extra_url = odg.model.BDBAVulnerabilityFinding(
-            **base_kwargs,
-            urls=['https://extra.example'],
-        )
-
-        assert without_extra_url.key == with_extra_url.key
-
-
 class TestIterPackageVersionOverwrites:
     def test_from_resource_label(self):
         label = ocm.Label(

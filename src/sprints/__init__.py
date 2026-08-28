@@ -80,7 +80,7 @@ class SprintInfosCurrent(aiohttp.web.View):
 
         try:
             offset = int(utility.param(params, 'offset', default=0))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             raise aiohttp.web.HTTPBadRequest(text='Invalid offset')
 
         if ref_date_raw := utility.param(params, 'before'):
