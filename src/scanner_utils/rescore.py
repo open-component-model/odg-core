@@ -50,7 +50,7 @@ def compute_auto_triage_cves(
 
         try:
             cvss = odg.cvss.CVSSV3.parse(v.cvss_vector)
-        except (ValueError, KeyError, IndexError):
+        except ValueError, KeyError, IndexError:
             logger.debug('could not parse CVSS vector %r for %s', v.cvss_vector, v.cve)
             continue
 

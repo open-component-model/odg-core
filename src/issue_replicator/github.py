@@ -1367,8 +1367,9 @@ def vulnerability_summary(
         # only return URLs for BDBA findings, to link to the BDBA report
         urls = set()
         for finding in finding_group.findings:
-            if isinstance(finding.finding.data, odg.model.BDBAVulnerabilityFinding):
-                urls.update(finding.finding.data.urls)
+            finding_data = finding.finding.data
+            if isinstance(finding_data, odg.model.BDBAVulnerabilityFinding):
+                urls.add(f'[BDBA {finding_data.product_id}]({finding_data.report_url})')
         return sorted(urls)
 
     def group_aggregated_findings(

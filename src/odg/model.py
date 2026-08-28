@@ -533,10 +533,6 @@ class BDBAVulnerabilityFinding(VulnerabilityFinding, BDBAMixin):
     def __post_init__(self):
         if self.cvss_score is None and self.cvss_v3_score is not None:
             self.cvss_score = self.cvss_v3_score
-        if self.report_url:
-            bdba_link = f'[BDBA {self.product_id}]({self.report_url})'
-            if bdba_link not in self.urls:
-                self.urls.append(bdba_link)
         super().__post_init__()
 
 

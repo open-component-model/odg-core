@@ -9,7 +9,7 @@ include = ["bdba*"]
 [project]
 name = "bdba-client"
 version = "0.15.0"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "cachecontrol",
     "dacite",
