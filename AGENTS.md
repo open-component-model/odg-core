@@ -15,6 +15,7 @@ specific capability (scanning, reporting, replication, etc.); extensions share c
 - `src/odg/extensions_cfg.yaml` — extension-specific config 
 - `src/odg/ocm_repo_mappings.yaml` — config to map OCM components to OCI registries
 - `src/odg/profiles.yaml` — ODG profiles
+- `src/odg/findings_cfg.yaml` - behavior per finding type (rescoring, SLA times, etc.)
 - `src/secrets/` — secret YAML templates (one type per subdirectory)
 - `extension-definitions.yaml` — extension definitions
 
@@ -72,32 +73,33 @@ specific capability (scanning, reporting, replication, etc.); extensions share c
 
 ## Conventions
 
-* Follow ruff and bandit rules from `pyproject.toml`
-* Always end files with a new line
-* Set reasonable type hints (avoid `Any` or `object`)
-* Use expressive variable names (`item` over `i`)
-* In logs:
-    * Prefer `{param=}` over `param={param}`
-    * Many classes implement `__str__`
-* Prefer `is` over `==` when comparing enum values
-* Be conscise, specific and value dense
+- Follow ruff and bandit rules from `pyproject.toml`
+- Always end files with a new line
+- Set reasonable type hints (avoid `Any` or `object`)
+- Use expressive variable names (`item` over `i`)
+- In logs:
+    - Prefer `{param=}` over `param={param}`
+    - Many classes implement `__str__`
+- Prefer `is` over `==` when comparing enum values
+- Be conscise, specific and value dense
+- Sort members alphabetically where it is suitable (e.g. enum members, static lists, etc.)
 
 ## After you finished
 
-* Run tests with `make test`
-* Lint/format with `make lint && make format` after the feature is ready
-* Update documentation as needed:
-  * Check for breaking changes in `README.md`
-  * For extension specific configuration: `charts/bootstrapping/values.documentation.yaml`
-  * For API changes: `src/swagger/swagger.yaml`
+- Run tests with `make test`
+- Lint/format with `make lint && make format` after the feature is ready
+- Update documentation as needed:
+  - Check for breaking changes in `README.md`
+  - For extension specific configuration: `charts/bootstrapping/values.documentation.yaml`
+  - For API changes: `src/swagger/swagger.yaml`
 
 ## Boundaries
 
-* Always run Python commands with `uv run`
-* Never run `make setup` or `make run`, ask user if needed
-* Never create commits or PRs yourself, let the user sign & signoff
+- Always run Python commands with `uv run`
+- Never run `make setup` or `make run`, ask user if needed
+- Never create commits or PRs yourself, let the user sign & signoff
 
 ## Hints
 
-* oci/ocm libs: https://github.com/gardener/cc-utils
-* OCM spec: https://github.com/open-component-model/ocm-spec/tree/main/doc
+- oci/ocm libs: https://github.com/gardener/cc-utils
+- OCM spec: https://github.com/open-component-model/ocm-spec/tree/main/doc
