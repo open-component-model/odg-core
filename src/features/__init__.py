@@ -233,6 +233,7 @@ class FeatureAuthentication(FeatureBase):
     name: str = 'authentication'
     signing_cfgs: list[secret_mgmt.signing_cfg.SigningCfg] = dataclasses.field(default_factory=list)
     oauth_cfgs: list[secret_mgmt.oauth_cfg.OAuthCfg] = dataclasses.field(default_factory=list)
+    oidc_cfgs: list[secret_mgmt.oauth_cfg.OidcCfg] = dataclasses.field(default_factory=list)
 
     def serialize(self, profile: Profile | None = None) -> dict[str, any]:
         return {
@@ -794,10 +795,16 @@ def deserialise_authentication(
         logger.warning(f'Authentication config not found: {e}')
         return FeatureAuthentication(FeatureStates.UNAVAILABLE)
 
+    try:
+        oidc_cfgs = secret_factory.oidc_cfg()
+    except secret_mgmt.SecretTypeNotFound:
+        oidc_cfgs = []
+
     return FeatureAuthentication(
         state=FeatureStates.AVAILABLE,
         signing_cfgs=signing_cfgs,
         oauth_cfgs=oauth_cfgs,
+        oidc_cfgs=oidc_cfgs,
     )
 
 

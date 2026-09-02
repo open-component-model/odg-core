@@ -96,6 +96,7 @@ class DBCache(Base):
 class RoleBindingOriginType(enum.StrEnum):
     GITHUB = 'github'
     MANUAL = 'manual'
+    OIDC = 'oidc'
 
 
 @dataclasses.dataclass
@@ -132,10 +133,21 @@ class GitHubRoleBindingOrigin(RoleBindingOrigin):
         )
 
 
+@dataclasses.dataclass(kw_only=True)
+class OidcRoleBindingOrigin(RoleBindingOrigin):
+    type: RoleBindingOriginType = RoleBindingOriginType.OIDC
+    issuer: str
+    sub: str
+
+    @property
+    def key(self) -> str:
+        return f'{self.type}|{self.issuer}|{self.sub}'
+
+
 @dataclasses.dataclass
 class RoleBinding:
     name: str
-    origin: GitHubRoleBindingOrigin | RoleBindingOrigin
+    origin: GitHubRoleBindingOrigin | OidcRoleBindingOrigin | RoleBindingOrigin
 
     @property
     def key(self) -> str:
@@ -208,6 +220,16 @@ class GitHubAppIdentifier(Identifier):
         return f'app_name:{self.app_name}_hostname:{self.hostname}'
 
 
+@dataclasses.dataclass
+class OidcIdentifier(Identifier):
+    sub: str
+    issuer: str
+
+    @property
+    def normalised(self) -> str:
+        return f'sub:{self.sub}_issuer:{self.issuer}'
+
+
 class UserIdentifiers(Base):
     __tablename__ = 'user_identifiers'
 
@@ -218,7 +240,9 @@ class UserIdentifiers(Base):
     identifier = sa.Column(sa.JSON)  # Identifier
 
     @property
-    def deserialised_identifier(self) -> GitHubAppIdentifier | GitHubUserIdentifier | UserIdentifier:
+    def deserialised_identifier(
+        self,
+    ) -> GitHubAppIdentifier | GitHubUserIdentifier | OidcIdentifier | UserIdentifier:
         idp_type = secret_mgmt.oauth_cfg.OAuthCfgTypes(self.type)
 
         if idp_type is secret_mgmt.oauth_cfg.OAuthCfgTypes.GITHUB:
@@ -232,11 +256,16 @@ class UserIdentifiers(Base):
                 data=self.identifier,
             )
 
-        else:
+        if idp_type is secret_mgmt.oauth_cfg.OAuthCfgTypes.OIDC:
             return dacite.from_dict(
-                data_class=UserIdentifier,
+                data_class=OidcIdentifier,
                 data=self.identifier,
             )
+
+        return dacite.from_dict(
+            data_class=UserIdentifier,
+            data=self.identifier,
+        )
 
 
 class BlobStore(Base):

@@ -181,6 +181,38 @@ def iter_github_app_role_bindings(
             )
 
 
+def iter_oidc_role_bindings(
+    identifier: dm.OidcIdentifier,
+    oidc_cfgs: collections.abc.Iterable[secret_mgmt.oauth_cfg.OidcCfg],
+) -> collections.abc.Iterable[dm.RoleBinding]:
+    for oidc_cfg in oidc_cfgs:
+        if identifier.issuer != oidc_cfg.issuer:
+            continue
+
+        def find_oidc_subject(
+            subjects: list[secret_mgmt.oauth_cfg.Subject],
+        ) -> secret_mgmt.oauth_cfg.Subject | None:
+            for subject in subjects:
+                if subject.type is secret_mgmt.oauth_cfg.SubjectType.OIDC_SUB:
+                    if subject.matches(identifier.sub):
+                        return subject
+
+        for role_binding in oidc_cfg.role_bindings:
+            if not find_oidc_subject(subjects=role_binding.subjects):
+                continue
+
+            yield from (
+                dm.RoleBinding(
+                    name=role,
+                    origin=dm.OidcRoleBindingOrigin(
+                        issuer=identifier.issuer,
+                        sub=identifier.sub,
+                    ),
+                )
+                for role in role_binding.roles
+            )
+
+
 def update_github_role_bindings(
     identifiers: collections.abc.Iterable[dm.UserIdentifiers],
     role_bindings: collections.abc.Sequence[dm.RoleBinding],
@@ -235,8 +267,45 @@ def update_github_role_bindings(
     return role_bindings
 
 
+def update_oidc_role_bindings(
+    identifiers: collections.abc.Iterable[dm.UserIdentifiers],
+    role_bindings: collections.abc.Sequence[dm.RoleBinding],
+    oidc_cfgs: collections.abc.Iterable[secret_mgmt.oauth_cfg.OidcCfg],
+) -> list[dm.RoleBinding]:
+    """
+    Returns an updated list of `role_bindings` by removing existing role bindings which originate
+    from OIDC and adding new role bindings based on the current OIDC configuration.
+    """
+    role_bindings = [
+        role_binding
+        for role_binding in role_bindings
+        if role_binding.origin.type != dm.RoleBindingOriginType.OIDC
+    ]
+
+    oidc_role_bindings = set()
+
+    for identifier in identifiers:
+        if identifier.type != secret_mgmt.oauth_cfg.OAuthCfgTypes.OIDC:
+            continue
+
+        identifier = identifier.deserialised_identifier
+
+        if isinstance(identifier, dm.OidcIdentifier):
+            oidc_role_bindings.update(
+                iter_oidc_role_bindings(
+                    identifier=identifier,
+                    oidc_cfgs=oidc_cfgs,
+                ),
+            )
+
+    role_bindings.extend(oidc_role_bindings)
+
+    return role_bindings
+
+
 async def update_user_role_bindings(
     oauth_cfgs: collections.abc.Iterable[secret_mgmt.oauth_cfg.OAuthCfg],
+    oidc_cfgs: collections.abc.Iterable[secret_mgmt.oauth_cfg.OidcCfg],
     db_session: sqlasync.session.AsyncSession,
     github_api_lookup: collections.abc.Callable[[str], github3.github.GitHub | None],
 ):
@@ -270,6 +339,11 @@ async def update_user_role_bindings(
                 oauth_cfgs=oauth_cfgs,
                 github_orgs_by_hostname=github_orgs_by_hostname,
                 github_teams_by_hostname=github_teams_by_hostname,
+            )
+            role_bindings = update_oidc_role_bindings(
+                identifiers=user.identifiers,
+                role_bindings=role_bindings,
+                oidc_cfgs=oidc_cfgs,
             )
             len_role_bindings_after = len(role_bindings)
 
@@ -321,12 +395,18 @@ async def main():
 
     oauth_cfgs = secret_factory.oauth_cfg()
 
+    try:
+        oidc_cfgs = secret_factory.oidc_cfg()
+    except secret_mgmt.SecretTypeNotFound:
+        oidc_cfgs = []
+
     github_api_lookup = lookups.github_api_lookup()
 
     db_session = await deliverydb.sqlalchemy_session_async(db_url)
     try:
         await update_user_role_bindings(
             oauth_cfgs=oauth_cfgs,
+            oidc_cfgs=oidc_cfgs,
             db_session=db_session,
             github_api_lookup=github_api_lookup,
         )

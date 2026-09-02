@@ -1951,6 +1951,49 @@ secrets:
               # GitHub API for membership and is not interpreted as a regex.
               name: ""
 
+  # @param secrets.oidc-cfg mapping of a secret-name (freely selectable) and the OIDC configuration
+  # for machine-to-machine authentication using OIDC-compliant JWTs signed with RS256 (e.g.
+  # Kubernetes ServiceAccount tokens, GitHub Actions OIDC tokens). Tokens signed with other
+  # algorithms (e.g. ES256, RS512) are rejected.
+  oidc-cfg:
+    primary:
+      # @param secrets.oidc-cfg.<name>.name name of the OIDC configuration
+      name: ""
+      # @param secrets.oidc-cfg.<name>.issuer the OIDC issuer URL; used to discover the JWKS endpoint
+      # via <issuer>/.well-known/openid-configuration
+      # e.g. for a Gardener shoot with authentication.gardener.cloud/issuer=managed:
+      # issuer: https://discovery.ingress.<landscape>/projects/<project>/shoots/<uid>/issuer
+      issuer: ""
+      # @param secrets.oidc-cfg.<name>.audiences list of accepted audience values in the token's aud claim
+      # e.g.
+      # audiences:
+      #   - delivery-service
+      audiences: []
+      # @param secrets.oidc-cfg.<name>.role_bindings a list of mappings between user roles and the
+      # respective subjects these roles should be assigned to
+      role_bindings:
+          # @param secrets.oidc-cfg.<name>.role_bindings[].roles the name of the roles which should
+          # be assigned to the subjects
+          # options:
+          # - reader
+          # - writer
+          # - admin
+          # - <any-role-defined-via-secrets.rbac.<name>.roles[].name>
+          # e.g.
+          # roles: ["reader"]
+        - roles: []
+          # @param secrets.oidc-cfg.<name>.role_bindings[].subjects a list of subjects which should
+          # be assigned to the defined roles
+          subjects:
+              # @param secrets.oidc-cfg.<name>.role_bindings[].subjects[].type the type of subject
+              # options:
+              # - oidc-sub: name is matched as a regex against the sub claim of the token
+            - type: ""
+              # @param secrets.oidc-cfg.<name>.role_bindings[].subjects[].name the sub claim to match.
+              # Interpreted as a Python regex (re.fullmatch), so plain values (e.g.
+              # "system:serviceaccount:default:my-sa") match literally, while patterns are also supported.
+              name: ""
+
   # @param secrets.ppms mapping of named PPMS credentials (name is freely selectable)
   ppms:
     primary:
