@@ -94,11 +94,11 @@ installation:
     value_type: literal
   - helm_attribute: primary.resources.requests.cpu
     helm_chart_name: postgresql
-    value: 250m
+    value: 500m
     value_type: literal
   - helm_attribute: primary.resources.requests.memory
     helm_chart_name: postgresql
-    value: 256Mi
+    value: 1Gi
     value_type: literal
   - helm_attribute: auth.existingSecret
     helm_chart_name: postgresql
