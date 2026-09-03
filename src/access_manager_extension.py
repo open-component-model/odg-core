@@ -393,7 +393,10 @@ async def main():
         namespace=namespace,
     )
 
-    oauth_cfgs = secret_factory.oauth_cfg()
+    try:
+        oauth_cfgs = secret_factory.oauth_cfg()
+    except secret_mgmt.SecretTypeNotFound:
+        oauth_cfgs = []
 
     try:
         oidc_cfgs = secret_factory.oidc_cfg()

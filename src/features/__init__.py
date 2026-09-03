@@ -789,16 +789,24 @@ def deserialise_authentication(
     secret_factory: secret_mgmt.SecretFactory,
 ) -> FeatureAuthentication:
     try:
-        oauth_cfgs = secret_factory.oauth_cfg()
         signing_cfgs = secret_factory.signing_cfg()
     except secret_mgmt.SecretTypeNotFound as e:
         logger.warning(f'Authentication config not found: {e}')
         return FeatureAuthentication(FeatureStates.UNAVAILABLE)
 
     try:
+        oauth_cfgs = secret_factory.oauth_cfg()
+    except secret_mgmt.SecretTypeNotFound:
+        oauth_cfgs = []
+
+    try:
         oidc_cfgs = secret_factory.oidc_cfg()
     except secret_mgmt.SecretTypeNotFound:
         oidc_cfgs = []
+
+    if not oauth_cfgs and not oidc_cfgs:
+        logger.warning('Authentication config not found: no oauth-cfg or oidc-cfg secrets present')
+        return FeatureAuthentication(FeatureStates.UNAVAILABLE)
 
     return FeatureAuthentication(
         state=FeatureStates.AVAILABLE,
