@@ -18,3 +18,9 @@ gateway:
   enableTls: true
   fullnameOverride: open-delivery-gear
 host: delivery-service
+limitRange:
+  defaultRequest:
+    memory: 250Mi
+    cpu: 100m
+  default:
+    memory: 500Mi
