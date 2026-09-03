@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "semver"]
+requires = ["setuptools==84.0.0", "semver==3.0.4"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,33 +8,36 @@ description = "Mandatory system internals for the Open Delivery Gear"
 requires-python = ">=3.14"
 dynamic = ["version"]
 dependencies = [
+    # bdba-client and odg-client are uv workspace members (versions in
+    # packages/*/pyproject.toml, wired below via [tool.uv.sources]) — do not
+    # pin them here; renovate ignores them (see .github/renovate.json5).
     "bdba-client",
     "odg-client",
-    "aiohttp",
-    "aiohttp-swagger3",
-    "awesomeversion",
-    "boto3",
-    "brotli",
-    "cachetools",
-    "cyclonedx-python-lib",
-    "dacite",
-    "dataclasses-json",
-    "gardener-cicd-libs",
-    "github3.py",
-    "htmllistparse",
-    "jsonpath-ng",
-    "jsonschema",
-    "kubernetes",
-    "prometheus_client",
-    "psycopg[binary]",
-    "pyjwt",
-    "requests",
-    "sqlalchemy>1.4.0",
-    "starlette",
-    "urllib3",
-    "uvicorn",
-    "watchdog",
-    "python-dateutil",
+    "aiohttp==3.14.3",
+    "aiohttp-swagger3==0.10.0",
+    "awesomeversion==25.8.0",
+    "boto3==1.43.70",
+    "brotli==1.2.0",
+    "cachetools==7.1.7",
+    "cyclonedx-python-lib==11.11.2",
+    "dacite==1.9.2",
+    "dataclasses-json==0.6.7",
+    "gardener-cicd-libs==1.2830.0",
+    "github3.py==4.0.1",
+    "htmllistparse==0.6.1",
+    "jsonpath-ng==1.8.0",
+    "jsonschema==4.26.0",
+    "kubernetes==36.0.3",
+    "prometheus_client==0.26.0",
+    "psycopg[binary]==3.3.4",
+    "pyjwt==2.13.0",
+    "requests==2.34.2",
+    "sqlalchemy==2.0.52",
+    "starlette==1.6.0",
+    "urllib3==2.7.0",
+    "uvicorn==0.52.1",
+    "watchdog==6.0.0",
+    "python-dateutil==2.9.0.post0",
 ]
 
 [tool.uv.workspace]
@@ -46,17 +49,17 @@ odg-client = { workspace = true }
 
 [dependency-groups]
 dev = [
-    "aiohttp-devtools",
-    "aiosqlite",
-    "greenlet",
-    "numpy",
-    "pytest<9.1",
-    "pytest-asyncio",
-    "scipy",
-    "ruff",
-    "bandit",
-    "semver",
-    "setuptools",
+    "aiohttp-devtools==1.1.2",
+    "aiosqlite==0.22.1",
+    "greenlet==3.5.5",
+    "numpy==2.5.2",
+    "pytest==9.0.3",
+    "pytest-asyncio==1.4.0",
+    "scipy==1.18.0",
+    "ruff==0.16.2",
+    "bandit==1.9.4",
+    "semver==3.0.4",
+    "setuptools==84.0.0",
 ]
 
 [tool.bandit]

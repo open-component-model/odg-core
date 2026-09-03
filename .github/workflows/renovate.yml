@@ -1,0 +1,62 @@
+name: Renovate
+# Thin caller: delegates to the central reusable renovate workflow. The central
+# sweeper (in the central repository listed below) covers this repository on a
+# schedule; this workflow adds push-triggered rebase/automerge runs and config
+# validation on pull requests.
+#
+# Full runs require the GitHub App credentials (vars.ODG_BOT_APP_ID /
+# secrets.ODG_BOT_PRIVATE_KEY) to be configured for this repository; without
+# them all runs are read-only dry-runs.
+# TESTING SETUP (fork end-to-end test): references the fork
+# alexbass01/open-component-model-github, pinned to its floating major tag @v1.
+on:
+  # Run after every merge to the default branch so renovate rebases /
+  # automerges its PRs before they go stale.
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+    paths:
+      - .github/workflows/renovate.yml
+      - .github/renovate.json5
+  workflow_dispatch:
+    inputs:
+      repoCache:
+        description: 'Repository cache: enabled (use + update), disabled (skip), reset (discard old, start fresh)'
+        type: choice
+        default: enabled
+        options: [ enabled, disabled, reset ]
+      ignoreSchedule:
+        description: 'Ignore renovate schedule settings'
+        type: boolean
+        default: false
+      logLevel:
+        description: 'Log level'
+        type: choice
+        default: info
+        options: [ info, debug ]
+      useOdgbotCredentials:
+        description: 'Use GitHub App credentials if configured (else: GITHUB_TOKEN)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  renovate:
+    uses: alexbass01/open-component-model-github/.github/workflows/renovate.yml@v1
+    secrets: inherit
+    with:
+      repository: ${{ github.repository }}
+      # TODO(prod): after rollout, drop centralConfig (default points to
+      # open-component-model/.github@v1).
+      centralConfig: alexbass01/open-component-model-github@v1
+      repoCache: ${{ inputs.repoCache || 'enabled' }}
+      ignoreSchedule: ${{ github.event_name == 'workflow_dispatch' && inputs.ignoreSchedule }}
+      logLevel: ${{ inputs.logLevel || 'info' }}
+      useOdgbotCredentials: ${{ github.event_name != 'workflow_dispatch' || inputs.useOdgbotCredentials }}
+      # Pull requests validate the config via a read-only dry-run.
+      dryRun: ${{ github.event_name == 'pull_request' }}

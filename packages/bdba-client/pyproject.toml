@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools==84.0.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
@@ -11,8 +11,8 @@ name = "bdba-client"
 version = "0.15.0"
 requires-python = ">=3.14"
 dependencies = [
-    "cachecontrol",
-    "dacite",
-    "python-dateutil",
-    "requests",
+    "cachecontrol==0.14.4",
+    "dacite==1.9.2",
+    "python-dateutil==2.9.0.post0",
+    "requests==2.34.2",
 ]

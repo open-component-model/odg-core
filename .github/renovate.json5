@@ -1,0 +1,93 @@
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: [
+    'config:recommended',
+    'config:best-practices',
+    'helpers:pinGitHubActionDigests',
+    'docker:pinDigests',
+    'security:openssf-scorecard',
+    ':dependencyDashboard',
+    ':rebaseStalePrs',
+  ],
+  internalChecksFilter: 'strict',
+  minimumReleaseAge: '7 days',
+  branchPrefix: 'renovate/',
+  prConcurrentLimit: 5,
+  prHourlyLimit: 0,
+  automerge: false,
+  automergeType: 'pr',
+  vulnerabilityAlerts: {
+    minimumReleaseAge: null,
+    automerge: false,
+  },
+  packageRules: [
+    {
+      // Majors wait as checkboxes in the dependency dashboard ("Pending
+      // Approval") instead of occupying prConcurrentLimit slots — tick one
+      // there to have its PR created when you're ready to work on it.
+      matchUpdateTypes: ['major'],
+      dependencyDashboardApproval: true,
+    },
+    {
+      matchUpdateTypes: ['patch'],
+      automerge: true,
+    },
+    {
+      matchManagers: ['github-actions'],
+      automerge: true,
+    },
+    {
+      // gardener/cc-utils is intentionally pinned to @v1 as a floating major
+      // tag — frequent updates, deliberately unpinned. Disable to avoid
+      // constant SHA-bump PRs.
+      matchManagers: ['github-actions'],
+      matchDepNames: ['gardener/cc-utils'],
+      enabled: false,
+    },
+    {
+      // bdba-client/odg-client are uv workspace members (packages/), wired
+      // via [tool.uv.sources] workspace=true — their versions live in the
+      // member pyproject.tomls, not on PyPI. Disable so renovate never
+      // treats them as external PyPI packages.
+      matchManagers: ['pep621', 'uv'],
+      matchDepNames: ['bdba-client', 'odg-client'],
+      enabled: false,
+    },
+    {
+      // Bundle Alpine package pin bumps (from the repology customManager
+      // below) into a single PR instead of one PR per package.
+      matchDatasources: ['repology'],
+      matchDepNames: ['/alpine_\\d+_\\d+\\//'],
+      groupName: 'alpine packages',
+    },
+  ],
+  customManagers: [
+    {
+      // Track the Renovate version used in the workflow
+      customType: 'regex',
+      managerFilePatterns: ['.github/workflows/renovate.yml'],
+      matchStrings: ["renovate-version:\\s*'(?<currentValue>[^'@]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?'"],
+      depNameTemplate: 'ghcr.io/renovatebot/renovate',
+      datasourceTemplate: 'docker',
+    },
+    {
+      // Alpine package pins in the Dockerfile (`apk add pkg=version-rev`).
+      // The comment line above each pin carries the repology coordinates:
+      // depName "<repo>/<pkg>" where <repo> (e.g. alpine_3_24) must match the
+      // Alpine version of the base image — flip it when the FROM tag moves
+      // (e.g. alpine3.24 -> alpine3.25).
+      // Regex must be slash-delimited ("/.../") — without the slashes a
+      // managerFilePatterns entry is treated as a glob and matches nothing.
+      customType: 'regex',
+      managerFilePatterns: ['/(^|/)Dockerfile$/'],
+      matchStrings: [
+        '\\s*# renovate: datasource=repology depName=(?<depName>alpine_\\d+_\\d+/[a-z0-9+.-]+) versioning=apk\\s+[a-z0-9+.-]+=(?<currentValue>[0-9][^\\s\\\\]*)',
+      ],
+      datasourceTemplate: 'repology',
+      versioningTemplate: 'apk',
+    },
+  ],
+  // NOTE: .ocm/base-component.yaml is deliberately NOT managed here (no
+  // customManager, no postUpgradeTasks sync) — its postgresql chart/image
+  // versions are tied to the delivery-db schema and updated manually.
+}

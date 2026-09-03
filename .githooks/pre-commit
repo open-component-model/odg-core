@@ -2,7 +2,10 @@
 set -e
 
 # Only act on staged Python files (added, copied, modified, renamed)
-mapfile -d '' STAGED < <(git diff --cached --name-only -z --diff-filter=ACMR -- '*.py')
+STAGED=()
+while IFS= read -r -d '' file; do
+    STAGED+=("$file")
+done < <(git diff --cached --name-only -z --diff-filter=ACMR -- '*.py')
 if [ "${#STAGED[@]}" -eq 0 ]; then
     exit 0
 fi

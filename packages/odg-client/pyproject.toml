@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools==84.0.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
@@ -12,9 +12,9 @@ description = "Client library for the Open Delivery Gear"
 version = "0.12.0"
 requires-python = ">=3.14"
 dependencies = [
-    "dacite",
-    "gardener-ocm",
-    "pycryptodome",
-    "pyjwt",
-    "requests",
+    "dacite==1.9.2",
+    "gardener-ocm==1.2830.0",
+    "pycryptodome==3.23.0",
+    "pyjwt==2.13.0",
+    "requests==2.34.2",
 ]

@@ -23,7 +23,7 @@ def create_cbom(
     sbom_path: str | None = None,
 ) -> dict:
     """
-    Uses `cbomkit-theia` (https://github.com/IBM/cbomkit-theia) to create a CBOM document for the
+    Uses `cbomkit-theia` (https://github.com/cbomkit/cbomkit-theia) to create a CBOM document for the
     provided `image` OR local `dir`. If a path to a SBOM document is specified, the resulting CBOM
     will be an enriched version of this SBOM, otherwise it will be created from-scratch.
     """
