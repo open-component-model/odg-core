@@ -75,6 +75,10 @@ def default_secret_type_to_class(secret_type: str) -> object:
             import secret_mgmt.oauth_cfg
 
             return secret_mgmt.oauth_cfg.OAuthCfg
+        case 'oidc-cfg':
+            import secret_mgmt.oauth_cfg
+
+            return secret_mgmt.oauth_cfg.OidcCfg
         case 'oci-registry':
             import secret_mgmt.oci_registry
 
