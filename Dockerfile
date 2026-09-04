@@ -1,4 +1,4 @@
-FROM golang:1.26.6-alpine3.24 AS cbomkit-theia-builder
+FROM golang:1.27.1-alpine3.24 AS cbomkit-theia-builder
 ARG CBOMKIT_THEIA_VERSION=1.0.1
 RUN apk add --no-cache git \
  && git clone --branch ${CBOMKIT_THEIA_VERSION} https://github.com/IBM/cbomkit-theia.git /cbomkit-theia \
