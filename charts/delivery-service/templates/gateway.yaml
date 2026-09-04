@@ -1,0 +1,30 @@
+{{- if .Values.gateway.enabled }}
+{{- $name := .Values.gateway.fullnameOverride }}
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Values.target_namespace | default .Release.Namespace }}
+  {{- if default dict (.Values.gateway).annotations }}
+  annotations:
+    {{- range $annotation, $value := default dict .Values.gateway.annotations }}
+    {{ $annotation }}: {{ $value }}
+    {{- end }}
+  {{- end }}
+spec:
+  gatewayClassName: {{ .Values.gateway.className }}
+  listeners:
+  {{- if .Values.gateway.enableTls }}
+    - name: https
+      port: 443
+      protocol: HTTPS
+      tls:
+        certificateRefs:
+          - name: "{{ $name }}-tls"
+  {{- else }}
+    - name: http
+      port: 80
+      protocol: HTTP
+  {{- end }}
+{{- end }}
