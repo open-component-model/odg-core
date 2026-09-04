@@ -51,7 +51,7 @@ dev = [
     "aiohttp-devtools",
     "aiosqlite",
     "greenlet",
-    "pytest<9.1",
+    "pytest<9.2",
     "pytest-asyncio",
     "ruff",
     "bandit",
