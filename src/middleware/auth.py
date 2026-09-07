@@ -1,3 +1,4 @@
+import asyncio
 import collections.abc
 import datetime
 import enum
@@ -33,6 +34,8 @@ import util
 logger = logging.getLogger(__name__)
 
 SESSION_TOKEN_MAX_AGE = datetime.timedelta(minutes=5)
+
+_jwks_clients: dict[str, jwt.PyJWKClient] = {}
 REFRESH_TOKEN_MAX_AGE = datetime.timedelta(days=183)
 
 
@@ -323,9 +326,17 @@ async def find_github_identifier(
 
 
 def find_role_bindings(
-    oauth_cfg: secret_mgmt.oauth_cfg.OAuthCfg,
-    user_identifier: dm.GitHubAppIdentifier | dm.GitHubUserIdentifier,
+    cfg: secret_mgmt.oauth_cfg.OAuthCfg | secret_mgmt.oauth_cfg.OidcCfg,
+    user_identifier: dm.GitHubAppIdentifier | dm.GitHubUserIdentifier | dm.OidcIdentifier,
 ) -> collections.abc.Iterable[dm.RoleBinding]:
+    if isinstance(cfg, secret_mgmt.oauth_cfg.OidcCfg):
+        yield from find_oidc_role_bindings(
+            oidc_cfg=cfg,
+            user_identifier=user_identifier,
+        )
+        return
+
+    oauth_cfg = cfg
     if oauth_cfg.type is secret_mgmt.oauth_cfg.OAuthCfgTypes.GITHUB:
         github_api_lookup = lookups.github_api_lookup()
         github_host = urllib.parse.urlparse(oauth_cfg.api_url).hostname.lower()
@@ -396,7 +407,136 @@ def find_role_bindings(
             )
 
     else:
-        raise ValueError(f'unsupported {oauth_cfg.type=}')
+        raise ValueError(f'unsupported {cfg.type=}')
+
+
+def find_oidc_cfg(
+    token: str,
+    oidc_cfgs: collections.abc.Iterable[secret_mgmt.oauth_cfg.OidcCfg],
+) -> secret_mgmt.oauth_cfg.OidcCfg:
+    try:
+        unverified_issuer = jwt.decode(
+            token,
+            options={'verify_signature': False},
+        ).get('iss')
+    except jwt.InvalidTokenError as e:
+        logger.warning(f'Failed to decode OIDC token: {e}')
+        raise aiohttp.web.HTTPUnauthorized
+
+    oidc_cfg = next(
+        (cfg for cfg in oidc_cfgs if cfg.issuer == unverified_issuer),
+        None,
+    )
+
+    if oidc_cfg is None:
+        logger.warning(
+            f'OIDC token issuer {unverified_issuer!r} not found in configured providers',
+        )
+        raise aiohttp.web.HTTPUnauthorized(
+            text=f'OIDC issuer {unverified_issuer!r} is not configured',
+        )
+
+    return oidc_cfg
+
+
+async def _get_jwks_client(
+    oidc_cfg: secret_mgmt.oauth_cfg.OidcCfg,
+) -> jwt.PyJWKClient:
+    if not oidc_cfg.issuer.startswith('https://'):
+        logger.warning(f'OIDC issuer {oidc_cfg.issuer!r} does not use HTTPS')
+        raise aiohttp.web.HTTPUnauthorized
+
+    jwks_client = _jwks_clients.get(oidc_cfg.issuer)
+    if jwks_client is not None:
+        return jwks_client
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                oidc_cfg.oidc_cfg_url,
+                timeout=aiohttp.ClientTimeout(total=10),
+                allow_redirects=False,
+            ) as resp:
+                resp.raise_for_status()
+                discovery = await resp.json()
+    except Exception as e:
+        raise aiohttp.web.HTTPUnauthorized from e
+
+    jwks_uri = discovery.get('jwks_uri')
+    if not jwks_uri:
+        raise aiohttp.web.HTTPUnauthorized
+
+    if not jwks_uri.startswith('https://'):
+        logger.warning(f'OIDC jwks_uri {jwks_uri!r} does not use HTTPS')
+        raise aiohttp.web.HTTPUnauthorized
+
+    jwks_client = jwt.PyJWKClient(jwks_uri, cache_keys=True)
+    _jwks_clients[oidc_cfg.issuer] = jwks_client
+    return jwks_client
+
+
+async def verify_oidc_token(
+    token: str,
+    oidc_cfg: secret_mgmt.oauth_cfg.OidcCfg,
+) -> dm.OidcIdentifier:
+    try:
+        jwks_client = await _get_jwks_client(oidc_cfg=oidc_cfg)
+        signing_key = await asyncio.get_running_loop().run_in_executor(
+            None,
+            jwks_client.get_signing_key_from_jwt,
+            token,
+        )
+        claims = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=['RS256'],
+            issuer=oidc_cfg.issuer,
+            audience=oidc_cfg.audiences,
+            options={'require': ['exp', 'iat', 'iss', 'sub', 'aud']},
+        )
+    except aiohttp.web.HTTPUnauthorized:
+        raise
+    except Exception as e:
+        logger.warning(f'OIDC token verification failed for {oidc_cfg.issuer=}: {e}')
+        raise aiohttp.web.HTTPUnauthorized
+
+    sub = claims.get('sub')
+    if not sub:
+        logger.warning(f'OIDC token missing sub claim for {oidc_cfg.issuer=}')
+        raise aiohttp.web.HTTPUnauthorized
+
+    return dm.OidcIdentifier(
+        sub=sub,
+        issuer=oidc_cfg.issuer,
+    )
+
+
+def find_oidc_role_bindings(
+    oidc_cfg: secret_mgmt.oauth_cfg.OidcCfg,
+    user_identifier: dm.OidcIdentifier,
+) -> collections.abc.Iterable[dm.RoleBinding]:
+    def find_oidc_subject(
+        subjects: list[secret_mgmt.oauth_cfg.Subject],
+    ) -> secret_mgmt.oauth_cfg.Subject | None:
+        for subject in subjects:
+            if subject.type is secret_mgmt.oauth_cfg.SubjectType.OIDC_SUB:
+                if subject.matches(user_identifier.sub):
+                    return subject
+
+    for role_binding in oidc_cfg.role_bindings:
+        if not find_oidc_subject(subjects=role_binding.subjects):
+            continue
+
+        yield from (
+            dm.RoleBinding(
+                name=role,
+                origin=dm.OidcRoleBindingOrigin(
+                    issuer=user_identifier.issuer,
+                    sub=user_identifier.sub,
+                ),
+            )
+            for role in role_binding.roles
+        )
 
 
 def build_refresh_token_payload(
@@ -573,12 +713,20 @@ class OAuthLogin(aiohttp.web.View):
         if (access_token and api_url) or (client_id and code):
             idp_type = secret_mgmt.oauth_cfg.OAuthCfgTypes.GITHUB
 
+        elif oidc_token := (
+            self.request.headers.get('Authorization', '').removeprefix('Bearer ').strip()
+            or access_token
+        ):
+            idp_type = secret_mgmt.oauth_cfg.OAuthCfgTypes.OIDC
+            use_refresh_token = False
+
         else:
             raise aiohttp.web.HTTPUnauthorized(
                 headers={
                     'WWW-Authenticate': (
                         'Add either the url query params "code" and "client_id" '
                         'or a valid "access_token" with a github "api_url"'
+                        'or a Bearer token in the Authorization header for OIDC'
                     ),
                 },
             )
@@ -594,6 +742,19 @@ class OAuthLogin(aiohttp.web.View):
                 oauth_cfg=oauth_cfg,
                 github_access_token=access_token,
                 github_code=code,
+            )
+
+        elif idp_type is secret_mgmt.oauth_cfg.OAuthCfgTypes.OIDC:
+            if not feature_authentication.oidc_cfgs:
+                raise aiohttp.web.HTTPUnauthorized(text='No OIDC providers configured')
+
+            oidc_cfg = find_oidc_cfg(
+                token=oidc_token,
+                oidc_cfgs=feature_authentication.oidc_cfgs,
+            )
+            user_identifier = await verify_oidc_token(
+                token=oidc_token,
+                oidc_cfg=oidc_cfg,
             )
 
         else:
@@ -614,7 +775,8 @@ class OAuthLogin(aiohttp.web.View):
 
             role_bindings = set(
                 find_role_bindings(
-                    oauth_cfg=oauth_cfg,
+                    cfg=oidc_cfg if idp_type is secret_mgmt.oauth_cfg.OAuthCfgTypes.OIDC
+                    else oauth_cfg,
                     user_identifier=user_identifier,
                 ),
             )

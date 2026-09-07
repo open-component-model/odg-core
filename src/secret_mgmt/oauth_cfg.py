@@ -10,6 +10,7 @@ RoleName = str
 
 class OAuthCfgTypes(enum.StrEnum):
     GITHUB = 'github'
+    OIDC = 'oidc'
 
 
 class SubjectType(enum.StrEnum):
@@ -17,6 +18,7 @@ class SubjectType(enum.StrEnum):
     GITHUB_USER = 'github-user'
     GITHUB_ORG = 'github-org'
     GITHUB_TEAM = 'github-team'
+    OIDC_SUB = 'oidc-sub'
 
 
 @dataclasses.dataclass
@@ -54,3 +56,15 @@ class OAuthCfg:
     @property
     def token_url(self) -> str:
         return f'https://{self.normalised_domain}/login/oauth/access_token'
+
+
+@dataclasses.dataclass
+class OidcCfg:
+    name: str
+    issuer: str
+    audiences: list[str]
+    role_bindings: list[RoleBinding] = dataclasses.field(default_factory=list)
+
+    @property
+    def oidc_cfg_url(self) -> str:
+        return f'{self.issuer}/.well-known/openid-configuration'
