@@ -537,7 +537,7 @@ wheels = [
 
 [[package]]
 name = "cyclonedx-python-lib"
-version = "11.11.2"
+version = "11.12.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "license-expression" },
@@ -545,9 +545,9 @@ dependencies = [
     { name = "py-serializable" },
     { name = "sortedcontainers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/51/f6/db1e11bc6eb542e433e3844173a5cb77820b34c82f150cd59109ac7deb5c/cyclonedx_python_lib-11.11.2.tar.gz", hash = "sha256:1995edc423a813dde2bb839eea48ec1c8e1ad0861a2e11601ee249762cd135bd", size = 1443706, upload-time = "2026-08-12T14:20:48.207Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/17/40/6509e6cfd7f2f3255501690f46375fdd224949e21fd1e96f4f4c8a9041b1/cyclonedx_python_lib-11.12.0.tar.gz", hash = "sha256:16767c4039de90c04e9f03348f8f0ed4b8ff842eaa7eefcad3a95685f970dacf", size = 1445378, upload-time = "2026-08-13T07:52:18.675Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fb/63/f2fc535bea600afe1c03171d6d583704e360b6af2677bf64972bfb6de718/cyclonedx_python_lib-11.11.2-py3-none-any.whl", hash = "sha256:da00c77410566db3197e64a0e7f22065341277a5b91a41b984256c8a6f58ac8c", size = 528720, upload-time = "2026-08-12T14:20:46.681Z" },
+    { url = "https://files.pythonhosted.org/packages/cf/f0/b2cb999244f2f4194df63ecff6939228178fa63a33be809c412684ca8db7/cyclonedx_python_lib-11.12.0-py3-none-any.whl", hash = "sha256:0e807521a921a5c3cb8ce1153f8a61d29eedfe76a46aac2796b7c6b573391a54", size = 529453, upload-time = "2026-08-13T07:52:16.836Z" },
 ]
 
 [[package]]
@@ -1377,7 +1377,7 @@ requires-dist = [
     { name = "boto3", specifier = "==1.43.83" },
     { name = "brotli", specifier = "==1.2.0" },
     { name = "cachetools", specifier = "==7.1.7" },
-    { name = "cyclonedx-python-lib", specifier = "==11.11.2" },
+    { name = "cyclonedx-python-lib", specifier = "==11.12.0" },
     { name = "dacite", specifier = "==1.9.2" },
     { name = "dataclasses-json", specifier = "==0.6.7" },
     { name = "gardener-cicd-libs", specifier = "==1.2830.0" },

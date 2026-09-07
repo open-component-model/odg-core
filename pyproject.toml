@@ -19,7 +19,7 @@ dependencies = [
     "boto3==1.43.83",
     "brotli==1.2.0",
     "cachetools==7.1.7",
-    "cyclonedx-python-lib==11.11.2",
+    "cyclonedx-python-lib==11.12.0",
     "dacite==1.9.2",
     "dataclasses-json==0.6.7",
     "gardener-cicd-libs==1.2830.0",
