@@ -18,7 +18,7 @@ dependencies = [
     "awesomeversion==25.8.0",
     "boto3==1.43.83",
     "brotli==1.2.0",
-    "cachetools==7.1.7",
+    "cachetools==7.1.8",
     "cyclonedx-python-lib==11.12.0",
     "dacite==1.9.2",
     "dataclasses-json==0.6.7",
