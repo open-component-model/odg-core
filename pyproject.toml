@@ -16,7 +16,7 @@ dependencies = [
     "aiohttp==3.14.3",
     "aiohttp-swagger3==0.10.0",
     "awesomeversion==25.8.0",
-    "boto3==1.43.86",
+    "boto3==1.43.87",
     "brotli==1.2.0",
     "cachetools==7.1.8",
     "cyclonedx-python-lib==11.12.0",
