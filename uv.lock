@@ -794,7 +794,7 @@ wheels = [
 
 [[package]]
 name = "gardener-ocm"
-version = "1.2839.0"
+version = "1.2842.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cachetools" },
@@ -808,7 +808,7 @@ dependencies = [
     { name = "semver" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/79/f7/5fb1942a404e3893bd501cb223af615b9acdb5853fccf0ce4874f691a255/gardener_ocm-1.2839.0-py3-none-any.whl", hash = "sha256:5f44e98d5ef5f2133eb673c972aaaa612feb394294f87edad0704253ba6e5d1e", size = 159920, upload-time = "2026-08-31T09:29:12.79Z" },
+    { url = "https://files.pythonhosted.org/packages/bb/44/4cfa47843c7c838c2027bf1e6012b6fffb5f10e1b2d73a80cb6ccd8fe0f7/gardener_ocm-1.2842.0-py3-none-any.whl", hash = "sha256:aa4f42c87564859849fbc4860ac9296f13e38ff8270fdfdb368108a2418244f1", size = 159922, upload-time = "2026-09-02T06:34:33.85Z" },
 ]
 
 [[package]]
@@ -1314,7 +1314,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "dacite", specifier = "==1.9.2" },
-    { name = "gardener-ocm", specifier = "==1.2839.0" },
+    { name = "gardener-ocm", specifier = "==1.2842.0" },
     { name = "pycryptodome", specifier = "==3.23.0" },
     { name = "pyjwt", specifier = "==2.13.0" },
     { name = "requests", specifier = "==2.34.2" },
