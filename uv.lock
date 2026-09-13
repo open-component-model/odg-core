@@ -736,7 +736,7 @@ sdist = { url = "https://files.pythonhosted.org/packages/04/0b/4506cb2e831cea4b0
 
 [[package]]
 name = "gardener-cicd-libs"
-version = "1.2839.0"
+version = "1.2842.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cachecontrol" },
@@ -775,7 +775,7 @@ dependencies = [
     { name = "yamllint" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6f/b2/72ab34b55f72e1ab7e8117ed8f6e96acd6fe0837a3fc8b0842801dc69fe3/gardener_cicd_libs-1.2839.0-py3-none-any.whl", hash = "sha256:4c06a6ada2e1dfb1d5dd716f79f31c88ab6e28534474ec359a6136fa40e552d2", size = 235240, upload-time = "2026-08-31T09:29:08.039Z" },
+    { url = "https://files.pythonhosted.org/packages/80/4c/68f9af69f762a71077569fb6b913fb3e5a7a552d5f5779ddf3a9d40a8421/gardener_cicd_libs-1.2842.0-py3-none-any.whl", hash = "sha256:070e23e0720a507dfb0a829b8c9a88961acaa797dba46585025840ff41b30119", size = 235240, upload-time = "2026-09-02T06:34:29.174Z" },
 ]
 
 [[package]]
@@ -1380,7 +1380,7 @@ requires-dist = [
     { name = "cyclonedx-python-lib", specifier = "==11.12.0" },
     { name = "dacite", specifier = "==1.9.2" },
     { name = "dataclasses-json", specifier = "==0.6.7" },
-    { name = "gardener-cicd-libs", specifier = "==1.2839.0" },
+    { name = "gardener-cicd-libs", specifier = "==1.2842.0" },
     { name = "github3-py", specifier = "==4.0.1" },
     { name = "htmllistparse", specifier = "==0.6.1" },
     { name = "jsonpath-ng", specifier = "==1.8.0" },
