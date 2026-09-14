@@ -77,15 +77,15 @@ class CveCategorisationLabel(Label):
 
 
 @dataclasses.dataclass(frozen=True)
-class ArtefactReferenceEntry:
+class ArtifactReferenceEntry:
     identity: dict
 
 
 @dataclasses.dataclass(frozen=True)
-class ArtefactReferencesLabel(Label):
-    name = 'ocm.software/artefact-references'
+class ArtifactReferencesLabel(Label):
+    name = 'ocm.software/artifact-references'
     label_version = 'v1alpha1'
-    value: tuple[ArtefactReferenceEntry, ...]
+    value: tuple[ArtifactReferenceEntry, ...]
 
 
 @functools.cache

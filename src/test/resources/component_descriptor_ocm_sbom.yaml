@@ -26,7 +26,7 @@ componentDescriptors:
             type: ociRegistry
             imageReference: registry.example.com/my-image-sbom:1.0.0
           labels:
-            - name: ocm.software/artefact-references
+            - name: ocm.software/artifact-references
               version: v1alpha1
               value:
                 - identity:
@@ -65,7 +65,7 @@ componentDescriptors:
             type: ociRegistry
             imageReference: registry.example.com/my-image-sbom-amd64:2.0.0
           labels:
-            - name: ocm.software/artefact-references
+            - name: ocm.software/artifact-references
               version: v1alpha1
               value:
                 - identity:
@@ -81,7 +81,7 @@ componentDescriptors:
             type: ociRegistry
             imageReference: registry.example.com/my-image-sbom-arm64:2.0.0
           labels:
-            - name: ocm.software/artefact-references
+            - name: ocm.software/artifact-references
               version: v1alpha1
               value:
                 - identity:

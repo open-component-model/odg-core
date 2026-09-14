@@ -60,8 +60,8 @@ def find_ocm_sbom_resource(
     resource: ocm.Resource,
 ) -> ocm.Resource | None:
     for candidate in component.resources:
-        label = candidate.find_label(odg.labels.ArtefactReferencesLabel.name)
-        if not label or label.version != odg.labels.ArtefactReferencesLabel.label_version:
+        label = candidate.find_label(odg.labels.ArtifactReferencesLabel.name)
+        if not label or label.version != odg.labels.ArtifactReferencesLabel.label_version:
             continue
         for entry in label.value:
             if _identity_matches(entry.get('identity', {}), resource):
@@ -267,7 +267,7 @@ def find_existing_sbom_metadata(
     delivery_service_client: odg_client.DeliveryServiceClient,
 ) -> dict | None:
     """
-    Query for existing SBOM metadata for the given artefact.
+    Query for existing SBOM metadata for the given artifact.
 
     Returns the metadata entry if found, None otherwise.
     Failures are logged and treated as "no existing SBOM" (safe fallback).
@@ -297,7 +297,7 @@ def generate_sbom_for_artefact(
     **kwargs,
 ) -> SBOM | None:
     """
-    Generates Software Bill of Materials (SBOM) for a component artefact.
+    Generates Software Bill of Materials (SBOM) for a component artifact.
     Resolves the component descriptor from OCM repositories,
     retrieves BDBA security scans, and exports the SBOM
     in the requested format with OCM metadata.

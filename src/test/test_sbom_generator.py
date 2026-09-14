@@ -54,7 +54,7 @@ def _make_sbom_resource(
         label_value = [{'identity': {'name': 'my-image'}}]
 
     labels = [ocm.Label(
-        name=odg.labels.ArtefactReferencesLabel.name,
+        name=odg.labels.ArtifactReferencesLabel.name,
         value=label_value,
         version=label_version,
     )]
@@ -243,9 +243,9 @@ class TestFetchOcmSbom:
             sbom_generator.fetch_ocm_sbom(sbom_resource, oci_client, component)
 
 
-# --- generate_sbom_for_artefact (integration-level with mocks) ---
+# --- generate_sbom_for_artifact (integration-level with mocks) ---
 
-class TestGenerateSbomForArtefact:
+class TestGenerateSbomForArtifact:
     def _make_extension_cfg(self, generation_mode=odg.model.SbomGenerationMode.SYFT):
         cfg = unittest.mock.MagicMock(spec=odg.extensions_cfg.SBOMGeneratorConfig)
         cfg.is_supported.return_value = True
@@ -260,7 +260,7 @@ class TestGenerateSbomForArtefact:
         cfg.mapping.return_value = mapping
         return cfg
 
-    def _make_artefact(self):
+    def _make_artifact(self):
         return odg.model.ComponentArtefactId(
             component_name='my.component',
             component_version='1.0.0',
@@ -316,7 +316,7 @@ class TestGenerateSbomForArtefact:
             ) as mock_syft,
         ):
             sbom_generator.generate_sbom_for_artefact(
-                artefact=self._make_artefact(),
+                artefact=self._make_artifact(),
                 extension_cfg=self._make_extension_cfg(),
                 component_descriptor_lookup=unittest.mock.MagicMock(),
                 delivery_service_client=delivery_client,
@@ -349,7 +349,7 @@ class TestGenerateSbomForArtefact:
             ) as mock_syft,
         ):
             sbom_generator.generate_sbom_for_artefact(
-                artefact=self._make_artefact(),
+                artefact=self._make_artifact(),
                 extension_cfg=self._make_extension_cfg(),
                 component_descriptor_lookup=unittest.mock.MagicMock(),
                 delivery_service_client=delivery_client,
@@ -386,7 +386,7 @@ class TestGenerateSbomForArtefact:
             ) as mock_syft,
         ):
             sbom_generator.generate_sbom_for_artefact(
-                artefact=self._make_artefact(),
+                artefact=self._make_artifact(),
                 extension_cfg=self._make_extension_cfg(),
                 component_descriptor_lookup=unittest.mock.MagicMock(),
                 delivery_service_client=delivery_client,
