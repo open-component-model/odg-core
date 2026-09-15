@@ -175,6 +175,16 @@ extensions_cfg:
     # @param extensions_cfg.backlog_controller.remove_claim_after_minutes is a backlog work-item is
     # claimed longer, the controller will remove the claim so that another worker can process it
     remove_claim_after_minutes: 30
+    # @param extensions_cfg.backlog_controller.extension_options_overwrite optional per-extension
+    # overwrite of max_replicas, backlog_items_per_replica, and remove_claim_after_minutes. The key
+    # must be a valid service name (see Services enum)
+    # e.g.
+    # extension_options_overwrite:
+    #   bdba:
+    #     max_replicas: 10
+    #     backlog_items_per_replica: 5
+    #     remove_claim_after_minutes: 60
+    extension_options_overwrite: {}
 
   # @param extensions_cfg.bdba workers which interact with BDBA to create vulnerability and/or
   # license findings
