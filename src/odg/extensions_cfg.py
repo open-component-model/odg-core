@@ -246,7 +246,7 @@ class ArtefactEnumeratorConfig(ExtensionCfgMixins):
 
 
 @dataclasses.dataclass(kw_only=True)
-class BacklogControllerConfig(ExtensionCfgMixins):
+class BacklogControllerConfigOptions:
     """
     :param int max_replicas:
         Maximum number of replicas per extension to which the backlog controller will scale. Note,
@@ -260,10 +260,26 @@ class BacklogControllerConfig(ExtensionCfgMixins):
         period.
     """
 
-    service: Services = Services.BACKLOG_CONTROLLER
     max_replicas: int = 5
     backlog_items_per_replica: int = 3
     remove_claim_after_minutes: int = 30
+
+
+@dataclasses.dataclass(kw_only=True)
+class BacklogControllerConfig(ExtensionCfgMixins, BacklogControllerConfigOptions):
+    service: Services = Services.BACKLOG_CONTROLLER
+    extension_options_overwrite: dict[str, dict] = dataclasses.field(default_factory=dict)
+
+    def __post_init__(self):
+        self.extension_options_overwrite = dict(
+            (
+                Services(key),
+                dacite.from_dict(BacklogControllerConfigOptions, value)
+                if isinstance(value, dict)
+                else value,
+            )
+            for key, value in self.extension_options_overwrite.items()
+        )
 
 
 @dataclasses.dataclass

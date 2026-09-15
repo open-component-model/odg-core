@@ -31,6 +31,15 @@ def on_backlog_change(
 ):
     service = metadata.get('labels').get(k8s.model.LABEL_SERVICE)
 
+    if overwrite := backlog_controller_cfg.extension_options_overwrite.get(service):
+        max_replicas = overwrite.max_replicas
+        items_per_replica = overwrite.backlog_items_per_replica
+        remove_claim_after_minutes = overwrite.remove_claim_after_minutes
+    else:
+        max_replicas = backlog_controller_cfg.max_replicas
+        items_per_replica = backlog_controller_cfg.backlog_items_per_replica
+        remove_claim_after_minutes = backlog_controller_cfg.remove_claim_after_minutes
+
     labels = {
         k8s.model.LABEL_SERVICE: service,
     }
@@ -78,11 +87,11 @@ def on_backlog_change(
                 backlog_crd=backlog_crd,
             )
         elif claimed_at.tzinfo and now - claimed_at >= datetime.timedelta(
-            minutes=backlog_controller_cfg.remove_claim_after_minutes,
+            minutes=remove_claim_after_minutes,
         ):
             logger.warning(
                 f'the backlog item {crd_name} was claimed for more than '
-                f'{backlog_controller_cfg.remove_claim_after_minutes} minutes by pod {claimed_by}',
+                f'{remove_claim_after_minutes} minutes by pod {claimed_by}',
             )
             k8s.backlog.remove_claim(
                 namespace=namespace,
@@ -96,10 +105,7 @@ def on_backlog_change(
     elif service == odg.extensions_cfg.Services.BLACKDUCK:
         # limit parallel BlackDuck API load
         max_replicas = 2
-    else:
-        max_replicas = backlog_controller_cfg.max_replicas
 
-    items_per_replica = backlog_controller_cfg.backlog_items_per_replica
     desired_replicas = min(math.ceil(len(backlog_crds) / items_per_replica), max_replicas)
 
     k8s.util.scale_replicas(
