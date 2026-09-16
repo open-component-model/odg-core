@@ -21,7 +21,7 @@
     automerge: false,
   },
   // Weekly maintenance regenerating uv.lock (enabled via config:best-practices
-  // -> :maintainLockFilesWeekly). Automerge like patch updates: the nightly
+  // -> :maintainLockFilesWeekly). Automerge like patch updates: the scheduled
   // sweeper merges it unattended, no human review needed.
   lockFileMaintenance: {
     automerge: true,
