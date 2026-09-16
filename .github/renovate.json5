@@ -20,6 +20,12 @@
     minimumReleaseAge: null,
     automerge: false,
   },
+  // Weekly maintenance regenerating uv.lock (enabled via config:best-practices
+  // -> :maintainLockFilesWeekly). Automerge like patch updates: the nightly
+  // sweeper merges it unattended, no human review needed.
+  lockFileMaintenance: {
+    automerge: true,
+  },
   packageRules: [
     {
       matchDepNames: ['gardener-cicd-libs', 'gardener-ocm', 'gardener-oci'],
