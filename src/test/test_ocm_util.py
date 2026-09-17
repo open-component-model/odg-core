@@ -32,11 +32,13 @@ def _make_referencing_resource(
     if label_value is None:
         label_value = [{'identity': {'name': 'my-image'}}]
 
-    labels = [ocm.Label(
-        name=odg.labels.ArtifactReferencesLabel.name,
-        value=label_value,
-        version=label_version,
-    )]
+    labels = [
+        ocm.Label(
+            name=odg.labels.ArtifactReferencesLabel.name,
+            value=label_value,
+            version=label_version,
+        ),
+    ]
 
     return ocm.Resource(
         name=name,
@@ -56,6 +58,7 @@ def _make_component(resources):
 
 # --- _identity_matches ---
 
+
 class TestIdentityMatches:
     def test_name_mismatch(self):
         resource = _make_resource(name='my-image')
@@ -72,35 +75,41 @@ class TestIdentityMatches:
     def test_version_mismatch(self):
         resource = _make_resource(name='my-image', version='1.0.0')
         assert not ocm_util._identity_matches(
-            {'name': 'my-image', 'version': '2.0.0'}, resource,
+            {'name': 'my-image', 'version': '2.0.0'},
+            resource,
         )
 
     def test_extra_identity_exact_match(self):
         resource = _make_resource(name='my-image', extra_identity={'arch': 'amd64'})
         assert ocm_util._identity_matches(
-            {'name': 'my-image', 'arch': 'amd64'}, resource,
+            {'name': 'my-image', 'arch': 'amd64'},
+            resource,
         )
 
     def test_extra_identity_key_missing_in_resource(self):
         resource = _make_resource(name='my-image', extra_identity={})
         assert not ocm_util._identity_matches(
-            {'name': 'my-image', 'arch': 'amd64'}, resource,
+            {'name': 'my-image', 'arch': 'amd64'},
+            resource,
         )
 
     def test_extra_identity_extra_key_in_resource(self):
         resource = _make_resource(name='my-image', extra_identity={'arch': 'amd64', 'os': 'linux'})
         assert not ocm_util._identity_matches(
-            {'name': 'my-image', 'arch': 'amd64'}, resource,
+            {'name': 'my-image', 'arch': 'amd64'},
+            resource,
         )
 
     def test_extra_identity_value_mismatch(self):
         resource = _make_resource(name='my-image', extra_identity={'arch': 'amd64'})
         assert not ocm_util._identity_matches(
-            {'name': 'my-image', 'arch': 'arm64'}, resource,
+            {'name': 'my-image', 'arch': 'arm64'},
+            resource,
         )
 
 
 # --- iter_resources_referencing ---
+
 
 class TestIterResourcesReferencing:
     def test_no_resources(self):
@@ -152,9 +161,13 @@ class TestIterResourcesReferencing:
             label_value=[{'identity': {'name': 'my-image'}}],
         )
         component = _make_component([subject, sbom, attestation])
-        result = list(ocm_util.iter_resources_referencing(
-            component, subject, resource_type='sbom',
-        ))
+        result = list(
+            ocm_util.iter_resources_referencing(
+                component,
+                subject,
+                resource_type='sbom',
+            ),
+        )
         assert result == [sbom]
 
     def test_identity_no_match(self):
@@ -165,9 +178,11 @@ class TestIterResourcesReferencing:
 
     def test_multiple_entries_in_label(self):
         subject = _make_resource(name='my-image')
-        ref = _make_referencing_resource(label_value=[
-            {'identity': {'name': 'other-image'}},
-            {'identity': {'name': 'my-image'}},
-        ])
+        ref = _make_referencing_resource(
+            label_value=[
+                {'identity': {'name': 'other-image'}},
+                {'identity': {'name': 'my-image'}},
+            ],
+        )
         component = _make_component([subject, ref])
         assert list(ocm_util.iter_resources_referencing(component, subject)) == [ref]

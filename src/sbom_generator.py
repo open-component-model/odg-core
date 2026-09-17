@@ -69,12 +69,14 @@ def fetch_ocm_sbom(
     component: ocm.Component,
     secret_factory: secret_mgmt.SecretFactory,
 ) -> SBOM:
-    descriptor = next(ocm_util.iter_blob_descriptors(
-        component=component,
-        access=sbom_resource.access,
-        oci_client=oci_client,
-        secret_factory=secret_factory,
-    ))
+    descriptor = next(
+        ocm_util.iter_blob_descriptors(
+            component=component,
+            access=sbom_resource.access,
+            oci_client=oci_client,
+            secret_factory=secret_factory,
+        ),
+    )
     raw = json.loads(b''.join(descriptor.content))
     return SBOM(sbom_raw=raw, sbom_format=_detect_sbom_format(raw))
 
@@ -325,14 +327,12 @@ def generate_sbom_for_artefact(
                 component=resource_node.component,
                 secret_factory=secret_factory,
             )
-            logger.info(
-                f'Using OCM-shipped SBoM resource {ocm_sbom_resource.name!r} for {artefact}'
-            )
+            logger.info(f'Using OCM-shipped SBoM resource {ocm_sbom_resource.name!r} for {artefact}')
         except Exception as e:
             logger.warning(
                 f'Failed to fetch OCM-shipped SBoM for {artefact} '
                 f'(resource: {ocm_sbom_resource.name!r}): {e}. '
-                'Falling back to ad-hoc generation.'
+                'Falling back to ad-hoc generation.',
             )
             sbom_result = None
 
@@ -349,8 +349,8 @@ def generate_sbom_for_artefact(
 
                 if not syft_output_format:
                     raise ValueError(
-                        f'Unsupported SBOM format "{extension_cfg.output_format}" for generation mode '
-                        f'"{extension_cfg.generation_mode}". Supported formats: '
+                        f'Unsupported SBOM format "{extension_cfg.output_format}" for generation '
+                        f'mode "{extension_cfg.generation_mode}". Supported formats: '
                         f'{", ".join(f.value for f in syft.SyftSbomFormat)}',
                     )
 
@@ -372,8 +372,8 @@ def generate_sbom_for_artefact(
 
                 if not bdba_output_format:
                     raise ValueError(
-                        f'Unsupported SBOM format "{extension_cfg.output_format}" for generation mode '
-                        f'"{extension_cfg.generation_mode}". Supported formats: '
+                        f'Unsupported SBOM format "{extension_cfg.output_format}" for generation '
+                        f'mode "{extension_cfg.generation_mode}". Supported formats: '
                         f'{", ".join(f.value for f in bdba.model.BdbaSbomFormat)}',
                     )
 

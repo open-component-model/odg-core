@@ -302,7 +302,7 @@ def iter_resources_referencing(
             logger.warning(
                 f'Skipping candidate {candidate.name!r}: unsupported label version '
                 f'{raw_label.version!r} (expected '
-                f'{odg.labels.ArtifactReferencesLabel.version!r})'
+                f'{odg.labels.ArtifactReferencesLabel.version!r})',
             )
             continue
         label: odg.labels.ArtifactReferencesLabel = odg.labels.deserialise_label(raw_label)

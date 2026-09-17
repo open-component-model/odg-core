@@ -60,11 +60,13 @@ def _make_sbom_resource(
     if label_value is None:
         label_value = [{'identity': {'name': 'my-image'}}]
 
-    labels = [ocm.Label(
-        name=odg.labels.ArtifactReferencesLabel.name,
-        value=label_value,
-        version=label_version,
-    )]
+    labels = [
+        ocm.Label(
+            name=odg.labels.ArtifactReferencesLabel.name,
+            value=label_value,
+            version=label_version,
+        ),
+    ]
 
     return ocm.Resource(
         name=name,
@@ -124,7 +126,8 @@ def _make_resource_node(component_resources=None):
 def _patch_blob_descriptors(chunks: list[bytes]):
     descriptor = ocm_util.BlobDescriptor(content=iter(chunks), size=sum(len(c) for c in chunks))
     return unittest.mock.patch(
-        'ocm_util.iter_blob_descriptors', return_value=iter([descriptor]),
+        'ocm_util.iter_blob_descriptors',
+        return_value=iter([descriptor]),
     )
 
 
@@ -133,6 +136,7 @@ def _make_sync_lookup(path):
 
     def sync_lookup(component_id, *_, **kwargs):
         import asyncio
+
         kwargs.pop('absent_ok', None)
         return asyncio.run(async_lookup(component_id, **kwargs))
 
@@ -163,6 +167,7 @@ def _make_delivery_client() -> unittest.mock.MagicMock:
 
 
 # --- find_ocm_sbom_resource ---
+
 
 def test_find_ocm_sbom_resource_no_resources():
     component = _make_component([])
@@ -244,17 +249,20 @@ def test_find_ocm_sbom_resource_non_sbom_type_excluded():
         type='attestation',
         access=ocm.OciAccess(imageReference='registry.example.com/attestation:1.0.0'),
         extraIdentity={},
-        labels=[ocm.Label(
-            name=odg.labels.ArtifactReferencesLabel.name,
-            value=[{'identity': {'name': 'my-image'}}],
-            version='v1alpha1',
-        )],
+        labels=[
+            ocm.Label(
+                name=odg.labels.ArtifactReferencesLabel.name,
+                value=[{'identity': {'name': 'my-image'}}],
+                version='v1alpha1',
+            ),
+        ],
     )
     component = _make_component([subject, attestation])
     assert sbom_generator.find_ocm_sbom_resource(component, subject) is None
 
 
 # --- _detect_sbom_format ---
+
 
 def test_detect_sbom_format_cyclonedx():
     raw = {'bomFormat': 'CycloneDX', 'components': []}
@@ -273,6 +281,7 @@ def test_detect_sbom_format_unknown_raises():
 
 
 # --- fetch_ocm_sbom ---
+
 
 def test_fetch_ocm_sbom_joins_blob_content_and_detects_cyclonedx():
     sbom_resource = _make_sbom_resource(image_reference='registry.example.com/sbom:1.0.0')
@@ -329,13 +338,16 @@ def test_fetch_ocm_sbom_propagates_iter_errors():
 
 # --- generate_sbom_for_artifact (integration-level with mocks) ---
 
+
 def test_generate_sbom_ocm_sbom_found_skips_generation():
     sbom_payload = {'bomFormat': 'CycloneDX', 'components': []}
     sbom_res = _make_sbom_resource(label_value=[{'identity': {'name': 'my-image'}}])
-    resource_node = _make_resource_node(component_resources=[
-        _make_resource(name='my-image'),
-        sbom_res,
-    ])
+    resource_node = _make_resource_node(
+        component_resources=[
+            _make_resource(name='my-image'),
+            sbom_res,
+        ],
+    )
 
     layer = unittest.mock.MagicMock()
     layer.digest = 'sha256:abc'
@@ -369,9 +381,11 @@ def test_generate_sbom_ocm_sbom_found_skips_generation():
 
 
 def test_generate_sbom_no_ocm_sbom_falls_through_to_syft():
-    resource_node = _make_resource_node(component_resources=[
-        _make_resource(name='my-image'),
-    ])
+    resource_node = _make_resource_node(
+        component_resources=[
+            _make_resource(name='my-image'),
+        ],
+    )
 
     syft_result = sbom_generator.SBOM(
         sbom_raw={'bomFormat': 'CycloneDX'},
@@ -383,7 +397,8 @@ def test_generate_sbom_no_ocm_sbom_falls_through_to_syft():
     with (
         unittest.mock.patch('k8s.util.get_ocm_node', return_value=resource_node),
         unittest.mock.patch(
-            'sbom_generator.generate_sbom_with_syft', return_value=syft_result,
+            'sbom_generator.generate_sbom_with_syft',
+            return_value=syft_result,
         ) as mock_syft,
     ):
         sbom_generator.generate_sbom_for_artefact(
@@ -400,10 +415,12 @@ def test_generate_sbom_no_ocm_sbom_falls_through_to_syft():
 
 def test_generate_sbom_fetch_failure_falls_back_to_syft():
     sbom_res = _make_sbom_resource(label_value=[{'identity': {'name': 'my-image'}}])
-    resource_node = _make_resource_node(component_resources=[
-        _make_resource(name='my-image'),
-        sbom_res,
-    ])
+    resource_node = _make_resource_node(
+        component_resources=[
+            _make_resource(name='my-image'),
+            sbom_res,
+        ],
+    )
 
     syft_result = sbom_generator.SBOM(
         sbom_raw={'bomFormat': 'CycloneDX'},
@@ -415,10 +432,12 @@ def test_generate_sbom_fetch_failure_falls_back_to_syft():
     with (
         unittest.mock.patch('k8s.util.get_ocm_node', return_value=resource_node),
         unittest.mock.patch(
-            'sbom_generator.fetch_ocm_sbom', side_effect=RuntimeError('fetch failed'),
+            'sbom_generator.fetch_ocm_sbom',
+            side_effect=RuntimeError('fetch failed'),
         ),
         unittest.mock.patch(
-            'sbom_generator.generate_sbom_with_syft', return_value=syft_result,
+            'sbom_generator.generate_sbom_with_syft',
+            return_value=syft_result,
         ) as mock_syft,
     ):
         sbom_generator.generate_sbom_for_artefact(
@@ -434,6 +453,7 @@ def test_generate_sbom_fetch_failure_falls_back_to_syft():
 
 
 # --- smoke tests: real OCM component descriptor from YAML, only I/O mocked ---
+
 
 def test_smoke_ocm_sbom_preferred_over_syft():
     sbom_payload = {
@@ -531,7 +551,8 @@ def test_smoke_no_ocm_sbom_falls_back_to_syft():
     delivery_client = _make_delivery_client()
 
     with unittest.mock.patch(
-        'sbom_generator.generate_sbom_with_syft', return_value=syft_result,
+        'sbom_generator.generate_sbom_with_syft',
+        return_value=syft_result,
     ) as mock_syft:
         sbom_generator.generate_sbom_for_artefact(
             artefact=artefact,
