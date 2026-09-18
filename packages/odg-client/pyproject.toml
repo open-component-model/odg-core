@@ -15,6 +15,6 @@ dependencies = [
     "dacite==1.9.2",
     "gardener-ocm==1.2842.0",
     "pycryptodome==3.23.0",
-    "pyjwt==2.13.0",
+    "pyjwt==2.14.0",
     "requests==2.34.2",
 ]
