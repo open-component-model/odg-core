@@ -39,7 +39,7 @@ permissions:
 
 jobs:
   renovate:
-    uses: open-component-model/.github/.github/workflows/renovate.yml@v1
+    uses: open-component-model/.github/.github/workflows/renovate.yml@857bbac9dd3d579085a59aa0b06e2e8139c8a187 # v1
     secrets: inherit
     with:
       repository: ${{ github.repository }}
