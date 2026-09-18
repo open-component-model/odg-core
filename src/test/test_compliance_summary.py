@@ -1,3 +1,4 @@
+import datetime
 import logging
 
 import ci.log
@@ -7,6 +8,62 @@ import compliance_summary as cs
 import odg.findings
 import odg.model
 import paths
+
+
+def _make_vuln_finding(
+    artefact: odg.model.ComponentArtefactId,
+    severity: str,
+) -> odg.model.ArtefactMetadata:
+    return odg.model.ArtefactMetadata(
+        artefact=artefact,
+        meta=odg.model.Metadata(
+            datasource=odg.model.Datasource.BDBA,
+            type=odg.model.Datatype.VULNERABILITY_FINDING,
+            creation_date=datetime.datetime.now(tz=datetime.timezone.utc),
+        ),
+        data=odg.model.VulnerabilityFinding(
+            package_name='libfoo',
+            package_version='1.0',
+            severity=severity,
+            cve='CVE-2024-1234',
+            cvss_score=9.0,
+        ),
+    )
+
+
+def _make_vuln_rescoring(
+    artefact: odg.model.ComponentArtefactId,
+    severity: str,
+) -> odg.model.ArtefactMetadata:
+    return odg.model.ArtefactMetadata(
+        artefact=artefact,
+        meta=odg.model.Metadata(
+            datasource=odg.model.Datasource.BDBA,
+            type=odg.model.Datatype.VULNERABILITY_FINDING,
+            creation_date=datetime.datetime.now(tz=datetime.timezone.utc),
+        ),
+        data=odg.model.CustomRescoring(
+            finding=odg.model.RescoringVulnerabilityFinding(
+                package_name='libfoo',
+                cve='CVE-2024-1234',
+            ),
+            referenced_type=odg.model.Datatype.VULNERABILITY_FINDING,
+            severity=severity,
+            user=odg.model.User(username='testuser'),
+        ),
+    )
+
+
+def _artefact_scan_info(artefact: odg.model.ComponentArtefactId) -> odg.model.ArtefactMetadata:
+    return odg.model.ArtefactMetadata(
+        artefact=artefact,
+        meta=odg.model.Metadata(
+            datasource=odg.model.Datasource.BDBA,
+            type=odg.model.Datatype.ARTEFACT_SCAN_INFO,
+        ),
+        data={},
+    )
+
 
 # surpress warnings due to unknown os-id
 ci.log.configure_default_logging(stdout_level=logging.ERROR)
@@ -257,3 +314,75 @@ async def test_licenses(component_artefact_id):
             rescorings=[],
         )
     ).categorisation == 'BLOCKER'
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    'scope_artefact',
+    [
+        # SINGLE scope: all fields are set
+        odg.model.ComponentArtefactId(
+            component_name='my-component',
+            component_version='1.0.0',
+            artefact_kind=odg.model.ArtefactKind.RESOURCE,
+            artefact=odg.model.LocalArtefactId(
+                artefact_name='my-image',
+                artefact_version='1.0.0',
+                artefact_type='ociImage',
+                artefact_extra_id={'os': 'linux', 'version': '1.0.0'},
+            ),
+        ),
+        # ARTEFACT scope: version fields are absent
+        odg.model.ComponentArtefactId(
+            component_name='my-component',
+            artefact_kind=odg.model.ArtefactKind.RESOURCE,
+            artefact=odg.model.LocalArtefactId(
+                artefact_name='my-image',
+                artefact_type='ociImage',
+                artefact_extra_id={'os': 'linux'},
+            ),
+        ),
+        # COMPONENT scope: artefact_kind and artefact fields are absent
+        odg.model.ComponentArtefactId(
+            component_name='my-component',
+        ),
+        # GLOBAL scope: component_name also absent
+        odg.model.ComponentArtefactId(),
+    ],
+)
+async def test_artefact_datatype_summary_rescoring_applied(scope_artefact):
+    """
+    artefact_datatype_summary must apply COMPONENT/GLOBAL-scoped rescorings and must match
+    when the rescoring extra-id version differs from the finding.
+    """
+    finding_cfg = odg.findings.Finding.from_file(
+        path=paths.findings_cfg_path(),
+        finding_type=odg.model.Datatype.VULNERABILITY_FINDING,
+    )
+
+    artefact = odg.model.ComponentArtefactId(
+        component_name='my-component',
+        component_version='1.0.0',
+        artefact_kind=odg.model.ArtefactKind.RESOURCE,
+        artefact=odg.model.LocalArtefactId(
+            artefact_name='my-image',
+            artefact_version='1.0.0',
+            artefact_type='ociImage',
+            artefact_extra_id={'os': 'linux', 'version': '1.0.0'},
+        ),
+    )
+
+    finding = _make_vuln_finding(artefact=artefact, severity='CRITICAL')
+    scan_info = _artefact_scan_info(artefact=artefact)
+    rescoring = _make_vuln_rescoring(artefact=scope_artefact, severity='NONE')
+
+    result = await cs.artefact_datatype_summary(
+        artefact=artefact,
+        finding_cfg=finding_cfg,
+        datasource=odg.model.Datasource.BDBA,
+        artefact_scan_infos=[scan_info],
+        findings=[finding],
+        rescorings=[rescoring],
+    )
+
+    assert result.categorisation is cs.ComplianceEntryCategorisation.CLEAN

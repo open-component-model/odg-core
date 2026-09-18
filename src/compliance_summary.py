@@ -199,24 +199,47 @@ async def artefact_datatype_summary(
         )
     ]
 
+    normalised_artefact_extra_identity = odg.model.normalise_artefact_extra_id(
+        artefact_extra_id=artefact.artefact.artefact_extra_id,
+        omit_version=True,
+    )
+
+    def matches_if_set(candidate, actual) -> bool:
+        return not candidate or candidate == actual
+
     rescorings_for_artefact = [
         rescoring
         for rescoring in rescorings
         if (
-            rescoring.artefact.artefact_kind is artefact.artefact_kind
-            and rescoring.artefact.artefact.artefact_type == artefact.artefact.artefact_type
-            and (
-                not rescoring.artefact.artefact.artefact_name
-                or rescoring.artefact.artefact.artefact_name == artefact.artefact.artefact_name
+            (
+                not rescoring.artefact.artefact_kind
+                or rescoring.artefact.artefact_kind is artefact.artefact_kind
             )
             and (
-                not rescoring.artefact.artefact.artefact_version
-                or rescoring.artefact.artefact.artefact_version == artefact.artefact.artefact_version
-            )
-            and (
-                not rescoring.artefact.artefact.normalised_artefact_extra_id
-                or rescoring.artefact.artefact.normalised_artefact_extra_id
-                == artefact.artefact.normalised_artefact_extra_id
+                not rescoring.artefact.artefact
+                or all(
+                    (
+                        matches_if_set(
+                            candidate=rescoring.artefact.artefact.artefact_name,
+                            actual=artefact.artefact.artefact_name,
+                        ),
+                        matches_if_set(
+                            candidate=rescoring.artefact.artefact.artefact_version,
+                            actual=artefact.artefact.artefact_version,
+                        ),
+                        matches_if_set(
+                            candidate=rescoring.artefact.artefact.artefact_type,
+                            actual=artefact.artefact.artefact_type,
+                        ),
+                        matches_if_set(
+                            candidate=odg.model.normalise_artefact_extra_id(
+                                artefact_extra_id=rescoring.artefact.artefact.artefact_extra_id,
+                                omit_version=True,
+                            ),
+                            actual=normalised_artefact_extra_identity,
+                        ),
+                    ),
+                )
             )
         )
     ]
