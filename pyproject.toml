@@ -53,7 +53,7 @@ odg-client = { workspace = true }
 dev = [
     "aiohttp-devtools==1.1.2",
     "aiosqlite==0.22.1",
-    "greenlet==3.5.5",
+    "greenlet==3.5.6",
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
     "ruff==0.16.7",
