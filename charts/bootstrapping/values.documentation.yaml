@@ -899,6 +899,16 @@ extensions_cfg:
     # @param extensions_cfg.trivy.interval time (in seconds) after which a component should be
     # re-scanned the latest
     interval: 86400 # 24h
+    # @param extensions_cfg.trivy.mappings list of component prefixes that should be processed
+    # together with individual S3 secret configuration
+    mappings:
+        # @param extensions_cfg.trivy.mappings[].prefix prefix of the OCM component name
+        # note: The prefixes are _not_ evaluated as a regex, use the empty string "" as "match-all"
+      - prefix: ""
+        # @param extensions_cfg.trivy.mappings[].aws_secret_name in case the resources are stored in
+        # AWS S3 and multiple AWS secrets are specified via secrets.aws, the name of the aws secret
+        # to use must be specified
+        aws_secret_name: null
     # @param extensions_cfg.trivy.on_unsupported behaviour in case the detected artefact
     # kind/type/access is not supported
     # options:

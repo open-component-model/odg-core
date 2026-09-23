@@ -20,6 +20,7 @@ import urllib.request
 import pytest
 
 import ocm_util
+import odg.extensions_cfg
 import secret_mgmt.oci_registry
 import trivy_extension.scanner
 
@@ -224,3 +225,33 @@ class TestScanOciImageArchive:
         )
         assert result.get('bomFormat') == 'CycloneDX'
         assert len(result.get('vulnerabilities') or []) >= 1
+
+
+class TestTrivyScannerGetAwsSecretName:
+    @staticmethod
+    def _cfg(*mappings: tuple[str, str | None]) -> odg.extensions_cfg.TrivyConfig:
+        return odg.extensions_cfg.TrivyConfig(
+            delivery_service_url='http://localhost',
+            mappings=[
+                odg.extensions_cfg.TrivyMapping(prefix=p, aws_secret_name=s) for p, s in mappings
+            ],
+        )
+
+    @pytest.fixture
+    def scanner(self):
+        return trivy_extension.scanner.TrivyScanner()
+
+    def test_returns_secret_name(self, scanner):
+        assert scanner.get_aws_secret_name(self._cfg(('', 'my-secret')), 'org/repo') == 'my-secret'
+
+    def test_returns_none_when_unset(self, scanner):
+        assert scanner.get_aws_secret_name(self._cfg(('', None)), 'org/repo') is None
+
+    def test_specific_prefix_wins_over_catchall(self, scanner):
+        cfg = self._cfg(('org/special', 'special'), ('', 'default'))
+        assert scanner.get_aws_secret_name(cfg, 'org/special-repo') == 'special'
+        assert scanner.get_aws_secret_name(cfg, 'org/other') == 'default'
+
+    def test_no_match_raises(self, scanner):
+        with pytest.raises(ValueError, match='No matching mapping entry found'):
+            scanner.get_aws_secret_name(self._cfg(('org/x', None)), 'org/y')
