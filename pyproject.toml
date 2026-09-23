@@ -34,7 +34,7 @@ dependencies = [
     "requests==2.34.2",
     "sqlalchemy==2.0.54",
     "starlette==1.6.0",
-    "urllib3==2.7.0",
+    "urllib3==2.8.0",
     "uvicorn==0.53.0",
     "watchdog==6.0.0",
     "python-dateutil==2.9.0.post0",
