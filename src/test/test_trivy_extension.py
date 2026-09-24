@@ -252,6 +252,13 @@ class TestTrivyScannerGetAwsSecretName:
         assert scanner.get_aws_secret_name(cfg, 'org/special-repo') == 'special'
         assert scanner.get_aws_secret_name(cfg, 'org/other') == 'default'
 
+    def test_returns_none_when_no_mappings(self, scanner):
+        cfg = odg.extensions_cfg.TrivyConfig(
+            delivery_service_url='http://localhost',
+            mappings=[],
+        )
+        assert scanner.get_aws_secret_name(cfg, 'org/repo') is None
+
     def test_no_match_raises(self, scanner):
         with pytest.raises(ValueError, match='No matching mapping entry found'):
             scanner.get_aws_secret_name(self._cfg(('org/x', None)), 'org/y')

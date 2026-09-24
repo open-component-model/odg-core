@@ -21,6 +21,8 @@ class TrivyScanner(scanner_utils.scanner.Scanner):
         extension_cfg: odg.extensions_cfg.TrivyConfig,
         component_name: str,
     ) -> str | None:
+        if not extension_cfg.mappings:
+            return None
         return extension_cfg.mapping(component_name).aws_secret_name
 
     def scan_oci_image(self, image_reference: str, secret_factory=None) -> dict:
