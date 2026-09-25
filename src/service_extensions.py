@@ -1,11 +1,14 @@
 import collections.abc
+import datetime
 import http
 import logging
 
 import aiohttp.web
 import dacite
+import sqlalchemy.ext.asyncio as sqlasync
 
 import consts
+import deliverydb.util
 import features
 import k8s.backlog
 import k8s.model
@@ -528,6 +531,8 @@ class RuntimeArtefacts(aiohttp.web.View):
         labels_raw = params.getall('label', default=[])
         labels = dict([label_raw.split(':') for label_raw in labels_raw])
 
+        db_session: sqlasync.session.AsyncSession = self.request[consts.REQUEST_DB_SESSION]
+
         for runtime_artefact_raw in (await self.request.json()).get('artefacts'):
             runtime_artefact = dacite.from_dict(
                 data_class=odg.model.ComponentArtefactId,
@@ -536,6 +541,33 @@ class RuntimeArtefacts(aiohttp.web.View):
                     cast=[odg.model.ArtefactKind],
                 ),
             )
+
+            now = datetime.datetime.now(tz=datetime.UTC)
+
+            compliance_snapshot = odg.model.ArtefactMetadata(
+                artefact=runtime_artefact,
+                meta=odg.model.Metadata(
+                    datasource=odg.model.Datasource.ODG,
+                    type=odg.model.Datatype.COMPLIANCE_SNAPSHOTS,
+                    creation_date=now,
+                    last_update=now,
+                ),
+                data=odg.model.ComplianceSnapshot(
+                    state=[
+                        odg.model.ComplianceSnapshotState(
+                            timestamp=now,
+                            status=odg.model.ComplianceSnapshotStatuses.ACTIVE,
+                        ),
+                    ],
+                ),
+            )
+
+            try:
+                db_session.add(deliverydb.util.to_db_artefact_metadata(compliance_snapshot))
+                await db_session.commit()
+            except:
+                await db_session.rollback()
+                raise
 
             k8s.runtime_artefacts.create_unique_runtime_artefact(
                 namespace=self.request.app[consts.APP_NAMESPACE_CALLBACK](),
