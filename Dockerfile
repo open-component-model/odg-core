@@ -32,6 +32,8 @@ RUN apk add --no-cache \
  && mkdir /freshclam \
  && chown clamav /freshclam
 
+COPY --from=aquasec/trivy:latest@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 /usr/local/bin/trivy /usr/local/bin/trivy
+
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 

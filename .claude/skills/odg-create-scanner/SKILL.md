@@ -58,9 +58,9 @@ Add `SCANNER = 'scanner'` to the `Datasource` StrEnum (keep alphabetical order),
 - Add `scanner: ScannerConfig | None = None` to `ExtensionsConfiguration`
 - Add `('scanner_name', self.scanner)` to the `vuln_scanners` list inside `__post_init__`
 
-### 3. .devcontainer/Dockerfile
+### 3. Dockerfile
 
-Add the CLI install snippet. For scanners distributed as a Docker image use a multi-stage COPY:
+Add the CLI install snippet to `Dockerfile` and `.devcontainer/Dockerfile`. For scanners distributed as a Docker image use a multi-stage COPY:
 
 ```dockerfile
 COPY --from=vendor/scanner:latest /usr/local/bin/scanner /usr/local/bin/scanner
