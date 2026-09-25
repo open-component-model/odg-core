@@ -421,7 +421,7 @@ async def main():
 
     component_descriptor_lookup = lookups.init_component_descriptor_lookup_async(
         cache_dir=parsed_arguments.cache_dir,
-        db_url=db_url,
+        db_url_callback=lambda: db_url,
         oci_client=oci_client,
     )
 

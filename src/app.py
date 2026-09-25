@@ -26,6 +26,7 @@ import lookups
 import metadata
 import middleware.auth
 import middleware.cors
+import middleware.db_session
 import middleware.errors
 import middleware.prometheus
 import middleware.route_feature_check as rfc
@@ -99,16 +100,12 @@ def add_app_context_vars(
 ) -> aiohttp.web.Application:
     oci_client = lookups.semver_sanitising_oci_client_async(secret_factory)
 
-    delivery_db_feature = features.get_feature(features.FeatureDeliveryDB)
-    if delivery_db_feature.state is features.FeatureStates.AVAILABLE:
-        delivery_db_feature: features.FeatureDeliveryDB
-        db_url = delivery_db_feature.db_url
-    else:
-        db_url = None
+    def db_url_callback() -> str | None:
+        return parsed_arguments.delivery_db_url or middleware.db_session.incluster_db_url()
 
     component_descriptor_lookup = lookups.init_component_descriptor_lookup_async(
         cache_dir=parsed_arguments.cache_dir,
-        db_url=db_url,
+        db_url_callback=db_url_callback,
         oci_client=oci_client,
     )
 
@@ -397,13 +394,10 @@ async def initialise_app():
         middleware.cors.cors_middleware(),
         middleware.errors.errors_middleware(),
         middleware.auth.auth_middleware(default_auth=default_auth),
+        middleware.db_session.db_session_middleware(db_url=parsed_arguments.delivery_db_url),
     ]
 
-    middlewares = await features.init_features(
-        parsed_arguments=parsed_arguments,
-        secret_factory=secret_factory,
-        middlewares=middlewares,
-    )
+    await features.init_features(parsed_arguments)
 
     if available_features := tuple(
         f for f in features.feature_cfgs if f.state is features.FeatureStates.AVAILABLE

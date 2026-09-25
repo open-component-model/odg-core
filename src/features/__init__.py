@@ -19,12 +19,9 @@ import ctx_util
 import k8s.util
 import lookups
 import middleware.auth
-import middleware.db_session
 import odg.extensions_cfg
 import odg.findings
 import paths
-import secret_mgmt
-import secret_mgmt.delivery_db
 import sprints.model as sm
 import util
 import yp
@@ -249,16 +246,6 @@ class FeatureClusterAccess(FeatureBase):
 @dataclasses.dataclass(frozen=True)
 class FeatureDeliveryDB(FeatureBase):
     name: str = 'delivery-db'
-    db_url: str = None
-
-    def get_db_url(self) -> str | None:
-        return self.db_url
-
-    def serialize(self, profile: Profile | None = None) -> dict[str, any]:
-        return {
-            'state': self.state,
-            'name': self.name,
-        }
 
 
 @dataclasses.dataclass(frozen=True)
@@ -876,15 +863,15 @@ def watch_for_file_changes(
         logger.warning('Feature config not found')
 
 
-async def init_features(
-    parsed_arguments,
-    secret_factory: secret_mgmt.SecretFactory,
-    middlewares: collections.abc.Iterable,
-) -> list:
+async def init_features(parsed_arguments):
+    """
+    Initialises the features (statically) which are only based on environment variables and/or CLI
+    arguments (as those are expected to not change) as well as the remaining features with a file
+    change event handler.
+    """
     global feature_cfgs
     feature_cfgs = []
 
-    cluster_access_feature = FeatureClusterAccess(FeatureStates.UNAVAILABLE)
     if not (k8s_cfg_name := parsed_arguments.k8s_cfg_name):
         k8s_cfg_name = os.environ.get('K8S_CFG_NAME')
 
@@ -899,6 +886,7 @@ async def init_features(
             kubeconfig_path=parsed_arguments.kubeconfig,
         )
     else:
+        cluster_access_feature = FeatureClusterAccess(FeatureStates.UNAVAILABLE)
         logger.warning(
             'required cfgs for cluster access feature missing, will be disabled; '
             f'{k8s_cfg_name=}, {k8s_namespace=}',
@@ -906,40 +894,14 @@ async def init_features(
 
     feature_cfgs.append(cluster_access_feature)
 
-    delivery_db_feature_state = FeatureStates.UNAVAILABLE
-    if db_url := parsed_arguments.delivery_db_url:
+    if parsed_arguments.delivery_db_url or cluster_access_feature.state is FeatureStates.AVAILABLE:
+        # feature is available if either url is specified directly or can be built from k8s context
         delivery_db_feature_state = FeatureStates.AVAILABLE
     else:
-        if cluster_access_feature.state is FeatureStates.AVAILABLE:
-            try:
-                delivery_db_cfgs = secret_factory.delivery_db()
-                if len(delivery_db_cfgs) != 1:
-                    raise ValueError(
-                        f'There must be exactly one delivery-db secret, found {len(delivery_db_cfgs)}',  # noqa: E501
-                    )
+        logger.warning('required cluster-access for delivery-db feature missing, will be disabled')
+        delivery_db_feature_state = FeatureStates.UNAVAILABLE
 
-                delivery_db_cfg: secret_mgmt.delivery_db.DeliveryDB = delivery_db_cfgs[0]
-                db_url = delivery_db_cfg.connection_url(
-                    namespace=cluster_access_feature.get_namespace(),
-                )
-                delivery_db_feature_state = FeatureStates.AVAILABLE
-            except secret_mgmt.SecretTypeNotFound:
-                logger.warning('Delivery database config not found')
-
-        else:
-            logger.warning(
-                'required cluster-access for delivery-db feature missing, will be disabled',
-            )
-
-    if delivery_db_feature_state is FeatureStates.AVAILABLE:
-        middlewares.append(
-            await middleware.db_session.db_session_middleware(
-                db_url=db_url,
-                verify_db_session=False,
-            ),
-        )
-
-    feature_cfgs.append(FeatureDeliveryDB(delivery_db_feature_state, db_url=db_url))
+    feature_cfgs.append(FeatureDeliveryDB(delivery_db_feature_state))
 
     event_handler = CfgFileChangeEventHandler()
     watch_for_file_changes(event_handler, paths.features_cfg_path())
@@ -954,8 +916,6 @@ async def init_features(
         watch_for_file_changes(event_handler, profiles_path)
 
     apply_raw_cfg()
-
-    return middlewares
 
 
 class Features(aiohttp.web.View):
