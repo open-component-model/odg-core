@@ -25,8 +25,6 @@ import odg.findings
 import paths
 import secret_mgmt
 import secret_mgmt.delivery_db
-import secret_mgmt.oauth_cfg
-import secret_mgmt.signing_cfg
 import sprints.model as sm
 import util
 import yp
@@ -220,20 +218,6 @@ class FeatureAddressbook(FeatureBase):
         )['github_instances']
 
         return github_mappings
-
-    def serialize(self, profile: Profile | None = None) -> dict[str, any]:
-        return {
-            'state': self.state,
-            'name': self.name,
-        }
-
-
-@dataclasses.dataclass(frozen=True)
-class FeatureAuthentication(FeatureBase):
-    name: str = 'authentication'
-    signing_cfgs: list[secret_mgmt.signing_cfg.SigningCfg] = dataclasses.field(default_factory=list)
-    oauth_cfgs: list[secret_mgmt.oauth_cfg.OAuthCfg] = dataclasses.field(default_factory=list)
-    oidc_cfgs: list[secret_mgmt.oauth_cfg.OidcCfg] = dataclasses.field(default_factory=list)
 
     def serialize(self, profile: Profile | None = None) -> dict[str, any]:
         return {
@@ -785,37 +769,6 @@ def deserialise_tests(tests_raw: dict) -> FeatureTests:
     )
 
 
-def deserialise_authentication(
-    secret_factory: secret_mgmt.SecretFactory,
-) -> FeatureAuthentication:
-    try:
-        signing_cfgs = secret_factory.signing_cfg()
-    except secret_mgmt.SecretTypeNotFound as e:
-        logger.warning(f'Authentication config not found: {e}')
-        return FeatureAuthentication(FeatureStates.UNAVAILABLE)
-
-    try:
-        oauth_cfgs = secret_factory.oauth_cfg()
-    except secret_mgmt.SecretTypeNotFound:
-        oauth_cfgs = []
-
-    try:
-        oidc_cfgs = secret_factory.oidc_cfg()
-    except secret_mgmt.SecretTypeNotFound:
-        oidc_cfgs = []
-
-    if not oauth_cfgs and not oidc_cfgs:
-        logger.warning('Authentication config not found: no oauth-cfg or oidc-cfg secrets present')
-        return FeatureAuthentication(FeatureStates.UNAVAILABLE)
-
-    return FeatureAuthentication(
-        state=FeatureStates.AVAILABLE,
-        signing_cfgs=signing_cfgs,
-        oauth_cfgs=oauth_cfgs,
-        oidc_cfgs=oidc_cfgs,
-    )
-
-
 def deserialise_cfg(raw: dict) -> collections.abc.Generator[FeatureBase, None, None]:
     yield deserialise_addressbook(raw.get('addressbook') or {})
 
@@ -930,21 +883,6 @@ async def init_features(
 ) -> list:
     global feature_cfgs
     feature_cfgs = []
-
-    feature_authentication = deserialise_authentication(
-        secret_factory=secret_factory,
-    )
-    if (
-        feature_authentication.state is FeatureStates.AVAILABLE
-        and not parsed_arguments.shortcut_auth
-    ):
-        middlewares.append(
-            middleware.auth.auth_middleware(
-                signing_cfgs=feature_authentication.signing_cfgs,
-                default_auth=middleware.auth.AuthType.BEARER,
-            ),
-        )
-    feature_cfgs.append(feature_authentication)
 
     cluster_access_feature = FeatureClusterAccess(FeatureStates.UNAVAILABLE)
     if not (k8s_cfg_name := parsed_arguments.k8s_cfg_name):

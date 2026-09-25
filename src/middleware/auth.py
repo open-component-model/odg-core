@@ -122,28 +122,6 @@ def token_payload_schema():
     return yaml.safe_load(open(paths.token_jsonschema_path, 'rb'))
 
 
-def _check_if_oauth_feature_available() -> 'features.FeatureAuthentication':  # noqa: F821
-    # Use this function instead of feature checking middleware to prevent
-    # circular module imports between middleware.auth.py and features.py
-    import features
-
-    feature_authentication = features.get_feature(features.FeatureAuthentication)
-
-    if feature_authentication.state == features.FeatureStates.AVAILABLE:
-        return feature_authentication
-
-    raise aiohttp.web.HTTPBadRequest(
-        reason='Feature is inactive',
-        text=util.dict_to_json_factory(
-            {
-                'error_id': 'feature-inactive',
-                'missing_features': [feature_authentication.name],
-            },
-        ),
-        content_type='application/json',
-    )
-
-
 @noauth
 class OAuthCfgs(aiohttp.web.View):
     async def get(self):
@@ -197,10 +175,15 @@ class OAuthCfgs(aiohttp.web.View):
                 'oauth_url_with_redirect': oauth_url,
             }
 
-        feature_authentication = _check_if_oauth_feature_available()
+        secret_factory = ctx_util.secret_factory()
+
+        try:
+            oauth_cfgs = secret_factory.oauth_cfg()
+        except secret_mgmt.SecretTypeNotFound:
+            oauth_cfgs = []
 
         return aiohttp.web.json_response(
-            data=[oauth_cfg_to_dict(oauth_cfg) for oauth_cfg in feature_authentication.oauth_cfgs],
+            data=[oauth_cfg_to_dict(oauth_cfg) for oauth_cfg in oauth_cfgs],
         )
 
 
@@ -702,8 +685,6 @@ class OAuthLogin(aiohttp.web.View):
           "401":
             description: The provided auth information is not valid.
         """
-        feature_authentication = _check_if_oauth_feature_available()
-
         issuer = self.request.app[consts.APP_BASE_URL]
         db_session: sqlasync.session.AsyncSession = self.request[consts.REQUEST_DB_SESSION]
 
@@ -739,9 +720,16 @@ class OAuthLogin(aiohttp.web.View):
                 },
             )
 
+        secret_factory = ctx_util.secret_factory()
+
         if idp_type is secret_mgmt.oauth_cfg.OAuthCfgTypes.GITHUB:
+            try:
+                oauth_cfgs = secret_factory.oauth_cfg()
+            except secret_mgmt.SecretTypeNotFound:
+                raise aiohttp.web.HTTPUnauthorized(text='No OAuth providers configured')
+
             oauth_cfg = find_github_oauth_cfg(
-                oauth_cfgs=feature_authentication.oauth_cfgs,
+                oauth_cfgs=oauth_cfgs,
                 api_url=api_url,
                 client_id=client_id,
             )
@@ -753,12 +741,14 @@ class OAuthLogin(aiohttp.web.View):
             )
 
         elif idp_type is secret_mgmt.oauth_cfg.OAuthCfgTypes.OIDC:
-            if not feature_authentication.oidc_cfgs:
+            try:
+                oidc_cfgs = secret_factory.oidc_cfg()
+            except secret_mgmt.SecretTypeNotFound:
                 raise aiohttp.web.HTTPUnauthorized(text='No OIDC providers configured')
 
             oidc_cfg = find_oidc_cfg(
                 token=oidc_token,
-                oidc_cfgs=feature_authentication.oidc_cfgs,
+                oidc_cfgs=oidc_cfgs,
             )
             user_identifier = await verify_oidc_token(
                 token=oidc_token,
@@ -853,8 +843,6 @@ class OAuthLogout(aiohttp.web.View):
           "200":
             description: Successfully logged out.
         """
-        _check_if_oauth_feature_available()
-
         refresh_token = self.request.cookies.get(odg_client.jwt.REFRESH_TOKEN_KEY)
 
         response = aiohttp.web.Response()
@@ -946,11 +934,15 @@ class OpenIDJwks(aiohttp.web.View):
         """
         secret_factory = self.request.app[consts.APP_SECRET_FACTORY]
 
+        try:
+            signing_cfgs = secret_factory.signing_cfg()
+        except secret_mgmt.SecretTypeNotFound as e:
+            logger.warning(f'No signing configuration found: {e}')
+            signing_cfgs = []
+
         return aiohttp.web.json_response(
             data={
-                'keys': [
-                    jwt_from_signing_cfg(signing_cfg) for signing_cfg in secret_factory.signing_cfg()
-                ],
+                'keys': [jwt_from_signing_cfg(signing_cfg) for signing_cfg in signing_cfgs],
             },
             dumps=util.dict_to_json_factory,
         )
@@ -996,7 +988,6 @@ def retrieve_role_bindings(
 
 
 def auth_middleware(
-    signing_cfgs: collections.abc.Iterable[secret_mgmt.signing_cfg.SigningCfg],
     default_auth: AuthType = AuthType.BEARER,
 ) -> aiohttp.typedefs.Middleware:
 
@@ -1033,8 +1024,10 @@ def auth_middleware(
             verify_signature=False,
         )
 
+        secret_factory = request.app[consts.APP_SECRET_FACTORY]
+
         signing_cfg = get_signing_cfg_for_key(
-            signing_cfgs=signing_cfgs,
+            secret_factory=secret_factory,
             key_id=decoded_jwt.get('key_id'),
         )
 
@@ -1046,8 +1039,6 @@ def auth_middleware(
         )
 
         validate_jwt_payload(decoded_jwt)
-
-        secret_factory = request.app[consts.APP_SECRET_FACTORY]
 
         role_bindings = retrieve_role_bindings(secret_factory)
 
@@ -1311,11 +1302,17 @@ class User(aiohttp.web.View):
 
 
 def get_signing_cfg_for_key(
-    signing_cfgs: collections.abc.Iterable[secret_mgmt.signing_cfg.SigningCfg],
+    secret_factory: secret_mgmt.SecretFactory,
     key_id: str | None,
 ) -> secret_mgmt.signing_cfg.SigningCfg:
     if not key_id:
         raise aiohttp.web.HTTPUnauthorized(text='Please specify a key_id')
+
+    try:
+        signing_cfgs = secret_factory.signing_cfg()
+    except secret_mgmt.SecretTypeNotFound as e:
+        logger.warning(f'No signing configuration found: {e}')
+        signing_cfgs = []
 
     for signing_cfg in signing_cfgs:
         if signing_cfg.id == key_id:

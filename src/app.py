@@ -388,9 +388,15 @@ async def initialise_app():
 
     secret_factory = ctx_util.secret_factory()
 
+    if parsed_arguments.shortcut_auth:
+        default_auth = middleware.auth.AuthType.NONE
+    else:
+        default_auth = middleware.auth.AuthType.BEARER
+
     middlewares = [
         middleware.cors.cors_middleware(),
         middleware.errors.errors_middleware(),
+        middleware.auth.auth_middleware(default_auth=default_auth),
     ]
 
     middlewares = await features.init_features(
