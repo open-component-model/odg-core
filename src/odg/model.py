@@ -14,6 +14,7 @@ import ocm.iter
 import typing_extensions
 
 import odg.cvss
+import util
 
 logger = logging.getLogger(__name__)
 
@@ -1113,7 +1114,11 @@ class ComplianceSnapshot:
         self,
         service: str | None = None,
     ) -> ComplianceSnapshotState | None:
-        for state in sorted(self.state, key=lambda s: s.timestamp, reverse=True):
+        for state in sorted(
+            self.state,
+            key=lambda s: util.normalise_date(s.timestamp),
+            reverse=True,
+        ):
             if service == state.service:
                 return state
         return None
@@ -1123,7 +1128,11 @@ class ComplianceSnapshot:
         service: str | None = None,
     ):
         current_state = None
-        for state in sorted(self.state, key=lambda s: s.timestamp, reverse=True):
+        for state in sorted(
+            self.state,
+            key=lambda s: util.normalise_date(s.timestamp),
+            reverse=True,
+        ):
             if service != state.service:
                 continue
 
