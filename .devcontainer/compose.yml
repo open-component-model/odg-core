@@ -20,6 +20,7 @@ services:
       DB_PASSWORD: MyPassword
       DB_NAME: postgres
       EXTENSIONS_CFG_PATH: /workspaces/odg-core/extensions_cfg.local.yaml
+      REQUESTS_CA_BUNDLE: /etc/ssl/certs/ca-certificates.crt # pick up container CA
     depends_on:
       db:
         condition: service_healthy
