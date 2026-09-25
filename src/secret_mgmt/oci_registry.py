@@ -90,14 +90,19 @@ def find_cfg(
 
 
 @functools.lru_cache
-def oci_cfg_lookup(
-    secret_factory: secret_mgmt.SecretFactory,
-) -> collections.abc.Callable[[str, oci.auth.Privileges, bool], oci.auth.OciCredentials]:
+def oci_cfg_lookup() -> collections.abc.Callable[
+    [str, oci.auth.Privileges, bool],
+    oci.auth.OciCredentials,
+]:
     def find_credentials(
         image_reference: oci.model.OciImageReference | str,
         privileges: oci.auth.Privileges = oci.auth.Privileges.READONLY,
         absent_ok: bool = True,
     ):
+        import ctx_util
+
+        secret_factory = ctx_util.secret_factory()
+
         oci_registry_cfg = find_cfg(
             secret_factory=secret_factory,
             image_reference=image_reference,

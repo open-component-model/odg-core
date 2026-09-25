@@ -16,7 +16,6 @@ import blobstore.blob
 import compliance_tests
 import components
 import consts
-import ctx_util
 import deliverydb.cache_async
 import dora
 import eol
@@ -33,7 +32,6 @@ import middleware.route_feature_check as rfc
 import osinfo
 import paths
 import rescore.artefacts
-import secret_mgmt
 import service_extensions
 import special_component
 import sprints
@@ -95,10 +93,9 @@ def get_base_url(
 
 def add_app_context_vars(
     app: aiohttp.web.Application,
-    secret_factory: secret_mgmt.SecretFactory,
     parsed_arguments,
 ) -> aiohttp.web.Application:
-    oci_client = lookups.semver_sanitising_oci_client_async(secret_factory)
+    oci_client = lookups.semver_sanitising_oci_client_async()
 
     def db_url_callback() -> str | None:
         return parsed_arguments.delivery_db_url or middleware.db_session.incluster_db_url()
@@ -109,7 +106,7 @@ def add_app_context_vars(
         oci_client=oci_client,
     )
 
-    github_api_lookup = lookups.github_api_lookup(secret_factory)
+    github_api_lookup = lookups.github_api_lookup()
     github_repo_lookup = lookups.github_repo_lookup(github_api_lookup)
 
     addressbook_feature = features.get_feature(features.FeatureAddressbook)
@@ -173,7 +170,6 @@ def add_app_context_vars(
     app[consts.APP_NAMESPACE_CALLBACK] = namespace_callback
     app[consts.APP_OCI_CLIENT] = oci_client
     app[consts.APP_PROFILES_CALLBACK] = profiles_callback
-    app[consts.APP_SECRET_FACTORY] = secret_factory
     app[consts.APP_SPECIAL_COMPONENT_CALLBACK] = special_component_callback
     app[consts.APP_SPRINTS_CONFIGURATION] = sprints_configuration
 
@@ -383,8 +379,6 @@ async def initialise_app():
     loop = asyncio.get_running_loop()
     loop.set_default_executor(executor)
 
-    secret_factory = ctx_util.secret_factory()
-
     if parsed_arguments.shortcut_auth:
         default_auth = middleware.auth.AuthType.NONE
     else:
@@ -434,7 +428,6 @@ async def initialise_app():
 
     app = add_app_context_vars(
         app=app,
-        secret_factory=secret_factory,
         parsed_arguments=parsed_arguments,
     )
 

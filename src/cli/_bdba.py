@@ -91,9 +91,7 @@ def scan(
     secret_factory = ctx_util.secret_factory()
     bdba_cfg = secret_factory.bdba(bdba_cfg_name)
 
-    oci_client = lookups.semver_sanitising_oci_client(
-        secret_factory=secret_factory,
-    )
+    oci_client = lookups.semver_sanitising_oci_client()
 
     if not bdba_api_url:
         bdba_api_url = bdba_cfg.api_url

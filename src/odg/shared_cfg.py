@@ -12,9 +12,7 @@ import cnudie.retrieve
 import oci.client
 import ocm
 
-import ctx_util
 import lookups
-import secret_mgmt
 
 
 own_dir = os.path.abspath(os.path.dirname(__file__))
@@ -71,7 +69,6 @@ class SharedCfgOCMReference(SharedCfgReference):
 
 
 def shared_cfg_lookup(
-    secret_factory: secret_mgmt.SecretFactory | None = None,
     github_repo_lookup: collections.abc.Callable[[str], github3.repos.Repository] | None = None,
     oci_client: oci.client.Client | None = None,
     component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById | None = None,
@@ -80,15 +77,12 @@ def shared_cfg_lookup(
     Creates a shared-cfg-lookup. Ideally, this lookup should be created at application launch, and
     passed to consumers.
     """
-    if not secret_factory:
-        secret_factory = ctx_util.secret_factory()
-
     if not github_repo_lookup:
-        github_api_lookup = lookups.github_api_lookup(secret_factory)
+        github_api_lookup = lookups.github_api_lookup()
         github_repo_lookup = lookups.github_repo_lookup(github_api_lookup)
 
     if not oci_client:
-        oci_client = lookups.semver_sanitising_oci_client(secret_factory)
+        oci_client = lookups.semver_sanitising_oci_client()
 
     if not component_descriptor_lookup:
         component_descriptor_lookup = lookups.init_component_descriptor_lookup()

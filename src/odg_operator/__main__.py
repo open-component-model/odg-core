@@ -26,7 +26,6 @@ import oci.client
 import ocm
 import ocm.iter
 
-import ctx_util
 import k8s.model
 import k8s.util
 import lookups
@@ -895,8 +894,7 @@ if __name__ == '__main__':
 
     logger.info(f'{odg_operator_cfg.required_extension_names=}')
 
-    secret_factory = ctx_util.secret_factory()
-    oci_client = lookups.semver_sanitising_oci_client(secret_factory)
+    oci_client = lookups.semver_sanitising_oci_client()
     component_descriptor_lookup = lookups.init_component_descriptor_lookup(
         cache_dir=parsed.ocm_cache_path,
         oci_client=oci_client,

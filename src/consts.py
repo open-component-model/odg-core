@@ -19,7 +19,6 @@ APP_KUBERNETES_API_CALLBACK = 'kubernetes_api_callback'
 APP_NAMESPACE_CALLBACK = 'namespace_callback'
 APP_OCI_CLIENT = 'oci_client'
 APP_PROFILES_CALLBACK = 'profiles_callback'
-APP_SECRET_FACTORY = 'secret_factory'
 APP_SPECIAL_COMPONENT_CALLBACK = 'special_component_callback'
 APP_SPRINTS_CONFIGURATION = 'sprints_configuration'
 

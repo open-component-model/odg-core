@@ -346,9 +346,7 @@ def main():
         ocm_repository=ocm_repo,
     )
 
-    oci_client = lookups.semver_sanitising_oci_client(
-        secret_factory=secret_factory,
-    )
+    oci_client = lookups.semver_sanitising_oci_client()
 
     size = os.path.getsize(outfile)
 

@@ -31,7 +31,6 @@ import deliverydb_cache.model as dcm
 import deliverydb_cache.util as dcu
 import odg_client
 import paths
-import secret_mgmt
 import secret_mgmt.github
 import secret_mgmt.oci_registry
 import util
@@ -398,15 +397,9 @@ def extended_ocm_repository_lookup(
 
 @functools.cache
 def semver_sanitising_oci_client(
-    secret_factory: secret_mgmt.SecretFactory = None,
     http_connection_pool_size: int = 16,
 ) -> oci.client.Client:
-    if not secret_factory:
-        secret_factory = ctx_util.secret_factory()
-
-    credentials_lookup = secret_mgmt.oci_registry.oci_cfg_lookup(
-        secret_factory=secret_factory,
-    )
+    credentials_lookup = secret_mgmt.oci_registry.oci_cfg_lookup()
 
     routes = oci.client.OciRoutes()
 
@@ -428,15 +421,9 @@ def semver_sanitising_oci_client(
 
 @functools.cache
 def semver_sanitising_oci_client_async(
-    secret_factory: secret_mgmt.SecretFactory = None,
     http_connection_pool_size: int | None = None,
 ) -> oci.client_async.Client:
-    if not secret_factory:
-        secret_factory = ctx_util.secret_factory()
-
-    credentials_lookup = secret_mgmt.oci_registry.oci_cfg_lookup(
-        secret_factory=secret_factory,
-    )
+    credentials_lookup = secret_mgmt.oci_registry.oci_cfg_lookup()
 
     routes = oci.client.OciRoutes()
 
@@ -719,15 +706,11 @@ def init_component_descriptor_lookup_async(
     )
 
 
-def github_api_lookup(
-    secret_factory: secret_mgmt.SecretFactory = None,
-) -> collections.abc.Callable[[str], github3.github.GitHub | None]:
+def github_api_lookup() -> collections.abc.Callable[[str], github3.github.GitHub | None]:
     """
     creates a github-api-lookup. ideally, this lookup should be created at application launch, and
     passed to consumers.
     """
-    if not secret_factory:
-        secret_factory = ctx_util.secret_factory()
 
     def github_api_lookup(
         repo_url: str,
@@ -741,6 +724,8 @@ def github_api_lookup(
         raises ValueError if no configuration (credentials) is found for the given repository url
         unless absent_ok is set to a truthy value, in which case None is returned instead.
         """
+        secret_factory = ctx_util.secret_factory()
+
         return secret_mgmt.github.github_api(
             secret_factory=secret_factory,
             repo_url=repo_url,

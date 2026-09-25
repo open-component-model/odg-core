@@ -206,9 +206,7 @@ def process_backlog_items(
     else:
         delivery_service_client = None
 
-    oci_client = lookups.semver_sanitising_oci_client(
-        secret_factory=secret_factory,
-    )
+    oci_client = lookups.semver_sanitising_oci_client()
 
     component_descriptor_lookup = lookups.init_component_descriptor_lookup(
         cache_dir=parsed_arguments.cache_dir,
@@ -255,6 +253,8 @@ def process_backlog_items(
         backlog_item = k8s.backlog.BacklogItem.from_dict(
             backlog_item=backlog_crd['spec'],
         )
+
+        secret_factory = ctx_util.secret_factory()
 
         callback(
             artefact=backlog_item.artefact,

@@ -932,7 +932,7 @@ class OpenIDJwks(aiohttp.web.View):
                       items:
                         type: object
         """
-        secret_factory = self.request.app[consts.APP_SECRET_FACTORY]
+        secret_factory = ctx_util.secret_factory()
 
         try:
             signing_cfgs = secret_factory.signing_cfg()
@@ -1024,7 +1024,7 @@ def auth_middleware(
             verify_signature=False,
         )
 
-        secret_factory = request.app[consts.APP_SECRET_FACTORY]
+        secret_factory = ctx_util.secret_factory()
 
         signing_cfg = get_signing_cfg_for_key(
             secret_factory=secret_factory,
@@ -1167,7 +1167,7 @@ class Rbac(aiohttp.web.View):
                             items:
                               type: string
         """
-        secret_factory = self.request.app[consts.APP_SECRET_FACTORY]
+        secret_factory = ctx_util.secret_factory()
 
         role_bindings = retrieve_role_bindings(secret_factory)
 
@@ -1261,7 +1261,7 @@ class User(aiohttp.web.View):
                             items:
                               type: string
         """
-        secret_factory = self.request.app[consts.APP_SECRET_FACTORY]
+        secret_factory = ctx_util.secret_factory()
         db_session: sqlasync.session.AsyncSession = self.request[consts.REQUEST_DB_SESSION]
         user_id = self.request[consts.REQUEST_USER_ID]
         user_role_names = self.request[consts.REQUEST_USER_ROLES]
