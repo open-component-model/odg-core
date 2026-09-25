@@ -390,12 +390,13 @@ async def initialise_app():
     else:
         default_auth = middleware.auth.AuthType.BEARER
 
-    middlewares = [
+    middlewares = (
         middleware.cors.cors_middleware(),
         middleware.errors.errors_middleware(),
         middleware.auth.auth_middleware(default_auth=default_auth),
         middleware.db_session.db_session_middleware(db_url=parsed_arguments.delivery_db_url),
-    ]
+        rfc.feature_check_middleware(),
+    )
 
     await features.init_features(parsed_arguments)
 
@@ -414,7 +415,6 @@ async def initialise_app():
             f'The following feature{"s are" if len(unavailable_features) != 1 else " is"} '
             f'inactive: {", ".join(sorted(f.name for f in unavailable_features))}',
         )
-        middlewares.append(rfc.feature_check_middleware(unavailable_features))
 
     app = aiohttp.web.Application(
         middlewares=middlewares,
