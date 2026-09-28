@@ -31,19 +31,6 @@ def _iter_rescorings_for_finding(
             continue
 
         if (
-            rescoring.artefact.artefact_kind
-            and rescoring.artefact.artefact_kind != finding.artefact.artefact_kind
-        ):
-            continue
-
-        if (
-            rescoring.artefact.artefact
-            and rescoring.artefact.artefact.artefact_type
-            and rescoring.artefact.artefact.artefact_type != finding.artefact.artefact.artefact_type
-        ):
-            continue
-
-        if (
             rescoring.artefact.component_name
             and rescoring.artefact.component_name != finding.artefact.component_name
         ):
