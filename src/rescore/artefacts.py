@@ -746,7 +746,6 @@ class Rescore(aiohttp.web.View):
         body = await self.request.json()
         rescorings_raw: list[dict] = body.get('entries', [])
 
-        extensions_cfg = self.request.app[consts.APP_EXTENSIONS_CFG]
         user_id = self.request[consts.REQUEST_USER_ID]
         db_session: sqlasync.session.AsyncSession = self.request[consts.REQUEST_DB_SESSION]
 
@@ -815,17 +814,24 @@ class Rescore(aiohttp.web.View):
             await db_session.rollback()
             raise
 
+        extensions_cfg = features.get_feature(features.FeatureExtensionsConfiguration).extensions_cfg
+        finding_cfgs = features.get_feature(features.FeatureFindingConfigurations).finding_cfgs
+        namespace = self.request.app[consts.APP_NAMESPACE]
+        kubernetes_api = self.request.app[consts.APP_KUBERNETES_API]
+
         if (
             extensions_cfg
             and extensions_cfg.issue_replicator
             and extensions_cfg.issue_replicator.enabled
+            and namespace
+            and kubernetes_api
         ):
             asyncio.create_task(
                 create_backlog_items_for_rescored_artefacts(
-                    namespace=self.request.app[consts.APP_NAMESPACE_CALLBACK](),
-                    kubernetes_api=self.request.app[consts.APP_KUBERNETES_API_CALLBACK](),
+                    namespace=namespace,
+                    kubernetes_api=kubernetes_api,
                     rescorings=rescorings,
-                    finding_cfgs=self.request.app[consts.APP_FINDING_CFGS],
+                    finding_cfgs=finding_cfgs,
                 ),
             )
 
@@ -910,7 +916,7 @@ class Rescore(aiohttp.web.View):
         if component_version == 'greatest':
             component_version = None
 
-        finding_cfgs = self.request.app[consts.APP_FINDING_CFGS]
+        finding_cfgs = features.get_feature(features.FeatureFindingConfigurations).finding_cfgs
         for finding_type in type_filter:
             for finding_cfg in finding_cfgs:
                 if odg.model.Datatype(finding_type) is finding_cfg.type:
@@ -969,6 +975,14 @@ class Rescore(aiohttp.web.View):
             artefact=artefact,
         )
 
+        sprints_feature = features.get_feature(features.FeatureSprints)
+        if sprints_feature.state is features.FeatureStates.AVAILABLE:
+            sprints_feature: features.FeatureSprints
+
+            sprints_configuration = sprints_feature.get_sprints_configuration()
+        else:
+            sprints_configuration = None
+
         rescoring_proposals = [
             rescoring_proposal
             async for rescoring_proposal in _iter_rescoring_proposals(
@@ -977,7 +991,7 @@ class Rescore(aiohttp.web.View):
                 scanner_writebacks=scanner_writebacks,
                 finding_cfgs=finding_cfgs,
                 cve_categorisation=cve_categorisation,
-                sprints_configuration=self.request.app[consts.APP_SPRINTS_CONFIGURATION],
+                sprints_configuration=sprints_configuration,
             )
         ]
 

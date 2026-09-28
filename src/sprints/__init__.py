@@ -3,7 +3,7 @@ import datetime
 import aiohttp.web
 import dateutil.parser
 
-import consts
+import features
 import sprints.util as su
 import util as utility
 
@@ -29,11 +29,17 @@ class SprintInfos(aiohttp.web.View):
                       items:
                         $ref: '#/components/schemas/Sprint'
         """
-        sprints_configuration = self.request.app[consts.APP_SPRINTS_CONFIGURATION]
+        sprints_feature = features.get_feature(features.FeatureSprints)
+        if sprints_feature.state is features.FeatureStates.AVAILABLE:
+            sprints_feature: features.FeatureSprints
+
+            sprints = sprints_feature.get_sprints_configuration().sprints
+        else:
+            sprints = []
 
         return aiohttp.web.json_response(
             data={
-                'sprints': sprints_configuration.sprints if sprints_configuration else [],
+                'sprints': sprints,
             },
             dumps=utility.dict_to_json_factory,
         )
@@ -91,11 +97,17 @@ class SprintInfosCurrent(aiohttp.web.View):
         else:
             ref_date = datetime.date.today()
 
-        sprints_configuration = self.request.app[consts.APP_SPRINTS_CONFIGURATION]
+        sprints_feature = features.get_feature(features.FeatureSprints)
+        if sprints_feature.state is features.FeatureStates.AVAILABLE:
+            sprints_feature: features.FeatureSprints
+
+            sprints = sprints_feature.get_sprints_configuration().sprints
+        else:
+            sprints = []
 
         current_sprint = su.find_sprint_for_ref_date(
             ref_date=ref_date,
-            sprints=sprints_configuration.sprints if sprints_configuration else None,
+            sprints=sprints,
             sprint_assignment_offset=offset,
         )
 

@@ -60,10 +60,11 @@ class DownloadTestResults(aiohttp.web.View):
         zip_buffer = io.BytesIO()
         zipf = zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED)
 
-        component_with_tests_callback = self.request.app[consts.APP_COMPONENT_WITH_TESTS_CALLBACK]
-        component_with_tests = component_with_tests_callback(component_name)
-
-        if not component_with_tests:
+        if not (
+            component_with_tests := features.get_feature(
+                features.FeatureTests,
+            ).get_component_with_tests(component_name)
+        ):
             raise aiohttp.web.HTTPBadRequest
 
         for asset in assets:

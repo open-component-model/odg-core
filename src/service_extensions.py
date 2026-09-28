@@ -65,19 +65,21 @@ class ContainerStatuses(aiohttp.web.View):
         """
         params = self.request.rel_url.query
 
-        extensions_cfg = self.request.app[consts.APP_EXTENSIONS_CFG]
+        extensions_cfg = features.get_feature(features.FeatureExtensionsConfiguration).extensions_cfg
 
         service_filter = params.getall(
             key='service',
-            default=list(extensions_cfg.enabled_extensions(convert_to_camel_case=True)),
+            default=list(extensions_cfg.enabled_extensions(convert_to_camel_case=True))
+            if extensions_cfg
+            else [],
         )
 
         return aiohttp.web.json_response(
             data=tuple(
                 iter_container_statuses(
                     service_filter=service_filter,
-                    namespace=self.request.app[consts.APP_NAMESPACE_CALLBACK](),
-                    kubernetes_api=self.request.app[consts.APP_KUBERNETES_API_CALLBACK](),
+                    namespace=self.request.app[consts.APP_NAMESPACE],
+                    kubernetes_api=self.request.app[consts.APP_KUBERNETES_API],
                 ),
             ),
             dumps=util.dict_to_json_factory,
@@ -147,11 +149,13 @@ class LogCollections(aiohttp.web.View):
         """
         params = self.request.rel_url.query
 
-        extensions_cfg = self.request.app[consts.APP_EXTENSIONS_CFG]
+        extensions_cfg = features.get_feature(features.FeatureExtensionsConfiguration).extensions_cfg
 
         service_filter = params.getall(
             key='service',
-            default=list(extensions_cfg.enabled_extensions(convert_to_camel_case=True)),
+            default=list(extensions_cfg.enabled_extensions(convert_to_camel_case=True))
+            if extensions_cfg
+            else [],
         )
 
         log_level = util.param(params, 'log_level', required=True)
@@ -162,8 +166,8 @@ class LogCollections(aiohttp.web.View):
                 iter_log_collections(
                     service_filter=service_filter,
                     log_level=log_level,
-                    namespace=self.request.app[consts.APP_NAMESPACE_CALLBACK](),
-                    kubernetes_api=self.request.app[consts.APP_KUBERNETES_API_CALLBACK](),
+                    namespace=self.request.app[consts.APP_NAMESPACE],
+                    kubernetes_api=self.request.app[consts.APP_KUBERNETES_API],
                 ),
             ),
         )
@@ -185,10 +189,12 @@ class ServiceExtensions(aiohttp.web.View):
                   items:
                     type: string
         """
-        extensions_cfg = self.request.app[consts.APP_EXTENSIONS_CFG]
+        extensions_cfg = features.get_feature(features.FeatureExtensionsConfiguration).extensions_cfg
 
         return aiohttp.web.json_response(
-            data=list(extensions_cfg.enabled_extensions(convert_to_camel_case=True)),
+            data=list(extensions_cfg.enabled_extensions(convert_to_camel_case=True))
+            if extensions_cfg
+            else [],
         )
 
 
@@ -258,8 +264,8 @@ class BacklogItems(aiohttp.web.View):
             data=tuple(
                 iter_backlog_items(
                     service=service,
-                    namespace=self.request.app[consts.APP_NAMESPACE_CALLBACK](),
-                    kubernetes_api=self.request.app[consts.APP_KUBERNETES_API_CALLBACK](),
+                    namespace=self.request.app[consts.APP_NAMESPACE],
+                    kubernetes_api=self.request.app[consts.APP_KUBERNETES_API],
                 ),
             ),
         )
@@ -302,8 +308,8 @@ class BacklogItems(aiohttp.web.View):
 
         k8s.backlog.update_backlog_crd(
             name=name,
-            namespace=self.request.app[consts.APP_NAMESPACE_CALLBACK](),
-            kubernetes_api=self.request.app[consts.APP_KUBERNETES_API_CALLBACK](),
+            namespace=self.request.app[consts.APP_NAMESPACE],
+            kubernetes_api=self.request.app[consts.APP_KUBERNETES_API],
             backlog_item=backlog_item,
         )
 
@@ -374,8 +380,8 @@ class BacklogItems(aiohttp.web.View):
 
             k8s.backlog.create_backlog_item(
                 service=service,
-                namespace=self.request.app[consts.APP_NAMESPACE_CALLBACK](),
-                kubernetes_api=self.request.app[consts.APP_KUBERNETES_API_CALLBACK](),
+                namespace=self.request.app[consts.APP_NAMESPACE],
+                kubernetes_api=self.request.app[consts.APP_KUBERNETES_API],
                 artefact=artefact,
                 priority=priority,
             )
@@ -409,8 +415,8 @@ class BacklogItems(aiohttp.web.View):
             k8s.util.delete_custom_resource(
                 crd=k8s.model.BacklogItemCrd,
                 name=name,
-                namespace=self.request.app[consts.APP_NAMESPACE_CALLBACK](),
-                kubernetes_api=self.request.app[consts.APP_KUBERNETES_API_CALLBACK](),
+                namespace=self.request.app[consts.APP_NAMESPACE],
+                kubernetes_api=self.request.app[consts.APP_KUBERNETES_API],
             )
 
         return aiohttp.web.Response(
@@ -485,8 +491,8 @@ class RuntimeArtefacts(aiohttp.web.View):
         return aiohttp.web.json_response(
             data=tuple(
                 iter_runtime_artefacts(
-                    namespace=self.request.app[consts.APP_NAMESPACE_CALLBACK](),
-                    kubernetes_api=self.request.app[consts.APP_KUBERNETES_API_CALLBACK](),
+                    namespace=self.request.app[consts.APP_NAMESPACE],
+                    kubernetes_api=self.request.app[consts.APP_KUBERNETES_API],
                     labels=labels,
                 ),
             ),
@@ -538,8 +544,8 @@ class RuntimeArtefacts(aiohttp.web.View):
             )
 
             k8s.runtime_artefacts.create_unique_runtime_artefact(
-                namespace=self.request.app[consts.APP_NAMESPACE_CALLBACK](),
-                kubernetes_api=self.request.app[consts.APP_KUBERNETES_API_CALLBACK](),
+                namespace=self.request.app[consts.APP_NAMESPACE],
+                kubernetes_api=self.request.app[consts.APP_KUBERNETES_API],
                 artefact=runtime_artefact,
                 labels=labels,
             )
@@ -574,8 +580,8 @@ class RuntimeArtefacts(aiohttp.web.View):
             k8s.util.delete_custom_resource(
                 crd=k8s.model.RuntimeArtefactCrd,
                 name=name,
-                namespace=self.request.app[consts.APP_NAMESPACE_CALLBACK](),
-                kubernetes_api=self.request.app[consts.APP_KUBERNETES_API_CALLBACK](),
+                namespace=self.request.app[consts.APP_NAMESPACE],
+                kubernetes_api=self.request.app[consts.APP_KUBERNETES_API],
             )
 
         return aiohttp.web.Response(

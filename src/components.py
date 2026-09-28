@@ -474,11 +474,23 @@ class ComponentResponsibles(aiohttp.web.View):
                 status=http.HTTPStatus.ACCEPTED,
             )
 
+        addressbook_feature = features.get_feature(features.FeatureAddressbook)
+        if addressbook_feature.state is features.FeatureStates.AVAILABLE:
+            addressbook_feature: features.FeatureAddressbook
+
+            addressbook_entries = addressbook_feature.get_addressbook_entries()
+            addressbook_github_mappings = addressbook_feature.get_github_mappings()
+            addressbook_source = addressbook_feature.get_source()
+        else:
+            addressbook_entries = []
+            addressbook_github_mappings = []
+            addressbook_source = None
+
         user_identities = [
             yp.inject(
-                addressbook_source=self.request.app[consts.APP_ADDRESSBOOK_SOURCE],
-                addressbook_entries=self.request.app[consts.APP_ADDRESSBOOK_ENTRIES],
-                addressbook_github_mappings=self.request.app[consts.APP_ADDRESSBOOK_GITHUB_MAPPINGS],
+                addressbook_source=addressbook_source,
+                addressbook_entries=addressbook_entries,
+                addressbook_github_mappings=addressbook_github_mappings,
                 user_id=user_id,
             ).identifiers
             for user_id in user_identities
@@ -1161,10 +1173,11 @@ class ComplianceSummary(aiohttp.web.View):
             component_node.component_id async for component_node in components_dependencies
         ]
 
-        finding_cfgs = self.request.app[consts.APP_FINDING_CFGS]
+        finding_cfgs = features.get_feature(features.FeatureFindingConfigurations).finding_cfgs
 
-        profiles_callback = self.request.app[consts.APP_PROFILES_CALLBACK]
-        if profile := profiles_callback(util.param(params, 'profile')):
+        if profile := features.get_feature(features.FeatureProfiles).find_profile(
+            util.param(params, 'profile'),
+        ):
             finding_cfgs = profile.filter_finding_cfgs(finding_cfgs)
 
         shortcut_cache = deliverydb.cache_async.parse_shortcut_cache(self.request)

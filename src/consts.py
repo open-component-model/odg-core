@@ -4,23 +4,14 @@ are dict-like objects, so the constants can be used to retrieve the desired vari
 globally available.
 """
 
-APP_ADDRESSBOOK_ENTRIES = 'addressbook_entries'
-APP_ADDRESSBOOK_GITHUB_MAPPINGS = 'addressbook_github_mappings'
-APP_ADDRESSBOOK_SOURCE = 'addressbook_source'
 APP_BASE_URL = 'base_url'
 APP_COMPONENT_DESCRIPTOR_LOOKUP = 'component_descriptor_lookup'
-APP_COMPONENT_WITH_TESTS_CALLBACK = 'component_with_tests_callback'
 APP_EOL_CLIENT = 'eol_client'
-APP_EXTENSIONS_CFG = 'extensions_cfg'
-APP_FINDING_CFGS = 'finding_cfgs'
 APP_GITHUB_API_LOOKUP = 'github_api_lookup'
 APP_GITHUB_REPO_LOOKUP = 'github_repo_lookup'
-APP_KUBERNETES_API_CALLBACK = 'kubernetes_api_callback'
-APP_NAMESPACE_CALLBACK = 'namespace_callback'
+APP_KUBERNETES_API = 'kubernetes_api'
+APP_NAMESPACE = 'namespace'
 APP_OCI_CLIENT = 'oci_client'
-APP_PROFILES_CALLBACK = 'profiles_callback'
-APP_SPECIAL_COMPONENT_CALLBACK = 'special_component_callback'
-APP_SPRINTS_CONFIGURATION = 'sprints_configuration'
 
 # `db_session` is intended to be used for tasks which have to be finished in a timely manner
 REQUEST_DB_SESSION = 'db_session'

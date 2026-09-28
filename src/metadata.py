@@ -743,7 +743,7 @@ class ArtefactMetadataQueryBySearchExpression(aiohttp.web.View):
         """
         body = await self.request.json()
         db_session: sqlasync.session.AsyncSession = self.request[consts.REQUEST_DB_SESSION]
-        finding_cfgs = self.request.app[consts.APP_FINDING_CFGS]
+        finding_cfgs = features.get_feature(features.FeatureFindingConfigurations).finding_cfgs
 
         req = sm.SearchRequest.from_dict(body)
 
@@ -1104,7 +1104,7 @@ class ArtefactMetadataQuery(aiohttp.web.View):
         db_session: sqlasync.session.AsyncSession = self.request[consts.REQUEST_DB_SESSION]
         db_stream = await db_session.stream(db_statement)
 
-        finding_cfgs = self.request.app[consts.APP_FINDING_CFGS]
+        finding_cfgs = features.get_feature(features.FeatureFindingConfigurations).finding_cfgs
 
         artefact_metadata = []
         async for partition in db_stream.partitions(size=50):
@@ -1215,7 +1215,7 @@ class ArtefactMetadata(aiohttp.web.View):
 
         created_artefacts: list[dm.ArtefactMetaData] = []
 
-        finding_cfgs = self.request.app[consts.APP_FINDING_CFGS]
+        finding_cfgs = features.get_feature(features.FeatureFindingConfigurations).finding_cfgs
 
         def find_entry_and_discovery_date(
             existing_entry: dm.ArtefactMetaData,

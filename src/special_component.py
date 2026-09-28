@@ -1,6 +1,5 @@
 import aiohttp.web
 
-import consts
 import features
 import util
 
@@ -31,9 +30,11 @@ class CurrentDependencies(aiohttp.web.View):
 
         id = util.param(params, 'id', required=True)
 
-        component_cfg = self.request.app[consts.APP_SPECIAL_COMPONENT_CALLBACK](id)
-
-        if not component_cfg:
+        if not (
+            component_cfg := features.get_feature(
+                features.FeatureSpecialComponents,
+            ).find_special_component(id)
+        ):
             return aiohttp.web.json_response(
                 data={},
             )

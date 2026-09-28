@@ -109,69 +109,31 @@ def add_app_context_vars(
     github_api_lookup = lookups.github_api_lookup()
     github_repo_lookup = lookups.github_repo_lookup(github_api_lookup)
 
-    addressbook_feature = features.get_feature(features.FeatureAddressbook)
-    if addressbook_feature.state is features.FeatureStates.AVAILABLE:
-        addressbook_feature: features.FeatureAddressbook
-
-        addressbook_entries = addressbook_feature.get_addressbook_entries()
-        addressbook_github_mappings = addressbook_feature.get_github_mappings()
-        addressbook_source = addressbook_feature.get_source()
-    else:
-        addressbook_entries = []
-        addressbook_github_mappings = []
-        addressbook_source = None
-
-    component_with_tests_callback = features.get_feature(
-        features.FeatureTests,
-    ).get_component_with_tests
-
-    extensions_cfg = features.get_feature(features.FeatureExtensionsConfiguration).extensions_cfg
-    finding_cfgs = features.get_feature(features.FeatureFindingConfigurations).finding_cfgs
-
     cluster_access_feature = features.get_feature(features.FeatureClusterAccess)
     if cluster_access_feature.state is features.FeatureStates.AVAILABLE:
-        kubernetes_api_callback = cluster_access_feature.get_kubernetes_api
+        cluster_access_feature: features.FeatureClusterAccess
+
+        kubernetes_api = cluster_access_feature.get_kubernetes_api()
+        namespace = cluster_access_feature.get_namespace()
     else:
-        kubernetes_api_callback = None
-
-    namespace_callback = cluster_access_feature.get_namespace
-
-    profiles_callback = features.get_feature(features.FeatureProfiles).find_profile
-
-    special_component_callback = features.get_feature(
-        features.FeatureSpecialComponents,
-    ).find_special_component
-
-    sprints_feature = features.get_feature(features.FeatureSprints)
-    if sprints_feature.state is features.FeatureStates.AVAILABLE:
-        sprints_configuration = sprints_feature.get_sprints_configuration()
-    else:
-        sprints_configuration = None
+        kubernetes_api = None
+        namespace = None
 
     base_url = get_base_url(
         is_productive=parsed_arguments.productive,
-        kubernetes_api=kubernetes_api_callback() if kubernetes_api_callback else None,
-        namespace=namespace_callback(),
+        kubernetes_api=kubernetes_api,
+        namespace=namespace,
         port=parsed_arguments.port,
     )
 
-    app[consts.APP_ADDRESSBOOK_ENTRIES] = addressbook_entries
-    app[consts.APP_ADDRESSBOOK_GITHUB_MAPPINGS] = addressbook_github_mappings
-    app[consts.APP_ADDRESSBOOK_SOURCE] = addressbook_source
     app[consts.APP_BASE_URL] = base_url
     app[consts.APP_COMPONENT_DESCRIPTOR_LOOKUP] = component_descriptor_lookup
-    app[consts.APP_COMPONENT_WITH_TESTS_CALLBACK] = component_with_tests_callback
     app[consts.APP_EOL_CLIENT] = eol.EolClient()
-    app[consts.APP_EXTENSIONS_CFG] = extensions_cfg
-    app[consts.APP_FINDING_CFGS] = finding_cfgs
     app[consts.APP_GITHUB_API_LOOKUP] = github_api_lookup
     app[consts.APP_GITHUB_REPO_LOOKUP] = github_repo_lookup
-    app[consts.APP_KUBERNETES_API_CALLBACK] = kubernetes_api_callback
-    app[consts.APP_NAMESPACE_CALLBACK] = namespace_callback
+    app[consts.APP_KUBERNETES_API] = kubernetes_api
+    app[consts.APP_NAMESPACE] = namespace
     app[consts.APP_OCI_CLIENT] = oci_client
-    app[consts.APP_PROFILES_CALLBACK] = profiles_callback
-    app[consts.APP_SPECIAL_COMPONENT_CALLBACK] = special_component_callback
-    app[consts.APP_SPRINTS_CONFIGURATION] = sprints_configuration
 
     return app
 

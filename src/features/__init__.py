@@ -10,11 +10,11 @@ import watchdog.events
 import watchdog.observers.polling
 
 import aiohttp.web
+import cachetools
 import dacite
 import github3.repos
 import yaml
 
-import consts
 import ctx_util
 import k8s.util
 import lookups
@@ -195,6 +195,7 @@ class FeatureAddressbook(FeatureBase):
 
         return yaml.safe_load(content)
 
+    @cachetools.cached(cachetools.TTLCache(maxsize=64, ttl=60 * 60 * 12))
     def get_addressbook_entries(self) -> list[yp.AddressbookEntry]:
         entries_raw = self._get_content(
             relpath=self.addressbook_relpath,
@@ -209,6 +210,7 @@ class FeatureAddressbook(FeatureBase):
             if entry_raw.get('github')
         ]
 
+    @cachetools.cached(cachetools.TTLCache(maxsize=64, ttl=60 * 60 * 12))
     def get_github_mappings(self) -> list[dict]:
         github_mappings = self._get_content(
             relpath=self.github_mappings_relpath,
@@ -549,7 +551,7 @@ class FeatureSprints(FeatureBase):
     name: str = 'sprints'
     sprints_relpath: str | None = None
     github_repo: github3.repos.Repository | None = None
-    sprints_cfg: SprintsConfiguration | None = None
+    sprints_cfg: SprintsConfiguration | None = dataclasses.field(default=None, hash=False)
 
     def _get_content(self, relpath: str) -> dict:
         if self.github_repo:
@@ -587,6 +589,7 @@ class FeatureSprints(FeatureBase):
             relpath=self.sprints_relpath,
         )['sprints']
 
+    @cachetools.cached(cachetools.TTLCache(maxsize=64, ttl=60 * 60 * 12))
     def get_sprints_configuration(self) -> sm.SprintsConfiguration:
         return sm.SprintsConfiguration(
             meta=self._get_sprints_metadata(),
@@ -959,8 +962,7 @@ class Features(aiohttp.web.View):
         """
         params = self.request.rel_url.query
 
-        profiles_callback = self.request.app[consts.APP_PROFILES_CALLBACK]
-        profile = profiles_callback(util.param(params, 'profile'))
+        profile = get_feature(FeatureProfiles).find_profile(util.param(params, 'profile'))
 
         self.feature_cfgs = list(f.serialize(profile) for f in feature_cfgs)
 
