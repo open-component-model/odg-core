@@ -7,6 +7,7 @@ import tarfile
 import tempfile
 
 import ocm_util
+import odg.extensions_cfg
 import scanner_utils.scanner
 import secret_mgmt.oci_registry
 
@@ -15,6 +16,16 @@ logger = logging.getLogger(__name__)
 
 @dataclasses.dataclass
 class TrivyScanner(scanner_utils.scanner.Scanner):
+    def get_aws_secret_name(
+        self,
+        extension_cfg: odg.extensions_cfg.TrivyConfig,
+        component_name: str,
+    ) -> str | None:
+        try:
+            return extension_cfg.mapping(component_name).aws_secret_name
+        except ValueError:
+            return None
+
     def scan_oci_image(self, image_reference: str, secret_factory=None) -> dict:
         logger.debug(f'Preparing OCI image scan {image_reference!r}')
         extra_args = []

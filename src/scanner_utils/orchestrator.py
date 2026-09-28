@@ -155,6 +155,7 @@ def run_scan(
             resource_node=resource_node,
             oci_client=oci_client,
             secret_factory=secret_factory,
+            aws_secret_name=scanner.get_aws_secret_name(extension_cfg, artefact.component_name),
         )
 
     findings = list(

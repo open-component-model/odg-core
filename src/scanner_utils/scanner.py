@@ -57,6 +57,9 @@ class Scanner(abc.ABC):
     input can override the `*_stream` hooks directly to avoid writing to disk.
     """
 
+    def get_aws_secret_name(self, extension_cfg, component_name: str) -> str | None:
+        return None
+
     def decide_route(
         self,
         evidence: scanner_utils.model.RouteEvidence,

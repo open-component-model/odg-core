@@ -361,16 +361,33 @@ class BDBAConfig(BacklogItemMixins):
         return is_supported
 
 
+@dataclasses.dataclass
+class TrivyMapping(Mapping):
+    """
+    :param str aws_secret_name:
+        Name of the AWS secret element to use to retrieve artefacts from S3.
+    """
+
+    aws_secret_name: str | None = None
+
+
 @dataclasses.dataclass(kw_only=True)
 class TrivyConfig(BacklogItemMixins):
     service: Services = Services.TRIVY
     delivery_service_url: str
-    mappings: list[Mapping] = dataclasses.field(default_factory=list)
+    mappings: list[TrivyMapping] = dataclasses.field(default_factory=list)
     interval: int = 60 * 60 * 24  # 24h
     on_unsupported: WarningVerbosities = WarningVerbosities.WARNING
     scan_target: scanner_utils.model.ScanningMode = (
         scanner_utils.model.ScanningMode.SBOM_WITH_BINARY_FALLBACK
     )
+
+    def mapping(self, name: str, /) -> TrivyMapping:
+        for mapping in self.mappings:
+            if name.startswith(mapping.prefix):
+                return mapping
+
+        raise ValueError(f'No matching mapping entry found for {name=}')
 
     def is_supported(
         self,
@@ -383,6 +400,8 @@ class TrivyConfig(BacklogItemMixins):
             ocm.AccessType.LOCAL_BLOB,
             ocm.AccessType.OCI_BLOB,
             ocm.AccessType.OCI_REGISTRY,
+            ocm.AccessType.S3,
+            ocm.AccessType.S3_V2,
         )
         supported_artefact_types = (
             ocm.ArtefactType.BLOB,
