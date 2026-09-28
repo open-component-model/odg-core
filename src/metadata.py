@@ -1001,15 +1001,6 @@ class ArtefactMetadataQuery(aiohttp.web.View):
             ):
                 yield query
 
-            if artefact_ref.artefact_kind:
-                yield sa.or_(
-                    sa.and_(
-                        none_ok,
-                        dm.ArtefactMetaData.artefact_kind.is_(None),
-                    ),
-                    dm.ArtefactMetaData.artefact_kind == artefact_ref.artefact_kind,
-                )
-
             if not artefact_ref.artefact:
                 return
 
@@ -1029,15 +1020,6 @@ class ArtefactMetadataQuery(aiohttp.web.View):
                         dm.ArtefactMetaData.artefact_version.is_(None),
                     ),
                     dm.ArtefactMetaData.artefact_version == artefact_version,
-                )
-
-            if artefact_type := artefact_ref.artefact.artefact_type:
-                yield sa.or_(
-                    sa.and_(
-                        none_ok,
-                        dm.ArtefactMetaData.artefact_type.is_(None),
-                    ),
-                    dm.ArtefactMetaData.artefact_type == artefact_type,
                 )
 
             if artefact_extra_id := artefact_ref.artefact.normalised_artefact_extra_id:
