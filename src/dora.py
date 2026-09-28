@@ -27,6 +27,7 @@ import version as versionutil
 import caching
 import components
 import consts
+import lookups
 import util
 
 logger = logging.getLogger(__name__)
@@ -138,6 +139,7 @@ async def versions_descriptors_newer_than(
     component_name: str,
     date: datetime.datetime,
     component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById,
+    ocm_repository_lookup: ocm.OcmRepositoryLookup,
     sorting_direction: typing.Literal['asc', 'desc'] = 'desc',
     db_session: sqlasync.session.AsyncSession = None,
 ) -> list[ocm.ComponentDescriptor]:
@@ -166,7 +168,10 @@ async def versions_descriptors_newer_than(
     descriptors: list[ocm.ComponentDescriptor] = []
 
     for version in versions:
-        descriptor = await component_descriptor_lookup((component_name, version))
+        descriptor = await component_descriptor_lookup(
+            (component_name, version),
+            ocm_repository_lookup=ocm_repository_lookup,
+        )
         try:
             if not _filter_component_newer_than_date(descriptor, date):
                 break
@@ -224,6 +229,7 @@ async def all_versions_sorted(
 async def get_next_older_descriptor(
     component_id: ocm.ComponentIdentity,
     component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById,
+    ocm_repository_lookup: ocm.OcmRepositoryLookup,
     db_session: sqlasync.session.AsyncSession = None,
 ) -> ocm.ComponentDescriptor | None:
     all_versions = await all_versions_sorted(
@@ -242,6 +248,7 @@ async def get_next_older_descriptor(
             name=component_id.name,
             version=old_target_version,
         ),
+        ocm_repository_lookup=ocm_repository_lookup,
     )
 
 
@@ -770,6 +777,7 @@ class DoraMetrics(aiohttp.web.View):
         filter_component_names = params.getall('filter_component_names', default=[])
 
         component_descriptor_lookup = self.request.app[consts.APP_COMPONENT_DESCRIPTOR_LOOKUP]
+        ocm_repository_lookup = lookups.init_ocm_repository_lookup()
         db_session = self.request.get(consts.REQUEST_DB_SESSION)
 
         await components.check_if_component_exists(
@@ -788,6 +796,7 @@ class DoraMetrics(aiohttp.web.View):
             component_name=target_component_name,
             date=datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=time_span_days),
             component_descriptor_lookup=component_descriptor_lookup,
+            ocm_repository_lookup=ocm_repository_lookup,
             sorting_direction='asc',
             db_session=db_session,
         )
@@ -802,6 +811,7 @@ class DoraMetrics(aiohttp.web.View):
                 target_descriptors_in_time_span[0].component.version,
             ),
             component_descriptor_lookup=component_descriptor_lookup,
+            ocm_repository_lookup=ocm_repository_lookup,
             db_session=db_session,
         ):
             target_descriptors_in_time_span.insert(0, next_older_descriptor)
@@ -815,6 +825,7 @@ class DoraMetrics(aiohttp.web.View):
                     end=target_descriptors_in_time_span[index].component,
                 ),
                 component_descriptor_lookup=component_descriptor_lookup,
+                ocm_repository_lookup=ocm_repository_lookup,
             )
 
             if component_diff:
@@ -881,6 +892,7 @@ def _cache_key_diff_components(
 async def _diff_components(
     component_vector: components.ComponentVector,
     component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById,
+    ocm_repository_lookup: ocm.OcmRepositoryLookup,
 ) -> cnudie.util.ComponentDiff | None:
     """
     calculates component-diff between components from passed-in component-vector
@@ -895,6 +907,7 @@ async def _diff_components(
             component=component_vector.start,
             lookup=component_descriptor_lookup,
             node_filter=ocm.iter.Filter.components,
+            ocm_repo=ocm_repository_lookup,
         )
     ]
 
@@ -904,6 +917,7 @@ async def _diff_components(
             component=component_vector.end,
             lookup=component_descriptor_lookup,
             node_filter=ocm.iter.Filter.components,
+            ocm_repo=ocm_repository_lookup,
         )
     ]
 

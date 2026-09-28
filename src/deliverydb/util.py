@@ -133,6 +133,7 @@ class ArtefactMetadataQueries:
         artefacts: collections.abc.Iterable[ocm.Resource | ocm.Source] = None,
         component: ocm.Component | ocm.ComponentIdentity = None,
         component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById = None,
+        ocm_repository_lookup: ocm.OcmRepositoryLookup | None = None,
         none_ok: bool = False,
     ) -> collections.abc.AsyncGenerator[sqle.BooleanClauseList, None, None]:
         """
@@ -153,7 +154,10 @@ class ArtefactMetadataQueries:
             if component.version:
                 if isinstance(component, ocm.ComponentIdentity):
                     try:
-                        component_descriptor = await component_descriptor_lookup(component)
+                        component_descriptor = await component_descriptor_lookup(
+                            component,
+                            ocm_repository_lookup=ocm_repository_lookup,
+                        )
                     except oci.model.OciImageNotFoundException:
                         yield False
                         return
@@ -220,6 +224,7 @@ class ArtefactMetadataQueries:
         components: tuple[ocm.Component | ocm.ComponentIdentity],
         none_ok: bool = False,
         component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById = None,
+        ocm_repository_lookup: ocm.OcmRepositoryLookup | None = None,
     ) -> collections.abc.AsyncGenerator[sqle.BooleanClauseList, None, None]:
         """
         Generates single SQL expressions which check for equality with one component of `components`
@@ -262,6 +267,7 @@ class ArtefactMetadataQueries:
                                 async for query in ArtefactMetadataQueries.artefact_queries(
                                     component=component,
                                     component_descriptor_lookup=component_descriptor_lookup,
+                                    ocm_repository_lookup=ocm_repository_lookup,
                                 )
                             ],
                         ),

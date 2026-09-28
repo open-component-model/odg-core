@@ -386,6 +386,7 @@ def extract_tar_archive_contents(
 
 async def find_artefact_node_async(
     component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById,
+    ocm_repository_lookup: ocm.OcmRepositoryLookup,
     artefact: odg.model.ComponentArtefactId,
     absent_ok: bool = False,
 ) -> ocm.iter.ResourceNode | ocm.iter.SourceNode | None:
@@ -398,6 +399,7 @@ async def find_artefact_node_async(
                 name=artefact.component_name,
                 version=artefact.component_version,
             ),
+            ocm_repository_lookup=ocm_repository_lookup,
             absent_ok=absent_ok,
         )
     ).component

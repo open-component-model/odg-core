@@ -19,6 +19,7 @@ import deliverydb.util as du
 import features
 import k8s.backlog
 import k8s.util
+import lookups
 import ocm_util
 import odg.cvss
 import odg.extensions_cfg
@@ -949,6 +950,7 @@ class Rescore(aiohttp.web.View):
         if odg.model.Datatype.VULNERABILITY_FINDING in type_filter:
             artefact_node = await ocm_util.find_artefact_node_async(
                 component_descriptor_lookup=self.request.app[consts.APP_COMPONENT_DESCRIPTOR_LOOKUP],
+                ocm_repository_lookup=lookups.init_ocm_repository_lookup(),
                 artefact=artefact,
                 absent_ok=True,
             )

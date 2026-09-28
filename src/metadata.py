@@ -17,6 +17,7 @@ import deliverydb.search_model as sm
 import deliverydb.util as du
 import deliverydb_cache.model as dcm
 import features
+import lookups
 import middleware.cors
 import odg.findings
 import odg.model
@@ -592,14 +593,18 @@ async def resolve_component_scope(
     component_name: str,
     component_version: str,
     recursive: bool,
-    component_descriptor_lookup,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
+    ocm_repository_lookup: ocm.OcmRepositoryLookup,
 ) -> dict[tuple[str, str], list[tuple]]:
     component_id = ocm.ComponentIdentity(
         name=component_name,
         version=component_version,
     )
 
-    root_descriptor = await component_descriptor_lookup(component_id)
+    root_descriptor = await component_descriptor_lookup(
+        component_id,
+        ocm_repository_lookup=ocm_repository_lookup,
+    )
     if not root_descriptor:
         raise aiohttp.web.HTTPBadRequest(
             text=f'could not resolve component descriptor for {component_name}:{component_version}',
@@ -631,7 +636,10 @@ async def resolve_component_scope(
 
         for ref_name, ref_version in _iter_component_references(component=component):
             ref_id = ocm.ComponentIdentity(name=ref_name, version=ref_version)
-            ref_descriptor = await component_descriptor_lookup(ref_id)
+            ref_descriptor = await component_descriptor_lookup(
+                ref_id,
+                ocm_repository_lookup=ocm_repository_lookup,
+            )
             if ref_descriptor:
                 queue.append(ref_descriptor)
 
@@ -762,6 +770,7 @@ class ArtefactMetadataQueryBySearchExpression(aiohttp.web.View):
         cursor = req.cursor
 
         component_descriptor_lookup = self.request.app.get(consts.APP_COMPONENT_DESCRIPTOR_LOOKUP)
+        ocm_repository_lookup = lookups.init_ocm_repository_lookup()
 
         scope_by_component: dict[tuple[str, str, bool], dict[tuple[str, str], list[tuple]]] = {}
 
@@ -797,6 +806,7 @@ class ArtefactMetadataQueryBySearchExpression(aiohttp.web.View):
                         component_version=comp_ver,
                         recursive=recursive,
                         component_descriptor_lookup=component_descriptor_lookup,
+                        ocm_repository_lookup=ocm_repository_lookup,
                     )
 
                 pred = _pred_for_resolved_ocm_scope(
@@ -959,6 +969,7 @@ class ArtefactMetadataQuery(aiohttp.web.View):
                     $ref: '#/components/schemas/ArtefactMetadata'
         """
         component_descriptor_lookup = self.request.app[consts.APP_COMPONENT_DESCRIPTOR_LOOKUP]
+        ocm_repository_lookup = lookups.init_ocm_repository_lookup()
         params = self.request.rel_url.query
 
         body = await self.request.json()
@@ -998,6 +1009,7 @@ class ArtefactMetadataQuery(aiohttp.web.View):
                 ],
                 none_ok=none_ok,
                 component_descriptor_lookup=component_descriptor_lookup,
+                ocm_repository_lookup=ocm_repository_lookup,
             ):
                 yield query
 

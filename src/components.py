@@ -607,6 +607,7 @@ async def greatest_component_versions(
                         version=version,
                     ),
                     component_descriptor_lookup=component_descriptor_lookup,
+                    ocm_repository_lookup=lookups.extended_ocm_repository_lookup(ocm_repo),
                 )
                 creation_date = util.get_creation_date(component_descriptor.component).strftime(
                     '%Y-%m-%d',
@@ -969,6 +970,7 @@ class ComponentDescriptorDiff(aiohttp.web.View):
         right_component_ref: ComponentRef = diff_request.right_component
 
         component_descriptor_lookup = self.request.app[consts.APP_COMPONENT_DESCRIPTOR_LOOKUP]
+        ocm_repository_lookup = lookups.init_ocm_repository_lookup()
 
         left_descriptor = await util.retrieve_component_descriptor(
             ocm.ComponentIdentity(
@@ -976,6 +978,7 @@ class ComponentDescriptorDiff(aiohttp.web.View):
                 version=left_component_ref.version,
             ),
             component_descriptor_lookup=component_descriptor_lookup,
+            ocm_repository_lookup=ocm_repository_lookup,
         )
         right_descriptor = await util.retrieve_component_descriptor(
             ocm.ComponentIdentity(
@@ -983,6 +986,7 @@ class ComponentDescriptorDiff(aiohttp.web.View):
                 version=right_component_ref.version,
             ),
             component_descriptor_lookup=component_descriptor_lookup,
+            ocm_repository_lookup=ocm_repository_lookup,
         )
 
         try:

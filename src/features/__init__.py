@@ -874,6 +874,7 @@ class CfgFileChangeEventHandler(watchdog.events.FileSystemEventHandler):
         FeatureAddressbook.get_addressbook_entries.cache_clear()
         FeatureAddressbook.get_github_mappings.cache_clear()
         FeatureSprints.get_sprints_configuration.cache_clear()
+        lookups.parse_ocm_repository_cfgs.cache_clear()
 
 
 @functools.cache
