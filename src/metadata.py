@@ -1225,9 +1225,15 @@ class ArtefactMetadata(aiohttp.web.View):
             if (
                 existing_entry.type != new_entry.type
                 or existing_entry.component_name != new_entry.component_name
-                or existing_entry.artefact_kind != new_entry.artefact_kind
                 or existing_entry.artefact_name != new_entry.artefact_name
-                or existing_entry.artefact_type != new_entry.artefact_type
+                or odg.model.normalise_artefact_extra_id(
+                    artefact_extra_id=existing_entry.artefact_extra_id,
+                    omit_version=True,
+                )
+                != odg.model.normalise_artefact_extra_id(
+                    artefact_extra_id=new_entry.artefact_extra_id,
+                    omit_version=True,
+                )
             ):
                 return None, None
 
