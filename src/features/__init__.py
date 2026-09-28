@@ -867,6 +867,7 @@ def apply_raw_cfg():
 
 class CfgFileChangeEventHandler(watchdog.events.FileSystemEventHandler):
     def dispatch(self, event):
+        logger.info(f'Detected configuration file change: {event.src_path}')
         try:
             apply_raw_cfg()
         except Exception as e:

@@ -14,6 +14,7 @@ own_dir = os.path.abspath(os.path.dirname(__file__))
 
 class FileChangeEventHandler(watchdog.events.FileSystemEventHandler):
     def dispatch(self, event):
+        logger.info(f'Detected secret file change: {event.src_path}')
         # Clear cache so that the next time the cfg factory is needed it is
         # created using the new cfg
         secret_factory.cache_clear()
