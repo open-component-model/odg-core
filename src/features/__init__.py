@@ -848,22 +848,45 @@ def apply_raw_cfg():
     feature_cfgs = [f for f in feature_cfgs if not isinstance(f, FeatureLicenses)]
     feature_cfgs.append(licenses_feature)
 
+    for path in (
+        paths.features_cfg_path(),
+        paths.extensions_cfg_path(absent_ok=True),
+        paths.findings_cfg_path(absent_ok=True),
+        paths.ocm_repo_mappings_path(absent_ok=True),
+        paths.profiles_path(absent_ok=True),
+        paths.sprints_path(absent_ok=True),
+        paths.addressbook_path(absent_ok=True),
+        paths.github_mappings_path(absent_ok=True),
+    ):
+        try:
+            watch_for_file_changes(path)
+        except Exception as e:
+            logger.debug(f'failed to instantiate file watcher for {path=}: {e}')
+            pass  # is expected if file does not exist
+
 
 class CfgFileChangeEventHandler(watchdog.events.FileSystemEventHandler):
     def dispatch(self, event):
-        apply_raw_cfg()
+        try:
+            apply_raw_cfg()
+        except Exception as e:
+            logger.error(f'failed to reload configuration: {e}')
+        FeatureAddressbook.get_addressbook_entries.cache_clear()
+        FeatureAddressbook.get_github_mappings.cache_clear()
+        FeatureSprints.get_sprints_configuration.cache_clear()
 
 
+@functools.cache
 def watch_for_file_changes(
-    event_handler: CfgFileChangeEventHandler,
     path: str,
+    event_handler: CfgFileChangeEventHandler | None = None,
 ):
-    try:
-        observer = watchdog.observers.polling.PollingObserver(timeout=60)
-        observer.schedule(event_handler, path)
-        observer.start()
-    except FileNotFoundError:
-        logger.warning('Feature config not found')
+    if not event_handler:
+        event_handler = CfgFileChangeEventHandler()
+
+    observer = watchdog.observers.polling.PollingObserver(timeout=60)
+    observer.schedule(event_handler, path)
+    observer.start()
 
 
 async def init_features(parsed_arguments):
@@ -905,18 +928,6 @@ async def init_features(parsed_arguments):
         delivery_db_feature_state = FeatureStates.UNAVAILABLE
 
     feature_cfgs.append(FeatureDeliveryDB(delivery_db_feature_state))
-
-    event_handler = CfgFileChangeEventHandler()
-    watch_for_file_changes(event_handler, paths.features_cfg_path())
-
-    if extensions_cfg_path := paths.extensions_cfg_path(absent_ok=True):
-        watch_for_file_changes(event_handler, extensions_cfg_path)
-    if findings_cfg_path := paths.findings_cfg_path(absent_ok=True):
-        watch_for_file_changes(event_handler, findings_cfg_path)
-    if ocm_repo_mappings_path := paths.ocm_repo_mappings_path(absent_ok=True):
-        watch_for_file_changes(event_handler, ocm_repo_mappings_path)
-    if profiles_path := paths.profiles_path(absent_ok=True):
-        watch_for_file_changes(event_handler, profiles_path)
 
     apply_raw_cfg()
 
