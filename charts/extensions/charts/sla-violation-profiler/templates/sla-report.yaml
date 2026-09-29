@@ -1,0 +1,83 @@
+{{- $podName := "sla-report" }}
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $podName }}
+  namespace: {{ .Values.target_namespace | default .Release.Namespace }}
+spec:
+  schedule: {{ default "0 2 * * *" .Values.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: {{ default 1 .Values.successful_jobs_history_limit }}
+  failedJobsHistoryLimit: {{ default 1 .Values.failed_jobs_history_limit }}
+  jobTemplate:
+    spec:
+      backoffLimit: {{ default 6 .Values.backoff_limit }}
+      ttlSecondsAfterFinished: {{ default 43200 .Values.ttl_seconds_after_finished }}
+      template:
+        metadata:
+          labels:
+            app: {{ $podName }}
+        spec:
+          containers:
+          - name: {{ $podName }}
+            image: {{ include "image" .Values.global.image }}
+            imagePullPolicy: IfNotPresent
+            command:
+            - python3
+            - -m
+            - sla_report_extension
+            securityContext:
+              allowPrivilegeEscalation: false
+            env:
+            - name: SECRET_FACTORY_PATH
+              value: /secrets
+            - name: EXTENSIONS_CFG_PATH
+              value: /extensions_cfg/extensions_cfg
+            - name: FINDINGS_CFG_PATH
+              value: /findings_cfg/findings_cfg
+            - name: K8S_TARGET_NAMESPACE
+              value: {{ .Values.target_namespace | default .Release.Namespace }}
+            volumeMounts:
+            - name: github
+              mountPath: /secrets/github
+            - name: github-app
+              mountPath: /secrets/github-app
+            - name: extensions-cfg
+              mountPath: /extensions_cfg
+            - name: findings-cfg
+              mountPath: /findings_cfg
+            {{- with (.Values.report).resources }}
+            resources:
+              {{- toYaml . | nindent 16 }}
+            {{- end }}
+          volumes:
+            - name: github
+              secret:
+                secretName: secret-factory-github
+                optional: true
+            - name: github-app
+              secret:
+                secretName: secret-factory-github-app
+                optional: true
+            - name: extensions-cfg
+              configMap:
+                name: extensions-cfg
+            - name: findings-cfg
+              configMap:
+                name: findings-cfg
+          restartPolicy: Never
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-from-sla-report
+  namespace: {{ .Values.target_namespace | default .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ $podName }}
+  policyTypes:
+    - Egress
+  egress:
+    - {}  # Allows all egress traffic to any destination and port

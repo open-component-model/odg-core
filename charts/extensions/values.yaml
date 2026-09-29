@@ -175,6 +175,13 @@ sla-violation-profiler:
         cpu: 500m
       limits:
         memory: 2Gi
+  report:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        memory: 256Mi
   enabled: false
   schedule: null
   target_namespace: null
