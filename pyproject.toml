@@ -30,7 +30,7 @@ dependencies = [
     "kubernetes==36.0.3",
     "prometheus_client==0.26.0",
     "psycopg[binary]==3.3.6",
-    "pyjwt==2.14.0",
+    "pyjwt==2.15.0",
     "requests==2.34.2",
     "sqlalchemy==2.0.54",
     "starlette==1.7.0",
