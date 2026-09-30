@@ -33,7 +33,7 @@ dependencies = [
     "pyjwt==2.14.0",
     "requests==2.34.2",
     "sqlalchemy==2.0.54",
-    "starlette==1.6.0",
+    "starlette==1.7.0",
     "urllib3==2.8.0",
     "uvicorn==0.53.0",
     "watchdog==6.0.0",
