@@ -12,7 +12,6 @@ import watchdog.observers.polling
 import aiohttp.web
 import cachetools
 import dacite
-import github3.repos
 import yaml
 
 import ctx_util
@@ -175,19 +174,19 @@ class FeatureAddressbook(FeatureBase):
     name: str = 'addressbook'
     addressbook_relpath: str = None
     github_mappings_relpath: str = None
-    github_repo: github3.repos.Repository | None = None
+    github_repo_url: str | None = None
 
     def get_source(self) -> str:
-        if self.github_repo:
-            return self.github_repo.url
-
-        return 'incluster-configuration'
+        return self.github_repo_url or 'incluster-configuration'
 
     def _get_content(self, relpath: str) -> dict:
-        if self.github_repo:
-            content = self.github_repo.file_contents(
+        if self.github_repo_url:
+            github_repo_lookup = lookups.github_repo_lookup(lookups.github_api_lookup())
+            github_repo = github_repo_lookup(self.github_repo_url)
+
+            content = github_repo.file_contents(
                 path=relpath,
-                ref=self.github_repo.default_branch,
+                ref=github_repo.default_branch,
             ).decoded
         else:
             # read file from local repository
@@ -550,14 +549,17 @@ def iter_sprints(
 class FeatureSprints(FeatureBase):
     name: str = 'sprints'
     sprints_relpath: str | None = None
-    github_repo: github3.repos.Repository | None = None
+    github_repo_url: str | None = None
     sprints_cfg: SprintsConfiguration | None = dataclasses.field(default=None, hash=False)
 
     def _get_content(self, relpath: str) -> dict:
-        if self.github_repo:
-            content = self.github_repo.file_contents(
+        if self.github_repo_url:
+            github_repo_lookup = lookups.github_repo_lookup(lookups.github_api_lookup())
+            github_repo = github_repo_lookup(self.github_repo_url)
+
+            content = github_repo.file_contents(
                 path=relpath,
-                ref=self.github_repo.default_branch,
+                ref=github_repo.default_branch,
             ).decoded
         else:
             # read file from local repository
@@ -619,13 +621,9 @@ def get_feature(
 
 def deserialise_addressbook(addressbook_raw: dict) -> FeatureAddressbook:
     if github_repo_url := addressbook_raw.get('repoUrl'):
-        github_api_lookup = lookups.github_api_lookup()
-        github_repo_lookup = lookups.github_repo_lookup(github_api_lookup)
-        github_repo = github_repo_lookup(github_repo_url)
         addressbook_relpath = addressbook_raw['addressbookRelpath']
         github_mappings_relpath = addressbook_raw['githubMappingsRelpath']
     else:
-        github_repo = None
         addressbook_relpath = paths.addressbook_path(
             path_overwrite=addressbook_raw.get('addressbookRelpath'),
             absent_ok=True,
@@ -641,7 +639,7 @@ def deserialise_addressbook(addressbook_raw: dict) -> FeatureAddressbook:
         FeatureStates.AVAILABLE,
         addressbook_relpath=addressbook_relpath,
         github_mappings_relpath=github_mappings_relpath,
-        github_repo=github_repo,
+        github_repo_url=github_repo_url,
     )
 
 
@@ -723,13 +721,8 @@ def deserialise_sprints(sprints_raw: dict) -> FeatureSprints:
             ),
         )
     elif github_repo_url := sprints_raw.get('repoUrl'):
-        github_repo_lookup = lookups.github_repo_lookup(
-            lookups.github_api_lookup(),
-        )
-        github_repo = github_repo_lookup(github_repo_url)
         sprints_relpath = sprints_raw['sprintsRelpath']
     else:
-        github_repo = None
         sprints_relpath = paths.sprints_path(
             path_overwrite=sprints_raw.get('sprintsRelpath'),
             absent_ok=True,
@@ -740,7 +733,7 @@ def deserialise_sprints(sprints_raw: dict) -> FeatureSprints:
     return FeatureSprints(
         FeatureStates.AVAILABLE,
         sprints_relpath=sprints_relpath,
-        github_repo=github_repo,
+        github_repo_url=github_repo_url,
     )
 
 
