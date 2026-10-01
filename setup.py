@@ -39,7 +39,7 @@ def package_data() -> dict[str, list[str]]:
         'responsibles': ['*.yaml'],
         'schema': ['*.yaml'],
         'secret_mgmt': ['*.yaml'],
-        'sla_report_extension': ['templates/*.mako'],
+        'sla_violation_profiler_extension': ['templates/*.mako'],
         'swagger': ['*.yaml'],
     }
 

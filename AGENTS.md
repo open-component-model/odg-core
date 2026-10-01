@@ -36,7 +36,7 @@ specific capability (scanning, reporting, replication, etc.); extensions share c
 - `responsibles_extension/` — responsible-user lookup
 - `sast.py` — SAST scanning
 - `sbom_generator.py` — SBOM generation
-- `sla_violation_profiler.py` — SLA violation profiler
+- `sla_violation_profile_extension/` — SLA violation profiler
 - `trivy_extension/` — Trivy vulnerability scanning
 
 **Shared libraries** in `src/`:

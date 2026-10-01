@@ -25,8 +25,7 @@ spec:
             imagePullPolicy: IfNotPresent
             command:
             - python3
-            - -m
-            - sla_report_extension
+            - sla_violation_profiler_extension/sla_report.py
             securityContext:
               allowPrivilegeEscalation: false
             env:
