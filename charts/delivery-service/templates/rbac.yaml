@@ -1,29 +1,49 @@
+# the service account is always required: pods reference it by name at admission time, also
+# in external-kubeconfig mode
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: delivery-service
+  namespace: {{ .Values.target_namespace | default .Release.Namespace }}
+---
 {{- if or (not .Values.envVars) (not .Values.envVars.K8S_CFG_NAME) }}
 kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: open-delivery-gear
+  name: delivery-service
   namespace: {{ .Values.target_namespace | default .Release.Namespace }}
 rules:
   - apiGroups:
       - ""
-      - apps
+    resources:
+      - pods
+    verbs:
+      - list
+  - apiGroups:
       - delivery-gear.gardener.cloud
     resources:
       - backlogitems
-      - logcollections
-      - pods
-      - replicasets
-      - runtimeartefacts
-      - deployments
     verbs:
       - create
+      - delete
       - get
       - list
-      - update
       - patch
+      - update
+  - apiGroups:
+      - delivery-gear.gardener.cloud
+    resources:
+      - logcollections
+    verbs:
+      - list
+  - apiGroups:
+      - delivery-gear.gardener.cloud
+    resources:
+      - runtimeartefacts
+    verbs:
+      - create
       - delete
-      - watch
+      - list
   - apiGroups:
       - gateway.networking.k8s.io
     resources:
@@ -34,14 +54,14 @@ rules:
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: open-delivery-gear
+  name: delivery-service
   namespace: {{ .Values.target_namespace | default .Release.Namespace }}
 subjects:
 - kind: ServiceAccount
-  name: default
+  name: delivery-service
   namespace: {{ .Values.target_namespace | default .Release.Namespace }}
 roleRef:
   kind: Role
-  name: open-delivery-gear
+  name: delivery-service
   apiGroup: rbac.authorization.k8s.io
 {{- end }}

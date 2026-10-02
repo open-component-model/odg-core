@@ -23,6 +23,7 @@ spec:
         app: {{ $podName }}
         delivery-gear.gardener.cloud/service: responsibles
     spec:
+      serviceAccountName: {{ .Chart.Name }}
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
@@ -48,6 +49,10 @@ spec:
               value: /extensions_cfg/extensions_cfg
             - name: FINDINGS_CFG_PATH
               value: /findings_cfg/findings_cfg
+            {{- if .Values.k8sCfgName }}
+            - name: K8S_CFG_NAME # external kubeconfig from secret store -> no SA-token auth
+              value: {{ .Values.k8sCfgName | quote }}
+            {{- end }}
             - name: K8S_TARGET_NAMESPACE
               value: {{ .Values.target_namespace | default .Release.Namespace }}
           volumeMounts:

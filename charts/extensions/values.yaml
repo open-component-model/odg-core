@@ -6,6 +6,10 @@ global:
     tag: null
 
 access-manager:
+  # k8sCfgName: name of a secret element of type 'kubernetes' (mounted at
+  # /secrets/kubernetes/<name>); if set, this workload authenticates via that external
+  # kubeconfig instead of the (then unmounted) SA token, and no RBAC Role is created
+  k8sCfgName: ''
   cronjob:
     resources:
       requests:
@@ -15,6 +19,10 @@ access-manager:
         memory: 500Mi
   enabled: false
 artefact-enumerator:
+  # k8sCfgName: name of a secret element of type 'kubernetes' (mounted at
+  # /secrets/kubernetes/<name>); if set, this workload authenticates via that external
+  # kubeconfig instead of the (then unmounted) SA token, and no RBAC Role is created
+  k8sCfgName: ''
   cronjob:
     resources:
       requests:
@@ -24,6 +32,10 @@ artefact-enumerator:
         memory: 1Gi
   enabled: false
 backlog-controller:
+  # k8sCfgName: name of a secret element of type 'kubernetes' (mounted at
+  # /secrets/kubernetes/<name>); if set, this workload authenticates via that external
+  # kubeconfig instead of the (then unmounted) SA token, and no RBAC Role is created
+  k8sCfgName: ''
   deployment:
     resources:
       requests:
@@ -33,6 +45,10 @@ backlog-controller:
         memory: 250Mi
   enabled: false
 bdba:
+  # k8sCfgName: name of a secret element of type 'kubernetes' (mounted at
+  # /secrets/kubernetes/<name>); if set, this workload authenticates via that external
+  # kubeconfig instead of the (then unmounted) SA token, and no RBAC Role is created
+  k8sCfgName: ''
   deployment:
     annotations: []
     resources:
@@ -43,6 +59,10 @@ bdba:
         memory: 1Gi
   enabled: false
 cache-manager:
+  # k8sCfgName: name of a secret element of type 'kubernetes' (mounted at
+  # /secrets/kubernetes/<name>); if set, this workload authenticates via that external
+  # kubeconfig instead of the (then unmounted) SA token, and no RBAC Role is created
+  k8sCfgName: ''
   cronjob:
     resources:
       requests:
@@ -52,6 +72,10 @@ cache-manager:
         memory: 1Gi
   enabled: false
 clamav:
+  # k8sCfgName: name of a secret element of type 'kubernetes' (mounted at
+  # /secrets/kubernetes/<name>); if set, this workload authenticates via that external
+  # kubeconfig instead of the (then unmounted) SA token, and no RBAC Role is created
+  k8sCfgName: ''
   deployment:
     annotations: []
     resources:
@@ -69,6 +93,10 @@ clamav:
       limits:
         memory: 1Gi
 codeql:
+  # k8sCfgName: name of a secret element of type 'kubernetes' (mounted at
+  # /secrets/kubernetes/<name>); if set, this workload authenticates via that external
+  # kubeconfig instead of the (then unmounted) SA token, and no RBAC Role is created
+  k8sCfgName: ''
   deployment:
     annotations: []
     resources:
@@ -79,6 +107,10 @@ codeql:
         memory: 500Mi
   enabled: false
 crypto:
+  # k8sCfgName: name of a secret element of type 'kubernetes' (mounted at
+  # /secrets/kubernetes/<name>); if set, this workload authenticates via that external
+  # kubeconfig instead of the (then unmounted) SA token, and no RBAC Role is created
+  k8sCfgName: ''
   deployment:
     annotations: []
     resources:
@@ -89,6 +121,10 @@ crypto:
         memory: 2Gi
   enabled: false
 delivery-db-backup:
+  # k8sCfgName: name of a secret element of type 'kubernetes' (mounted at
+  # /secrets/kubernetes/<name>); if set, this workload authenticates via that external
+  # kubeconfig instead of the (then unmounted) SA token, and no RBAC Role is created
+  k8sCfgName: ''
   cronjob:
     resources:
       requests:
@@ -98,6 +134,10 @@ delivery-db-backup:
         memory: 1Gi
   enabled: false
 ghas:
+  # k8sCfgName: name of a secret element of type 'kubernetes' (mounted at
+  # /secrets/kubernetes/<name>); if set, this workload authenticates via that external
+  # kubeconfig instead of the (then unmounted) SA token, and no RBAC Role is created
+  k8sCfgName: ''
   cronjob:
     resources:
       requests:
@@ -107,6 +147,10 @@ ghas:
         memory: 500Mi
   enabled: false
 issue-replicator:
+  # k8sCfgName: name of a secret element of type 'kubernetes' (mounted at
+  # /secrets/kubernetes/<name>); if set, this workload authenticates via that external
+  # kubeconfig instead of the (then unmounted) SA token, and no RBAC Role is created
+  k8sCfgName: ''
   deployment:
     annotations: []
     resources:
@@ -128,6 +172,10 @@ odg-operator:
   extensionDefinitions: null
   namespaceOverride: null
 osid:
+  # k8sCfgName: name of a secret element of type 'kubernetes' (mounted at
+  # /secrets/kubernetes/<name>); if set, this workload authenticates via that external
+  # kubeconfig instead of the (then unmounted) SA token, and no RBAC Role is created
+  k8sCfgName: ''
   deployment:
     annotations: []
     resources:
@@ -138,6 +186,10 @@ osid:
         memory: 500Mi
   enabled: false
 responsibles:
+  # k8sCfgName: name of a secret element of type 'kubernetes' (mounted at
+  # /secrets/kubernetes/<name>); if set, this workload authenticates via that external
+  # kubeconfig instead of the (then unmounted) SA token, and no RBAC Role is created
+  k8sCfgName: ''
   deployment:
     annotations: []
     resources:
@@ -148,6 +200,10 @@ responsibles:
         memory: 512Mi
   enabled: false
 sast:
+  # k8sCfgName: name of a secret element of type 'kubernetes' (mounted at
+  # /secrets/kubernetes/<name>); if set, this workload authenticates via that external
+  # kubeconfig instead of the (then unmounted) SA token, and no RBAC Role is created
+  k8sCfgName: ''
   deployment:
     annotations: []
     resources:
@@ -158,6 +214,10 @@ sast:
         memory: 500Mi
   enabled: false
 sbom-generator:
+  # k8sCfgName: name of a secret element of type 'kubernetes' (mounted at
+  # /secrets/kubernetes/<name>); if set, this workload authenticates via that external
+  # kubeconfig instead of the (then unmounted) SA token, and no RBAC Role is created
+  k8sCfgName: ''
   deployment:
     annotations: []
     resources:
@@ -168,6 +228,10 @@ sbom-generator:
         memory: 2Gi
   enabled: false
 sla-violation-profiler:
+  # k8sCfgName: name of a secret element of type 'kubernetes' (mounted at
+  # /secrets/kubernetes/<name>); if set, this workload authenticates via that external
+  # kubeconfig instead of the (then unmounted) SA token, and no RBAC Role is created
+  k8sCfgName: ''
   cronjob:
     resources:
       requests:
@@ -190,6 +254,10 @@ sla-violation-profiler:
   failed_jobs_history_limit: null
   backoff_limit: null
 trivy:
+  # k8sCfgName: name of a secret element of type 'kubernetes' (mounted at
+  # /secrets/kubernetes/<name>); if set, this workload authenticates via that external
+  # kubeconfig instead of the (then unmounted) SA token, and no RBAC Role is created
+  k8sCfgName: ''
   deployment:
     annotations: []
     nodeSelector: {} # to pin trivy pods to selected node(s)

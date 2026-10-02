@@ -19,6 +19,7 @@ spec:
       labels:
         app: {{ $podName }}
     spec:
+      automountServiceAccountToken: false # freshclam does not talk to the k8s api
       containers:
         - name: {{ $podName }}
           image: {{ include "image" .Values.global.image }}
