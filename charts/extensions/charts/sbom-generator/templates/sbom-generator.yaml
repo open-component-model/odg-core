@@ -31,6 +31,10 @@ spec:
             matchLabels:
               app: {{ $podName }}
       terminationGracePeriodSeconds: 1800 # 30 min
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ $podName }}
           image: {{ include "image" .Values.global.image }}

@@ -24,6 +24,10 @@ spec:
         delivery-gear.gardener.cloud/service: issueReplicator
     spec:
       terminationGracePeriodSeconds: 300 # 5 min
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ $podName }}
           image: {{ include "image" .Values.global.image }}

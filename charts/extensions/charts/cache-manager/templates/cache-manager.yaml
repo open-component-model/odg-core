@@ -19,6 +19,10 @@ spec:
           labels:
             app: {{ $podName }}
         spec:
+          {{- with .Values.global.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           containers:
           - name: {{ $podName }}
             image: {{ include "image" .Values.global.image }}

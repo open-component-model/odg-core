@@ -40,6 +40,10 @@ spec:
           labelSelector:
             matchLabels:
               app: {{ $podName }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ $podName }}
           image: {{ include "image" .Values.image }}

@@ -4,6 +4,7 @@ global:
     ref: null
     repository: null
     tag: null
+  imagePullSecrets: []
 
 access-manager:
   cronjob:

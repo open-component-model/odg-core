@@ -3,6 +3,7 @@ image:
   ref: null
   repository: null
   tag: null
+imagePullSecrets: []
 deployment:
   annotations: []
   resources:
