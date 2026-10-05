@@ -702,10 +702,12 @@ class OAuthLogin(aiohttp.web.View):
         if (access_token and api_url) or (client_id and code):
             idp_type = secret_mgmt.oauth_cfg.OAuthCfgTypes.GITHUB
 
-        elif not api_url and (oidc_token := (
-            self.request.headers.get('Authorization', '').removeprefix('Bearer ').strip()
-            or access_token
-        )):
+        elif not api_url and (
+            oidc_token := (
+                self.request.headers.get('Authorization', '').removeprefix('Bearer ').strip()
+                or access_token
+            )
+        ):
             idp_type = secret_mgmt.oauth_cfg.OAuthCfgTypes.OIDC
             use_refresh_token = False
 
