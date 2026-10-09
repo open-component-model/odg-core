@@ -138,6 +138,11 @@ test:
 		exit 1; \
 	fi
 
+# Performance testing
+test-perf:
+	@echo "Running performance tests..."
+	cd test/perf && uv run pytest -v -s
+
 # Build client packages (bdba and odg)
 build-clients:
 	@echo "Building client packages..."
@@ -192,6 +197,14 @@ build-docker-local: .check-build-prereqs
 		-f Dockerfile \
 		.
 	@echo "Docker image built: odg-core:$(ODG_CORE_LIBS_VERSION)"
+	@echo "Building debug Docker image (local arch)..."
+	@docker-buildx build \
+		--build-arg ODG_CORE_LIBS_VERSION=$(ODG_CORE_LIBS_VERSION) \
+		--load \
+		-t odg-core:$(ODG_CORE_LIBS_VERSION)-debug \
+		-f Dockerfile.debug \
+		.
+	@echo "Docker image built: odg-core:$(ODG_CORE_LIBS_VERSION)-debug"
 
 # Run PostgreSQL database instance
 run-db:
