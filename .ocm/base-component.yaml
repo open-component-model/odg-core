@@ -1,6 +1,6 @@
 componentReferences: []
 labels:
-- name: cloud.gardener.cnudie/responsibles
+- name: odg.ocm.software/responsibles
   value:
   - github_hostname: github.com
     teamname: open-component-model/odg-maintainers
@@ -22,12 +22,12 @@ resources:
       imageReference: europe-docker.pkg.dev/gardener-project/releases/ocm-gear/postgres:16.8.0
     relation: external
     labels:
-      - name: gardener.cloud/cve-categorisation
+      - name: security.ocm.software/risk-profile
         value:
-          authentication_enforced: True
+          authentication_enforced: true
           availability_requirement: high
           confidentiality_requirement: high
           integrity_requirement: high
           network_exposure: protected
-          user_interaction: gardener-operator
+          user_interaction: operator
 sources: []

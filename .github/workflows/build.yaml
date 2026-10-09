@@ -207,7 +207,7 @@ jobs:
               type: localBlob
               localReference: bandit.tar.gz
             labels:
-              - name: gardener.cloud/purposes
+              - name: odg.ocm.software/purposes
                 value:
                   - lint
                   - sast
@@ -266,7 +266,7 @@ jobs:
       build-args: |
         ODG_CORE_LIBS_VERSION=${{ needs.packages.outputs.version }}
       ocm-labels: |
-        name: gardener.cloud/cve-categorisation
+        name: security.ocm.software/risk-profile
         value:
           network_exposure: public
           authentication_enforced: true
