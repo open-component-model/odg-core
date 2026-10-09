@@ -344,7 +344,6 @@ async def mark_for_deletion_task(
     db_url: str,
     id: str,
     delete_after: datetime.datetime | None = None,
-    defer_db_commit: bool = False,
 ):
     db_session = await deliverydb.sqlalchemy_session_async(
         db_url=db_url,
@@ -358,7 +357,6 @@ async def mark_for_deletion_task(
             db_session=db_session,
             id=id,
             delete_after=delete_after,
-            defer_db_commit=defer_db_commit,
         )
     finally:
         await db_session.close()

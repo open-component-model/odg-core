@@ -11,7 +11,6 @@ import sqlalchemy.ext.asyncio as sqlasync
 import ocm
 
 import consts
-import deliverydb.cache_async as dc
 import deliverydb.model as dm
 import deliverydb.search_model as sm
 import deliverydb.util as du
@@ -1397,6 +1396,8 @@ class ArtefactMetadata(aiohttp.web.View):
 
         db_session: sqlasync.session.AsyncSession = self.request[consts.REQUEST_DB_SESSION]
 
+        cache_ids_to_invalidate: set[str] = set()
+
         try:
             for entry in entries:
                 entry = _fill_default_values(entry)
@@ -1411,9 +1412,16 @@ class ArtefactMetadata(aiohttp.web.View):
                     ),
                 )
 
-                await _mark_compliance_summary_cache_for_deletion(
-                    db_session=db_session,
+                _collect_compliance_summary_cache_ids(
                     artefact_metadata=artefact_metadata,
+                    cache_ids=cache_ids_to_invalidate,
+                )
+
+            if cache_ids_to_invalidate:
+                await db_session.execute(
+                    sa.update(dm.DBCache)
+                    .where(dm.DBCache.id.in_(cache_ids_to_invalidate))
+                    .values(delete_after=datetime.datetime.now(datetime.UTC)),
                 )
 
             await db_session.commit()
@@ -1497,55 +1505,10 @@ def _fill_default_values(
     return raw
 
 
-async def _mark_compliance_summary_cache_for_deletion(
-    db_session: sqlasync.session.AsyncSession,
-    artefact_metadata: dm.ArtefactMetaData,
-):
-    if not (
-        artefact_metadata.component_name
-        and artefact_metadata.component_version
-        and artefact_metadata.type
-        and artefact_metadata.datasource
-    ):
-        # If one of these properties is not set, the cache id cannot be calculated properly.
-        # Currently, this is only the case for BDBA findings where the component version is left
-        # empty. In that case, the cache is invalidated upon successful finish of the scan.
-        return
-
-    component = ocm.ComponentIdentity(
-        name=artefact_metadata.component_name,
-        version=artefact_metadata.component_version,
-    )
-
-    if artefact_metadata.type == odg.model.Datatype.ARTEFACT_SCAN_INFO:
-        # If the artefact scan info changes, the compliance summary for all datatypes related to
-        # this datasource has to be updated, because it may has changed from
-        # UNKNOWN -> CLEAN/FINDINGS
-        datatypes = odg.model.Datasource(artefact_metadata.datasource).datatypes()
-    else:
-        datatypes = (artefact_metadata.type,)
-
-    for datatype in datatypes:
-        try:
-            finding_type = odg.model.Datatype(datatype)
-        except ValueError:
-            continue
-
-        await dc.mark_function_cache_for_deletion(
-            encoding_format=dcm.EncodingFormat.PICKLE,
-            function='compliance_summary.component_datatype_summaries',
-            db_session=db_session,
-            defer_db_commit=True,  # only commit at the end of the query
-            component=component,
-            finding_type=finding_type,
-            datasource=artefact_metadata.datasource,
-        )
-
-
 def _collect_compliance_summary_cache_ids(
     artefact_metadata: dm.ArtefactMetaData,
     cache_ids: set[str],
-):
+) -> None:
     if not (
         artefact_metadata.component_name
         and artefact_metadata.component_version
@@ -1562,7 +1525,7 @@ def _collect_compliance_summary_cache_ids(
         version=artefact_metadata.component_version,
     )
 
-    if artefact_metadata.type == odg.model.Datatype.ARTEFACT_SCAN_INFO:
+    if artefact_metadata.type is odg.model.Datatype.ARTEFACT_SCAN_INFO:
         # If the artefact scan info changes, the compliance summary for all datatypes related to
         # this datasource has to be updated, because it may has changed from
         # UNKNOWN -> CLEAN/FINDINGS
