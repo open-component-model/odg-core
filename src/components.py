@@ -1186,24 +1186,35 @@ class ComplianceSummary(aiohttp.web.View):
 
         shortcut_cache = deliverydb.cache_async.parse_shortcut_cache(self.request)
 
-        compliance_summary = [
-            await cs.component_compliance_summary(
-                component=component,
-                finding_cfgs=finding_cfgs,
-                db_session=db_session,
-                component_descriptor_lookup=component_descriptor_lookup,
-                ocm_repo=ocm_repo,
-                shortcut_cache=shortcut_cache,
-            )
-            for component in components
-        ]
-
-        return aiohttp.web.json_response(
-            data={
-                'complianceSummary': compliance_summary,
-            },
-            dumps=util.dict_to_json_factory,
+        response = aiohttp.web.StreamResponse(
+            headers={'Content-Type': 'application/json'},
         )
+        await response.prepare(self.request)
+
+        await response.write(b'{"complianceSummary":[')
+        first = True
+        try:
+            for component in components:
+                component_summary = await cs.component_compliance_summary(
+                    component=component,
+                    finding_cfgs=finding_cfgs,
+                    db_session=db_session,
+                    component_descriptor_lookup=component_descriptor_lookup,
+                    ocm_repo=ocm_repo,
+                    shortcut_cache=shortcut_cache,
+                )
+                if not first:
+                    await response.write(b',')
+                first = False
+                await response.write(
+                    util.dict_to_json_factory(component_summary).encode(),
+                )
+            await response.write(b']}')
+            await response.write_eof()
+        except Exception:
+            response.force_close()
+            raise
+        return response
 
 
 class DownloadSBOM(aiohttp.web.View):

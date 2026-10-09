@@ -45,13 +45,15 @@ def add_prometheus_middleware(
         start_time = datetime.datetime.now()
         request.app[APP_REQUESTS_CONCURRENCY].labels(request.path, request.method).inc()
 
-        response = await handler(request)
+        try:
+            response = await handler(request)
+        finally:
+            request.app[APP_REQUESTS_CONCURRENCY].labels(request.path, request.method).dec()
 
         latency = datetime.datetime.now() - start_time
         request.app[APP_REQUEST_LATENCY_SECONDS].labels(request.path, request.method).observe(
             latency.total_seconds(),
         )  # noqa: E501
-        request.app[APP_REQUESTS_CONCURRENCY].labels(request.path, request.method).dec()
         request.app[APP_REQUESTS_TOTAL].labels(
             request.path,
             request.method,

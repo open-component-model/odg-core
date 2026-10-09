@@ -190,15 +190,6 @@ async def artefact_datatype_summary(
     findings: collections.abc.Sequence[odg.model.ArtefactMetadata],
     rescorings: collections.abc.Sequence[odg.model.ArtefactMetadata],
 ) -> ComplianceSummaryEntry:
-    findings_for_artefact = [
-        finding
-        for finding in findings
-        if (
-            finding.artefact.artefact_kind is artefact.artefact_kind
-            and finding.artefact.artefact == artefact.artefact
-        )
-    ]
-
     normalised_artefact_extra_identity = odg.model.normalise_artefact_extra_id(
         artefact_extra_id=artefact.artefact.artefact_extra_id,
         omit_version=True,
@@ -248,7 +239,7 @@ async def artefact_datatype_summary(
         finding_cfg=finding_cfg,
         datasource=datasource,
         scan_exists=scan_exists,
-        findings=findings_for_artefact,
+        findings=findings,
         rescorings=rescorings_for_artefact,
     )
 
@@ -289,36 +280,41 @@ async def component_datatype_summaries(
         db_session=db_session,
     )
 
-    if artefact_scan_infos:
-        findings = await deliverydb.util.findings_for_component(
-            component=component,
-            finding_type=finding_type,
-            datasource=datasource,
-            db_session=db_session,
-        )
-    else:
-        # if no scan exists, we don't have to query for findings
-        findings = []
-
-    if findings:
-        rescorings = await deliverydb.util.rescorings_for_component(
-            component=component,
-            finding_type=finding_type,
-            db_session=db_session,
-        )
-    else:
-        # if no findings exist, we don't have to query for rescorings
-        rescorings = []
+    rescorings = None  # lazily fetched on first artefact with findings
 
     summaries = []
-    for artefact in component.resources + component.sources:
+    for ocm_artefact in component.resources + component.sources:
         artefact = odg.model.component_artefact_id_from_ocm(
             component=component,
-            artefact=artefact,
+            artefact=ocm_artefact,
         )
 
         if not finding_cfg.matches(artefact):
             continue
+
+        artefact_has_scan = any(
+            scan_info.artefact.artefact_kind is artefact.artefact_kind
+            and scan_info.artefact.artefact == artefact.artefact
+            for scan_info in artefact_scan_infos
+        )
+
+        if artefact_has_scan:
+            findings = await deliverydb.util.findings_for_artefact(
+                component=component,
+                artefact=ocm_artefact,
+                finding_type=finding_type,
+                datasource=datasource,
+                db_session=db_session,
+            )
+        else:
+            findings = []
+
+        if findings and rescorings is None:
+            rescorings = await deliverydb.util.rescorings_for_component(
+                component=component,
+                finding_type=finding_type,
+                db_session=db_session,
+            )
 
         artefact_summary = await artefact_datatype_summary(
             artefact=artefact,
@@ -326,7 +322,7 @@ async def component_datatype_summaries(
             datasource=datasource,
             artefact_scan_infos=artefact_scan_infos,
             findings=findings,
-            rescorings=rescorings,
+            rescorings=rescorings or [],
         )
 
         summaries.append(
