@@ -1525,7 +1525,7 @@ def _collect_compliance_summary_cache_ids(
         version=artefact_metadata.component_version,
     )
 
-    if artefact_metadata.type is odg.model.Datatype.ARTEFACT_SCAN_INFO:
+    if artefact_metadata.type == odg.model.Datatype.ARTEFACT_SCAN_INFO:
         # If the artefact scan info changes, the compliance summary for all datatypes related to
         # this datasource has to be updated, because it may has changed from
         # UNKNOWN -> CLEAN/FINDINGS
