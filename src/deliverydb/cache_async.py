@@ -12,6 +12,7 @@ import sqlalchemy.exc
 import sqlalchemy.ext.asyncio as sqlasync
 
 import consts
+import deliverydb
 import deliverydb.model as dm
 import deliverydb_cache.model as dcm
 import deliverydb_cache.util as dcu
@@ -340,19 +341,27 @@ async def mark_for_deletion(
 
 
 async def mark_for_deletion_task(
-    db_session: sqlasync.session.AsyncSession,
+    db_url: str,
     id: str,
     delete_after: datetime.datetime | None = None,
     defer_db_commit: bool = False,
 ):
-    await mark_for_deletion(
-        db_session=db_session,
-        id=id,
-        delete_after=delete_after,
-        defer_db_commit=defer_db_commit,
+    db_session = await deliverydb.sqlalchemy_session_async(
+        db_url=db_url,
+        pool_size=deliverydb.DB_POOL_LOW_PRIO_SIZE,
+        max_overflow=deliverydb.DB_POOL_LOW_PRIO_MAX_OVERFLOW,
+        pool_timeout=deliverydb.DB_POOL_LOW_PRIO_TIMEOUT,
     )
 
-    await db_session.close()
+    try:
+        await mark_for_deletion(
+            db_session=db_session,
+            id=id,
+            delete_after=delete_after,
+            defer_db_commit=defer_db_commit,
+        )
+    finally:
+        await db_session.close()
 
 
 async def mark_function_cache_for_deletion(
@@ -425,7 +434,7 @@ class DeliveryDBCache(aiohttp.web.View):
           "204":
             description: Successful operation.
         """
-        db_session_low_prio = self.request[consts.REQUEST_DB_SESSION_LOW_PRIO]
+        db_url = self.request[consts.REQUEST_DB_URL]
         params = self.request.rel_url.query
 
         now = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -458,13 +467,19 @@ class DeliveryDBCache(aiohttp.web.View):
             )
             id = descriptor.id
 
-        asyncio.create_task(
+        task = asyncio.create_task(
             mark_for_deletion_task(
-                db_session=db_session_low_prio,
+                db_url=db_url,
                 id=id,
                 delete_after=delete_after,
             ),
         )
+
+        def _log_task_error(t: asyncio.Task) -> None:
+            if not t.cancelled() and (exc := t.exception()):
+                logger.warning(f'mark_for_deletion_task failed: {exc!r}')
+
+        task.add_done_callback(_log_task_error)
 
         return aiohttp.web.Response(
             status=http.HTTPStatus.NO_CONTENT,
