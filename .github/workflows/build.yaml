@@ -19,6 +19,7 @@ jobs:
       id-token: write
     with:
       mode: ${{ inputs.mode }}
+      version-prerelease: ${{ inputs.mode == 'snapshot' && '${epoch}' || '' }}
 
   packages:
     runs-on: ubuntu-latest
