@@ -197,7 +197,6 @@ build-docker-local: .check-build-prereqs
 # Package Helm charts for local use
 build-helm-local: .check-build-prereqs
 	@echo "Packaging Helm charts..."
-	@mkdir -p dist
 	@helm package charts/delivery-service \
 		--version $(ODG_CORE_LIBS_VERSION) \
 		--destination dist

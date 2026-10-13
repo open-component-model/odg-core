@@ -1837,9 +1837,7 @@ secrets:
 
   # @param secrets.delivery-db mapping of a secret-name (freely selectable) and the delivery-db
   # secret-values. There must be exactly _one_ secret.
-  # When using an external (managed) PostgreSQL instance, omit this section and instead reference
-  # a pre-existing Kubernetes Secret via `deliveryDb.existingSecretName` in the delivery-service chart values
-  # (the secret must mirror this chart's output: one key per secret name with a YAML-encoded value).
+  # When using an external (managed) PostgreSQL instance, specify hostname, port and database.
   delivery-db:
     primary:
       # @param secrets.delivery-db.<name>.username the PostgreSQL username
