@@ -1,0 +1,50 @@
+# legacy catch-all Role, shared by all workloads that still run under the `default` service
+# account (extensions). Keep it until every workload has migrated to its own service account.
+# After the last workload has migrated, remove this file completely.
+{{- if or (not .Values.envVars) (not .Values.envVars.K8S_CFG_NAME) }}
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: open-delivery-gear
+  namespace: {{ .Values.target_namespace | default .Release.Namespace }}
+rules:
+  - apiGroups:
+      - ""
+      - apps
+      - delivery-gear.gardener.cloud
+    resources:
+      - backlogitems
+      - logcollections
+      - pods
+      - replicasets
+      - runtimeartefacts
+      - deployments
+    verbs:
+      - create
+      - get
+      - list
+      - update
+      - patch
+      - delete
+      - watch
+  - apiGroups:
+      - gateway.networking.k8s.io
+    resources:
+      - httproutes
+    verbs:
+      - get
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: open-delivery-gear
+  namespace: {{ .Values.target_namespace | default .Release.Namespace }}
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: {{ .Values.target_namespace | default .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: open-delivery-gear
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}
