@@ -19,7 +19,13 @@ jobs:
       id-token: write
     with:
       mode: ${{ inputs.mode }}
-      version-prerelease: ${{ inputs.mode == 'snapshot' && '${epoch}' || '' }}
+      # Outer condition: inputs.mode == 'snapshot'
+      # - if false → the whole expression is '' (empty string)
+      # Inner condition (only when mode is snapshot): is this a PR or a non-default-branch push?
+      # - pull_request_target event → '0'
+      # - push to a non-default branch → '0'
+      # - anything else (e.g. push to main) → '${epoch}'
+      version-prerelease: ${{ inputs.mode == 'snapshot' && ((github.event_name == 'pull_request_target' || (github.event_name == 'push' && github.ref_name != github.event.repository.default_branch)) && '0' || '${epoch}') || '' }}
 
   packages:
     runs-on: ubuntu-latest
