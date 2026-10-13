@@ -1837,7 +1837,8 @@ secrets:
 
   # @param secrets.delivery-db mapping of a secret-name (freely selectable) and the delivery-db
   # secret-values. There must be exactly _one_ secret.
-  # When using an external (managed) PostgreSQL instance, specify hostname, port and database.
+  # When using an external (managed) PostgreSQL instance, specify hostname and optionally port
+  # and database.
   delivery-db:
     primary:
       # @param secrets.delivery-db.<name>.username the PostgreSQL username
