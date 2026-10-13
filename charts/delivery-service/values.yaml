@@ -4,6 +4,8 @@ image:
   repository: null
   tag: null
 imagePullSecrets: []
+deliveryDb:
+  secretName: secret-factory-delivery-db
 deployment:
   annotations: []
   resources:
@@ -18,8 +20,6 @@ gateway:
   enabled: false
   enableTls: true
   fullnameOverride: open-delivery-gear
-deliveryDb:
-  secretName: secret-factory-delivery-db
 host: delivery-service
 limitRange:
   defaultRequest:

@@ -58,7 +58,7 @@ spec:
           volumes:
             - name: delivery-db
               secret:
-                secretName: secret-factory-delivery-db
+                secretName: {{ .Values.deliveryDb.secretName }}
             - name: github
               secret:
                 secretName: secret-factory-github

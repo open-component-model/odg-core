@@ -14,6 +14,8 @@ access-manager:
         cpu: 100m
       limits:
         memory: 500Mi
+  deliveryDb:
+    secretName: secret-factory-delivery-db
   enabled: false
 artefact-enumerator:
   cronjob:
@@ -51,6 +53,8 @@ cache-manager:
         cpu: 500m
       limits:
         memory: 1Gi
+  deliveryDb:
+    secretName: secret-factory-delivery-db
   enabled: false
 clamav:
   deployment:
@@ -97,6 +101,8 @@ delivery-db-backup:
         cpu: 500m
       limits:
         memory: 1Gi
+  deliveryDb:
+    secretName: secret-factory-delivery-db
   enabled: false
 ghas:
   cronjob:
