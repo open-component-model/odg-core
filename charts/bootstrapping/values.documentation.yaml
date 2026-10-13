@@ -1852,6 +1852,9 @@ secrets:
       hostname: ""
       # @param secrets.delivery-db.<name>.port optional port of the PostgreSQL instance
       port: 5432
+      # @param secrets.delivery-db.<name>.database optional name of the PostgreSQL database to
+      # connect to. If omitted, the PostgreSQL default is used.
+      database: ""
 
   # @param secrets.github mapping of a secret-name (freely selectable) and the GitHub secret-values
   github:

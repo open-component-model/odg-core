@@ -9,6 +9,7 @@ class DeliveryDB:
     password: str
     hostname: str | None = None
     port: int = 5432
+    database: str | None = None
 
     def connection_url(
         self,
@@ -31,4 +32,5 @@ class DeliveryDB:
             password=self.password,
             host=hostname,
             port=self.port,
+            database=self.database or None,
         ).render_as_string(hide_password=False)
