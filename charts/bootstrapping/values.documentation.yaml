@@ -1849,10 +1849,12 @@ secrets:
       # instance (e.g. managed PostgreSQL).
       # If omitted, the in-cluster service `delivery-db.<namespace>.svc.cluster.local` is used.
       hostname: ""
-      # @param secrets.delivery-db.<name>.port optional port of the PostgreSQL instance
+      # @param secrets.delivery-db.<name>.port optional port of the PostgreSQL instance.
+      # Specify only for external PostgreSQL instance.
       port: 5432
       # @param secrets.delivery-db.<name>.database optional name of the PostgreSQL database to
       # connect to. If omitted, the PostgreSQL default is used.
+      # Specify only for external PostgreSQL instance.
       database: ""
 
   # @param secrets.github mapping of a secret-name (freely selectable) and the GitHub secret-values
