@@ -133,7 +133,7 @@ spec:
       volumes:
         - name: delivery-db
           secret:
-            secretName: {{ if .Values.deliveryDb.existingSecret }}{{ .Values.deliveryDb.existingSecret }}{{ else }}secret-factory-delivery-db{{ end }}
+            secretName: {{ if .Values.deliveryDb.existingSecretName }}{{ .Values.deliveryDb.existingSecretName }}{{ else }}secret-factory-delivery-db{{ end }}
         - name: github
           secret:
             secretName: secret-factory-github

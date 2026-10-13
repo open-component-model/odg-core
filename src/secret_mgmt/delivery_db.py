@@ -1,5 +1,7 @@
 import dataclasses
 
+from sqlalchemy.engine import URL
+
 
 @dataclasses.dataclass(kw_only=True)
 class DeliveryDB:
@@ -23,4 +25,10 @@ class DeliveryDB:
             hostname = self.hostname
         else:
             hostname = f'{service_name}.{namespace}.svc.cluster.local'
-        return f'{schema}://{self.username}:{self.password}@{hostname}:{self.port}'
+        return URL.create(
+            drivername=schema,
+            username=self.username,
+            password=self.password,
+            host=hostname,
+            port=self.port,
+        ).render_as_string(hide_password=False)

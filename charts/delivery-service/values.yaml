@@ -19,7 +19,7 @@ gateway:
   enableTls: true
   fullnameOverride: open-delivery-gear
 deliveryDb:
-  existingSecret: ""
+  existingSecretName: ""
 host: delivery-service
 limitRange:
   defaultRequest:
