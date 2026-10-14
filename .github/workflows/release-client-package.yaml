@@ -32,10 +32,10 @@ jobs:
           mkdir -p ${pkg_dir}
           pkg_dir="$(readlink -f ${pkg_dir})"
 
-          path="setup.${{ inputs.client }}-client.py"
+          path="../setup.${{ inputs.client }}-client.py"
 
           echo "Building distribution package from ${path} to ${pkg_dir}"
-          uv run python3 ${path} \
+          uv run --directory src python3 ${path} \
             bdist_wheel \
             --dist-dir ${pkg_dir}
 
