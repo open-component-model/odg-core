@@ -114,7 +114,9 @@ def test_scan_returns_finding_when_malware_detected():
     path = _write_tmpfile(b'X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR')
     malware_cfg = _make_malware_cfg()
     with unittest.mock.patch.object(
-        clamav, 'clamscan_version', return_value=('ClamAV 1.0', 1, '2024-01-01'),
+        clamav,
+        'clamscan_version',
+        return_value=('ClamAV 1.0', 1, '2024-01-01'),
     ):
         result, received = _run_scan(
             response=b'stream: Eicar-Signature FOUND\x00',
@@ -144,7 +146,9 @@ def test_scan_raises_on_socket_connect_failure():
     path = _write_tmpfile(b'data')
     clamav._lookup_clamd_socket.cache_clear()
     with unittest.mock.patch.object(
-        clamav, '_lookup_clamd_socket', return_value='/nonexistent/clamd.sock',
+        clamav,
+        '_lookup_clamd_socket',
+        return_value='/nonexistent/clamd.sock',
     ):
         with pytest.raises(OSError):
             clamav.scan(malware_cfg=None, data=_file_chunks(path), filename=path)
@@ -173,7 +177,9 @@ def test_scan_raises_on_clamd_disconnect():
         sock_path = f'{tmp}/clamd.sock'
         ready = threading.Event()
         server = threading.Thread(
-            target=_serve_then_disconnect, args=(sock_path, ready), daemon=True,
+            target=_serve_then_disconnect,
+            args=(sock_path, ready),
+            daemon=True,
         )
         server.start()
         ready.wait(timeout=3)
