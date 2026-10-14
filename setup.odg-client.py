@@ -23,7 +23,7 @@ setuptools.setup(
     version=str(bump_version()),
     description='Client library for the Open Delivery Gear',
     python_requires='>=3.14',
-    package_dir={'': '.'},
+    package_dir={'': os.path.join(own_dir, 'src')},
     py_modules=[],
     packages=[
         'delivery',

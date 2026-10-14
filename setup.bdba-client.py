@@ -21,7 +21,7 @@ def bump_version():
 setuptools.setup(
     name='bdba-client',
     version=str(bump_version()),
-    package_dir={'': '.'},
+    package_dir={'': os.path.join(own_dir, 'src')},
     python_requires='>=3.14',
     py_modules=[],
     packages=['bdba'],
