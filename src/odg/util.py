@@ -197,11 +197,11 @@ def process_backlog_items(
             delivery_service_url = extension_cfg.delivery_service_url
 
     if delivery_service_url:
-        delivery_service_client = odg_client.DeliveryServiceClient(
+        delivery_service_client = odg_client.DeliveryServiceClient.for_github(
             routes=odg_client.DeliveryServiceRoutes(
                 base_url=delivery_service_url,
             ),
-            auth_token_lookup=lookups.github_auth_token_lookup,
+            token_lookup=lookups.github_auth_token_lookup,
         )
     else:
         delivery_service_client = None

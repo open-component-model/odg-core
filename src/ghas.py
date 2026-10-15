@@ -491,11 +491,11 @@ def main():
     if not delivery_service_url:
         delivery_service_url = ghas_config.delivery_service_url
 
-    delivery_service_client = odg_client.DeliveryServiceClient(
+    delivery_service_client = odg_client.DeliveryServiceClient.for_github(
         routes=odg_client.DeliveryServiceRoutes(
             base_url=delivery_service_url,
         ),
-        auth_token_lookup=lookups.github_auth_token_lookup,
+        token_lookup=lookups.github_auth_token_lookup,
     )
 
     component_descriptor_lookup = lookups.init_component_descriptor_lookup(
