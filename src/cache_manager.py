@@ -409,11 +409,11 @@ async def main():
         delivery_service_url = cache_manager_cfg.delivery_service_url
 
     if delivery_service_url:
-        delivery_service_client = odg_client.DeliveryServiceClient(
+        delivery_service_client = odg_client.DeliveryServiceClient.for_github(
             routes=odg_client.DeliveryServiceRoutes(
                 base_url=delivery_service_url,
             ),
-            auth_token_lookup=lookups.github_auth_token_lookup,
+            token_lookup=lookups.github_auth_token_lookup,
         )
     else:
         logger.warning('No delivery-service URL provided, will not be able cleanup SBOMs')

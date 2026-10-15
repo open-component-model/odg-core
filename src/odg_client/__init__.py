@@ -5,6 +5,7 @@ import logging
 import time
 import typing
 import urllib.parse
+import warnings
 
 import dacite
 import jwt as pyjwt
@@ -143,20 +144,14 @@ class DeliveryServiceClient:
         max_retries: int | None = 5,
     ):
         """
-        Initialises a client which can be used to interact with the delivery-service.
-
-        :param DeliveryServiceRoutes routes
-            object which contains information of the base url of the desired instance of the
-            delivery-service as well as the available routes
-        :param AuthTokenLookup auth_token_lookup (optional)
-            the lookup to use for retrieving auth-tokens against oauth-endpoints
-        :param str auth_token (optional)
-            the auth-token to use for authentication
-        :param str api_url (optional)
-            the (GitHub) API URL to use for authentication. Only considered if `auth_token` is set
-        :param int max_retries (optional)
-            the maximum number of retries each request should attempt
+        Deprecated: use `DeliveryServiceClient.for_github` or `DeliveryServiceClient.for_oidc`.
         """
+        warnings.warn(
+            'DeliveryServiceClient.__init__ is deprecated — '
+            'use DeliveryServiceClient.for_github() or DeliveryServiceClient.for_oidc()',
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
         if auth_token_lookup and auth_token:
             raise ValueError('at most one of `auth_token_lookup` or `auth_token` must be provided')
@@ -166,14 +161,49 @@ class DeliveryServiceClient:
         self.auth_token = auth_token
         self.api_url = api_url
         self.auth_credentials: om.GitHubAuthCredentials = None  # filled lazily as needed
+        self._setup_session(max_retries)
 
+    def _setup_session(self, max_retries: int | None):
         self._bearer_token = None
         self._session = requests.sessions.Session()
         self._max_retries = max_retries
-        adapter = requests.adapters.HTTPAdapter(
+        self._session.mount('https://', requests.adapters.HTTPAdapter(max_retries=max_retries))
+
+    @classmethod
+    def for_github(
+        cls,
+        routes: DeliveryServiceRoutes,
+        token: str | None = None,
+        token_lookup: AuthTokenLookup | None = None,
+        api_url: str | None = None,
+        max_retries: int | None = 5,
+    ) -> '_GitHubDeliveryServiceClient':
+        if token and token_lookup:
+            raise ValueError('at most one of `token` or `token_lookup` must be provided')
+        return _GitHubDeliveryServiceClient(
+            routes=routes,
+            token=token,
+            token_lookup=token_lookup,
+            api_url=api_url,
             max_retries=max_retries,
         )
-        self._session.mount('https://', adapter)
+
+    @classmethod
+    def for_oidc(
+        cls,
+        routes: DeliveryServiceRoutes,
+        token: str | None = None,
+        token_lookup: collections.abc.Callable[[], str] | None = None,
+        max_retries: int | None = 5,
+    ) -> '_OidcDeliveryServiceClient':
+        if bool(token) == bool(token_lookup):
+            raise ValueError('exactly one of `token` or `token_lookup` must be provided')
+        return _OidcDeliveryServiceClient(
+            routes=routes,
+            token=token,
+            token_lookup=token_lookup,
+            max_retries=max_retries,
+        )
 
     def _openid_configuration(self):
         """
@@ -207,87 +237,11 @@ class DeliveryServiceClient:
             token_expiration_buffer_seconds=30,
         ):
             return
+        self._do_authenticate()
 
-        if not self.auth_token_lookup and not self.auth_token:
-            logger.info(
-                'Delivery-Service-Client has no auth-token-lookup or auth-token - '
-                'attempting anonymous auth',
-            )
-            return
-
-        if (
-            self.auth_credentials
-            and self.auth_credentials.auth_token.startswith('ey')
-            and odg_client.jwt.is_jwt_token_expired(
-                token=self.auth_credentials.auth_token,
-                token_expiration_buffer_seconds=30,
-            )
-        ):
-            self.auth_credentials = None
-
-        if not self.auth_credentials:
-            res = self._session.get(
-                url=self._routes.auth_configs(),
-                timeout=(4, 31),
-            )
-
-            res.raise_for_status()
-
-            auth_configs = res.json()
-
-            for auth_config in auth_configs:
-                api_url = auth_config.get('api_url')
-
-                if (auth_token := self.auth_token) and (not self.api_url or api_url == self.api_url):
-                    break
-                elif self.auth_token_lookup and (auth_token := self.auth_token_lookup(api_url)):
-                    break
-            else:
-                logger.info('no valid credentials found - attempting anonymous-auth')
-                return
-
-            self.auth_credentials = om.GitHubAuthCredentials(
-                api_url=api_url,
-                auth_token=auth_token,
-            )
-
-        params = {
-            'access_token': self.auth_credentials.auth_token,
-            'api_url': self.auth_credentials.api_url,
-        }
-
-        # do not log query parameters upon connection failures
-        urllib3_logger = logging.getLogger('urllib3.connectionpool')
-        was_disabled = urllib3_logger.disabled
-        urllib3_logger.disabled = True
-        try:
-            res = self._session.get(
-                url=self._routes.auth(),
-                params=params,
-                timeout=(4, 31),
-            )
-        finally:
-            urllib3_logger.disabled = was_disabled
-
-        if not res.ok:
-            logger.warning(
-                'authentication against delivery-service failed: '
-                f'{res.status_code=} {res.reason=} {res.content=}',
-            )
-
-        parsed_url = urllib.parse.urlparse(res.url)
-        parsed_query = urllib.parse.parse_qs(parsed_url.query)
-        parsed_query['access_token'] = ('REDACTED',)
-        query = urllib.parse.urlencode(parsed_query, doseq=True)
-        url = res.url.split('?')[0]
-        res.url = f'{url}?{query}'
-
-        res.raise_for_status()
-
-        self._bearer_token = res.cookies.get(odg_client.jwt.JWT_KEY)
-
-        if not self._bearer_token:
-            raise ValueError('delivery-service returned no bearer token upon authentication')
+    def _do_authenticate(self):
+        # only reached via deprecated __init__ — delegates to GitHub path
+        _GitHubDeliveryServiceClient._do_authenticate(self)
 
     def request(
         self,
@@ -837,6 +791,140 @@ class DeliveryServiceClient:
         res.raise_for_status()
 
 
+class _GitHubDeliveryServiceClient(DeliveryServiceClient):
+    def __init__(
+        self,
+        routes: DeliveryServiceRoutes,
+        token: str | None = None,
+        token_lookup: AuthTokenLookup | None = None,
+        api_url: str | None = None,
+        max_retries: int | None = 5,
+    ):
+        self._routes = routes
+        self.auth_token = token
+        self.auth_token_lookup = token_lookup
+        self.api_url = api_url
+        self.auth_credentials: om.GitHubAuthCredentials = None  # filled lazily as needed
+        self._setup_session(max_retries)
+
+    def _do_authenticate(self):
+        if not self.auth_token_lookup and not self.auth_token:
+            logger.info(
+                'Delivery-Service-Client has no auth-token-lookup or auth-token - '
+                'attempting anonymous auth',
+            )
+            return
+
+        if (
+            self.auth_credentials
+            and self.auth_credentials.auth_token.startswith('ey')
+            and odg_client.jwt.is_jwt_token_expired(
+                token=self.auth_credentials.auth_token,
+                token_expiration_buffer_seconds=30,
+            )
+        ):
+            self.auth_credentials = None
+
+        if not self.auth_credentials:
+            res = self._session.get(
+                url=self._routes.auth_configs(),
+                timeout=(4, 31),
+            )
+
+            res.raise_for_status()
+
+            auth_configs = res.json()
+
+            for auth_config in auth_configs:
+                api_url = auth_config.get('api_url')
+
+                if (auth_token := self.auth_token) and (not self.api_url or api_url == self.api_url):
+                    break
+                elif self.auth_token_lookup and (auth_token := self.auth_token_lookup(api_url)):
+                    break
+            else:
+                logger.info('no valid credentials found - attempting anonymous-auth')
+                return
+
+            self.auth_credentials = om.GitHubAuthCredentials(
+                api_url=api_url,
+                auth_token=auth_token,
+            )
+
+        params = {
+            'access_token': self.auth_credentials.auth_token,
+            'api_url': self.auth_credentials.api_url,
+        }
+
+        # do not log query parameters upon connection failures
+        urllib3_logger = logging.getLogger('urllib3.connectionpool')
+        was_disabled = urllib3_logger.disabled
+        urllib3_logger.disabled = True
+        try:
+            res = self._session.get(
+                url=self._routes.auth(),
+                params=params,
+                timeout=(4, 31),
+            )
+        finally:
+            urllib3_logger.disabled = was_disabled
+
+        if not res.ok:
+            logger.warning(
+                'authentication against delivery-service failed: '
+                f'{res.status_code=} {res.reason=} {res.content=}',
+            )
+
+        parsed_url = urllib.parse.urlparse(res.url)
+        parsed_query = urllib.parse.parse_qs(parsed_url.query)
+        parsed_query['access_token'] = ('REDACTED',)
+        query = urllib.parse.urlencode(parsed_query, doseq=True)
+        url = res.url.split('?')[0]
+        res.url = f'{url}?{query}'
+
+        res.raise_for_status()
+
+        self._bearer_token = res.cookies.get(odg_client.jwt.JWT_KEY)
+
+        if not self._bearer_token:
+            raise ValueError('delivery-service returned no bearer token upon authentication')
+
+
+class _OidcDeliveryServiceClient(DeliveryServiceClient):
+    def __init__(
+        self,
+        routes: DeliveryServiceRoutes,
+        token: str | None = None,
+        token_lookup: collections.abc.Callable[[], str] | None = None,
+        max_retries: int | None = 5,
+    ):
+        self._routes = routes
+        self.oidc_token = token
+        self.oidc_token_lookup = token_lookup
+        self._setup_session(max_retries)
+
+    def _do_authenticate(self):
+        token = self.oidc_token_lookup() if self.oidc_token_lookup else self.oidc_token
+        res = self._session.get(
+            url=self._routes.auth(),
+            headers={'Authorization': f'Bearer {token}'},
+            timeout=(4, 31),
+        )
+
+        if not res.ok:
+            logger.warning(
+                'authentication against delivery-service failed: '
+                f'{res.status_code=} {res.reason=} {res.content=}',
+            )
+
+        res.raise_for_status()
+
+        self._bearer_token = res.cookies.get(odg_client.jwt.JWT_KEY)
+
+        if not self._bearer_token:
+            raise ValueError('delivery-service returned no bearer token upon authentication')
+
+
 def _normalise_github_hostname(github_url: str):
     # hack: for github.com, we might get a different subdomain (api.github.com)
     github_hostname = odg_client.util.urlparse(github_url).hostname
@@ -927,9 +1015,9 @@ def client_from_github_app_secret(
             github_app_private_key=github_app_private_key,
         )
 
-    return DeliveryServiceClient(
+    return DeliveryServiceClient.for_github(
         routes=DeliveryServiceRoutes(
             base_url=delivery_service_base_url,
         ),
-        auth_token_lookup=token_lookup,
+        token_lookup=token_lookup,
     )

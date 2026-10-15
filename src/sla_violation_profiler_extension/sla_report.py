@@ -391,15 +391,15 @@ def main():
     auth_token = os.environ.get('DELIVERY_SERVICE_AUTH_TOKEN')
 
     if auth_token:
-        delivery_service_client = odg_client.DeliveryServiceClient(
+        delivery_service_client = odg_client.DeliveryServiceClient.for_github(
             routes=odg_client.DeliveryServiceRoutes(base_url=delivery_service_url),
-            auth_token=auth_token,
+            token=auth_token,
             api_url=os.environ.get('GITHUB_API_URL'),
         )
     else:
-        delivery_service_client = odg_client.DeliveryServiceClient(
+        delivery_service_client = odg_client.DeliveryServiceClient.for_github(
             routes=odg_client.DeliveryServiceRoutes(base_url=delivery_service_url),
-            auth_token_lookup=lookups.github_auth_token_lookup,
+            token_lookup=lookups.github_auth_token_lookup,
         )
 
     # prefer responsible handles on the github instance the report is published to

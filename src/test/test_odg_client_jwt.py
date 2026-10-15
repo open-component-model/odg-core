@@ -1,9 +1,12 @@
 import datetime
+import unittest.mock
 
 import Crypto.PublicKey.RSA
 import jwt
 import pytest
+import requests.cookies
 
+import odg_client
 import odg_client.jwt
 
 
@@ -82,3 +85,70 @@ def test_jwt(json_web_key, token):
             json_web_key=json_web_key,
             issuer='wrong-issuer',
         )
+
+
+def _make_client(**kwargs) -> odg_client.DeliveryServiceClient:
+    routes = odg_client.DeliveryServiceRoutes(base_url='https://delivery-service.example.com')
+    return odg_client.DeliveryServiceClient(routes=routes, **kwargs)
+
+
+def _make_oidc_client(**kwargs) -> odg_client.DeliveryServiceClient:
+    routes = odg_client.DeliveryServiceRoutes(base_url='https://delivery-service.example.com')
+    return odg_client.DeliveryServiceClient.for_oidc(routes=routes, **kwargs)
+
+
+def _mock_auth_response(bearer_token: str) -> unittest.mock.Mock:
+    res = unittest.mock.Mock()
+    res.ok = True
+    res.cookies = requests.cookies.RequestsCookieJar()
+    res.cookies.set(odg_client.jwt.JWT_KEY, bearer_token)
+    return res
+
+
+def test_oidc_token_calls_auth_with_bearer_header():
+    client = _make_oidc_client(token='sa-token-123')
+    mock_response = _mock_auth_response('session-jwt')
+
+    with unittest.mock.patch.object(client._session, 'get', return_value=mock_response) as mock_get:
+        client._authenticate()
+
+    mock_get.assert_called_once()
+    _, kwargs = mock_get.call_args
+    assert kwargs['headers']['Authorization'] == 'Bearer sa-token-123'
+    assert client._bearer_token == 'session-jwt'
+
+
+def test_oidc_token_lookup_calls_lookup_on_each_auth():
+    call_count = 0
+
+    def fresh_token():
+        nonlocal call_count
+        call_count += 1
+        return f'sa-token-{call_count}'
+
+    client = _make_oidc_client(token_lookup=fresh_token)
+    mock_response = _mock_auth_response('session-jwt')
+
+    with unittest.mock.patch.object(client._session, 'get', return_value=mock_response):
+        client._authenticate()
+        client._bearer_token = None  # force re-auth
+        client._authenticate()
+
+    assert call_count == 2
+
+
+def test_oidc_token_and_lookup_are_mutually_exclusive():
+    with pytest.raises(ValueError):
+        _make_oidc_client(token='tok', token_lookup=lambda: 'tok')
+
+
+def test_for_oidc_requires_token_or_lookup():
+    with pytest.raises(ValueError):
+        _make_oidc_client()
+
+
+def test_oidc_and_github_auth_are_mutually_exclusive():
+    # The API enforces this by having separate factory methods — verify
+    # the deprecated __init__ still validates the old-style combinations.
+    with pytest.raises(ValueError):
+        _make_client(auth_token='gh-tok', auth_token_lookup=lambda api_url: 'gh-tok')

@@ -305,11 +305,11 @@ def main():
     backup_retention_count = delivery_db_backup_cfg.backup_retention_count
     initial_version = delivery_db_backup_cfg.initial_version
 
-    delivery_service_client = odg_client.DeliveryServiceClient(
+    delivery_service_client = odg_client.DeliveryServiceClient.for_github(
         routes=odg_client.DeliveryServiceRoutes(
             base_url=delivery_service_url,
         ),
-        auth_token_lookup=lookups.github_auth_token_lookup,
+        token_lookup=lookups.github_auth_token_lookup,
     )
 
     greatest_versions = delivery_service_client.greatest_component_versions(
