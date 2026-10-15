@@ -683,6 +683,8 @@ class ClamAVConfig(BacklogItemMixins):
     :param list[ClamAVMapping] mappings
     :param int interval:
         Time after which an artefact must be re-scanned at latest.
+    :param int max_wait_seconds:
+        Maximum time to wait for a clamd scan response before raising a TimeoutError.
     :param WarningVerbosities on_unsupported
         Defines the handling if a backlog item should be processed which contains unsupported
         properties, e.g. an unsupported access type.
@@ -692,6 +694,7 @@ class ClamAVConfig(BacklogItemMixins):
     delivery_service_url: str
     mappings: list[ClamAVMapping]
     interval: int = 60 * 60 * 24  # 24h
+    max_wait_seconds: int = 600
     on_unsupported: WarningVerbosities = WarningVerbosities.WARNING
 
     def mapping(self, name: str, /) -> ClamAVMapping:

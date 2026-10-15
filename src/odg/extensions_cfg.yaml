@@ -36,6 +36,7 @@ cache_manager:
 
 clamav:
   enabled: False
+  # max_wait_seconds: 600
   mappings:
     - prefix: ''
 
