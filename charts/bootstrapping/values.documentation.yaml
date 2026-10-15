@@ -405,6 +405,9 @@ extensions_cfg:
         # AWS S3 and multiple AWS secrets are specified via secrets.aws, the name of the aws secret
         # to use must be specified
         aws_secret_name: null
+    # @param extensions_cfg.clamav.max_wait_seconds maximum time (in seconds) to wait for a clamd
+    # scan response before raising a TimeoutError
+    max_wait_seconds: 600
     # @param extensions_cfg.clamav.on_unsupported behaviour in case the detected artefact
     # kind/type/access is not supported
     # options:
