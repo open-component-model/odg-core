@@ -34,7 +34,7 @@ def _make_clamd_server(
         try:
             buf = b''
             while not buf.endswith(b'\x00'):
-                buf += conn.recv(16)
+                buf += conn.recv(1)
             while True:
                 raw = b''
                 while len(raw) < 4:
@@ -165,7 +165,7 @@ def test_scan_raises_on_clamd_disconnect():
             conn, _ = srv.accept()
             buf = b''
             while not buf.endswith(b'\x00'):
-                buf += conn.recv(16)
+                buf += conn.recv(1)
             conn.close()  # close without reading data or sending response
         except socket.timeout:
             pass
