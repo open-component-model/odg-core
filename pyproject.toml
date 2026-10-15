@@ -8,11 +8,11 @@ description = "Mandatory system internals for the Open Delivery Gear"
 requires-python = ">=3.14"
 dynamic = ["version"]
 dependencies = [
-    # bdba-client and odg-client are uv workspace members (versions in
-    # packages/*/pyproject.toml, wired below via [tool.uv.sources]) — do not
-    # pin them here; renovate ignores them (see .github/renovate.json5).
-    "bdba-client",
-    "odg-client",
+    # bdba-client and odg-client are uv workspace members (wired via [tool.uv.sources]).
+    # Versions are pinned by the release-client-package workflow; do not update via renovate
+    # (see .github/renovate.json5).
+    "bdba-client==0.15.0",
+    "odg-client==0.13.0",
     "aiohttp==3.14.4",
     "aiohttp-swagger3==0.10.0",
     "awesomeversion==25.8.0",
