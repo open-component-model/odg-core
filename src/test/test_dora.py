@@ -1,7 +1,7 @@
 import os
 
-import cnudie.util
 import ocm
+import ocm.diff
 
 import dora
 import test.resources.lookup_mocks as lookup_mocks
@@ -22,7 +22,7 @@ component_descriptor_lookup_mockup = lookup_mocks.component_descriptor_lookup_mo
 
 
 def test_dependency_changes_between_versions():
-    component_diff = cnudie.util.ComponentDiff(
+    component_diff = ocm.diff.ComponentDiff(
         cidentities_only_left=(),
         cidentities_only_right=(),
         cpairs_version_changed=(

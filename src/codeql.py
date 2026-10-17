@@ -7,7 +7,7 @@ import logging
 import urllib.parse
 
 import ci.log
-import cnudie.retrieve
+import ocm
 
 import github_util
 import k8s.util
@@ -137,7 +137,7 @@ def fetch_repo_info(
 
 def iter_artefact_metadata(
     artefact: odg.model.ComponentArtefactId,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     codeql_finding_config: odg.findings.Finding,
     codeql_config: odg.extensions_cfg.CodeqlConfig,
     secret_factory: secret_mgmt.SecretFactory,
@@ -289,7 +289,7 @@ def scan(
     artefact: odg.model.ComponentArtefactId,
     extension_cfg: odg.extensions_cfg.CodeqlConfig,
     codeql_finding_config: odg.findings.Finding,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_service_client: odg_client.DeliveryServiceClient,
     secret_factory: secret_mgmt.SecretFactory,
     **kwargs,

@@ -8,7 +8,6 @@ import github3.exceptions
 import github3.repos
 import yaml
 
-import cnudie.retrieve
 import oci.client
 import ocm
 
@@ -71,7 +70,7 @@ class SharedCfgOCMReference(SharedCfgReference):
 def shared_cfg_lookup(
     github_repo_lookup: collections.abc.Callable[[str], github3.repos.Repository] | None = None,
     oci_client: oci.client.Client | None = None,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById | None = None,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup | None = None,
 ) -> collections.abc.Callable[[SharedCfgReference], dict]:
     """
     Creates a shared-cfg-lookup. Ideally, this lookup should be created at application launch, and

@@ -3,9 +3,9 @@ import datetime
 import logging
 
 import ci.log
-import cnudie.retrieve
 import ocm
 import ocm.iter
+import ocm.retrieve
 
 import k8s.logging
 import lookups
@@ -221,7 +221,7 @@ def iter_versions_for_component(
 
 def create_sla_violation(
     root_descriptor: ocm.ComponentDescriptor,
-    ocm_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    ocm_lookup: ocm.ComponentDescriptorLookup,
     delivery_service_client: odg_client.DeliveryServiceClient,
 ) -> odg.model.ArtefactMetadata:
     all_component_identities = []
@@ -308,12 +308,12 @@ def main():
 
     ocm_repository_lookup = lookups.init_ocm_repository_lookup()
 
-    ocm_lookup = cnudie.retrieve.composite_component_descriptor_lookup(
+    ocm_lookup = ocm.retrieve.composite_component_descriptor_lookup(
         lookups=[
-            cnudie.retrieve.in_memory_cache_component_descriptor_lookup(
+            ocm.retrieve.in_memory_cache_component_descriptor_lookup(
                 ocm_repository_lookup=ocm_repository_lookup,
             ),
-            cnudie.retrieve.delivery_service_component_descriptor_lookup(
+            ocm.retrieve.delivery_service_component_descriptor_lookup(
                 ocm_repository_lookup=ocm_repository_lookup,
                 delivery_client=delivery_service_client,
             ),

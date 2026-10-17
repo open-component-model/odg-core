@@ -2,7 +2,6 @@ import collections.abc
 
 import yaml
 
-import cnudie.util
 import ocm
 
 
@@ -27,7 +26,7 @@ def component_descriptor_lookup_mockup_factory(
         component_identity: ocm.ComponentIdentity | str,
         ocm_repo: ocm.OcmRepository | None = None,
     ) -> ocm.ComponentDescriptor:
-        component_identity = cnudie.util.to_component_id(component_identity)
+        component_identity = ocm.to_component_id(component_identity)
         component_descriptors: list[ocm.ComponentDescriptor] = load_component_descriptors(
             mock_component_file_path,
         )

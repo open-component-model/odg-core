@@ -4,8 +4,8 @@ import functools
 import logging
 
 import ci.log
-import cnudie.retrieve
 import oci.client
+import ocm
 
 import crypto_extension.cbom
 import crypto_extension.model
@@ -85,7 +85,7 @@ def scan(
     artefact: odg.model.ComponentArtefactId,
     extension_cfg: odg.extensions_cfg.CryptoConfig,
     crypto_finding_cfg: odg.findings.Finding | None,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_service_client: odg_client.DeliveryServiceClient,
     oci_client: oci.client.Client,
     secret_factory: secret_mgmt.SecretFactory,

@@ -6,11 +6,11 @@ import sqlalchemy as sa
 import sqlalchemy.ext.asyncio as sqlasync
 import sqlalchemy.sql.elements as sqle
 
-import cnudie.retrieve_async
 import oci.model
 import ocm
 import ocm.iter
 import ocm.iter_async
+import ocm.retrieve_async
 
 import deliverydb.model as dm
 import odg.model
@@ -132,7 +132,7 @@ class ArtefactMetadataQueries:
     async def artefact_queries(
         artefacts: collections.abc.Iterable[ocm.Resource | ocm.Source] = None,
         component: ocm.Component | ocm.ComponentIdentity = None,
-        component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById = None,
+        component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById = None,
         ocm_repository_lookup: ocm.OcmRepositoryLookup | None = None,
         none_ok: bool = False,
     ) -> collections.abc.AsyncGenerator[sqle.BooleanClauseList, None, None]:
@@ -223,7 +223,7 @@ class ArtefactMetadataQueries:
     async def component_queries(
         components: tuple[ocm.Component | ocm.ComponentIdentity],
         none_ok: bool = False,
-        component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById = None,
+        component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById = None,
         ocm_repository_lookup: ocm.OcmRepositoryLookup | None = None,
     ) -> collections.abc.AsyncGenerator[sqle.BooleanClauseList, None, None]:
         """

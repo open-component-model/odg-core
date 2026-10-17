@@ -6,12 +6,11 @@ import functools
 import logging
 
 import cachetools
-import dacite
-import github3.repos
-
 import ci.log
-import cnudie.retrieve
+import dacite
 import github.user
+import github3.repos
+import ocm
 
 import github_util
 import issue_replicator.github
@@ -313,7 +312,7 @@ def _github_assignees(
 def replicate_issue_for_finding_type(
     artefact: odg.model.ComponentArtefactId,
     finding_cfg: odg.findings.Finding,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_service_client: odg_client.DeliveryServiceClient,
     mapping: odg.extensions_cfg.IssueReplicatorMapping,
     delivery_dashboard_url: str,
@@ -544,7 +543,7 @@ def replicate_issue(
     artefact: odg.model.ComponentArtefactId,
     extension_cfg: odg.extensions_cfg.IssueReplicatorConfig,
     finding_cfgs: collections.abc.Sequence[odg.findings.Finding],
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_service_client: odg_client.DeliveryServiceClient,
     parsed_arguments: argparse.Namespace,
     **kwargs,

@@ -13,13 +13,13 @@ import urllib.parse
 
 import aiohttp.web
 import cachetools.keys
-import cnudie.retrieve_async
-import cnudie.util
 import dateutil.parser
 import github3
 import ocm
+import ocm.diff
 import ocm.iter
 import ocm.iter_async
+import ocm.retrieve_async
 import ocm.util
 import sqlalchemy.ext.asyncio as sqlasync
 import version as versionutil
@@ -138,7 +138,7 @@ class DoraResponse:
 async def versions_descriptors_newer_than(
     component_name: str,
     date: datetime.datetime,
-    component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,
     ocm_repository_lookup: ocm.OcmRepositoryLookup,
     sorting_direction: typing.Literal['asc', 'desc'] = 'desc',
     db_session: sqlasync.session.AsyncSession = None,
@@ -186,12 +186,12 @@ async def versions_descriptors_newer_than(
 
 
 def _cache_key_gen_all_versions_sorted(
-    component: cnudie.util.ComponentName,
+    component: ocm.ComponentName,
     sorting_direction: typing.Literal['asc', 'desc'] = 'desc',
     db_session: sqlasync.session.AsyncSession = None,
 ):
     return cachetools.keys.hashkey(
-        cnudie.util.to_component_name(component),
+        ocm.to_component_name(component),
         sorting_direction,
     )
 
@@ -201,7 +201,7 @@ def _cache_key_gen_all_versions_sorted(
     key_func=_cache_key_gen_all_versions_sorted,
 )
 async def all_versions_sorted(
-    component: cnudie.util.ComponentName,
+    component: ocm.ComponentName,
     sorting_direction: typing.Literal['asc', 'desc'] = 'desc',
     db_session: sqlasync.session.AsyncSession = None,
 ) -> list[str]:
@@ -212,7 +212,7 @@ async def all_versions_sorted(
     asc-sorting means old to new => [0.102.0 ... 0.321.2]
     desc-sorting means new to old => [0.321.2 ... 0.102.0]
     """
-    component_name = cnudie.util.to_component_name(component)
+    component_name = ocm.to_component_name(component)
 
     versions = await components.component_versions(
         component_name=component_name,
@@ -228,7 +228,7 @@ async def all_versions_sorted(
 
 async def get_next_older_descriptor(
     component_id: ocm.ComponentIdentity,
-    component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,
     ocm_repository_lookup: ocm.OcmRepositoryLookup,
     db_session: sqlasync.session.AsyncSession = None,
 ) -> ocm.ComponentDescriptor | None:
@@ -875,7 +875,7 @@ class DoraMetrics(aiohttp.web.View):
 
 def _cache_key_diff_components(
     component_vector: components.ComponentVector,
-    component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,
 ):
     return cachetools.keys.hashkey(
         component_vector.start.name,
@@ -891,13 +891,13 @@ def _cache_key_diff_components(
 )
 async def _diff_components(
     component_vector: components.ComponentVector,
-    component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,
     ocm_repository_lookup: ocm.OcmRepositoryLookup,
-) -> cnudie.util.ComponentDiff | None:
+) -> ocm.diff.ComponentDiff | None:
     """
     calculates component-diff between components from passed-in component-vector
 
-    this function is mostly identical to cnudie.util.diff_components. It differs, however,
+    this function is mostly identical to ocm.diff.diff_components. It differs, however,
     in that it will merge multiple component-versions (of the same component) into just one
     component-version, choosing greatest/smallest versions.
     """
@@ -997,7 +997,7 @@ async def _diff_components(
     old_component_names -= both_names
     new_component_names -= both_names
 
-    return cnudie.util.ComponentDiff(
+    return ocm.diff.ComponentDiff(
         cidentities_only_left=set(),
         cidentities_only_right=set(),
         cpairs_version_changed=components_with_changed_versions,
@@ -1008,7 +1008,7 @@ async def _diff_components(
 
 
 def dependency_changes_between_versions(
-    component_diff: cnudie.util.ComponentDiff,
+    component_diff: ocm.diff.ComponentDiff,
     dependency_name_filter: collections.abc.Iterable[str] | None = None,
     only_rising_changes: bool = False,
 ) -> list[components.ComponentVector]:
