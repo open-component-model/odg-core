@@ -62,7 +62,11 @@ dev = [
     "bandit==1.9.4",
     "semver==3.1.0",
     "setuptools==84.0.0",
+    "testcontainers[postgres]>=4.15.0",
 ]
+
+[tool.pytest.ini_options]
+norecursedirs = ["test/perf"]
 
 [tool.bandit]
 exclude_dirs = ['test', '.venv']

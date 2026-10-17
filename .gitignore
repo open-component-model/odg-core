@@ -13,3 +13,5 @@ dist/
 *.egg-info/
 *.bak
 extensions_cfg.local.yaml
+test/perf/**/results/*
+test/perf/**/*.dump

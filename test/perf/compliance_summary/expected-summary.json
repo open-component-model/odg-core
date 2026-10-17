@@ -1,0 +1,3002 @@
+{
+  "complianceSummary": [
+    {
+      "artefacts": [
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_legacy,_nopkg,_prod,_slim,base,server,cloud,ali,multipath,iscsi,nvme,gardener",
+                "platform": "ali"
+              },
+              "artefact_name": "gardenlinux",
+              "artefact_type": "virtual_machine_image",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "MEDIUM",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": 2
+            },
+            {
+              "categorisation": "CLEAN",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": 0
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_legacy,_nopkg,_prod,_slim,base,server,cloud,ali,multipath,iscsi,nvme,gardener",
+                "platform": "ali"
+              },
+              "artefact_name": "rootfs",
+              "artefact_type": "application/tar+vm-image-rootfs",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "MEDIUM",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": 2
+            },
+            {
+              "categorisation": "CLEAN",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": 0
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_legacy,_nopkg,_prod,_slim,base,server,cloud,aws,multipath,iscsi,nvme,gardener",
+                "platform": "aws"
+              },
+              "artefact_name": "gardenlinux",
+              "artefact_type": "virtual_machine_image",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "MEDIUM",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": 2
+            },
+            {
+              "categorisation": "CLEAN",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": 0
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_legacy,_nopkg,_prod,_slim,base,server,cloud,aws,multipath,iscsi,nvme,gardener",
+                "platform": "aws"
+              },
+              "artefact_name": "rootfs",
+              "artefact_type": "application/tar+vm-image-rootfs",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "MEDIUM",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": 2
+            },
+            {
+              "categorisation": "CLEAN",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": 0
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "arm64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_legacy,_nopkg,_prod,_slim,base,server,cloud,aws,multipath,iscsi,nvme,gardener",
+                "platform": "aws"
+              },
+              "artefact_name": "gardenlinux",
+              "artefact_type": "virtual_machine_image",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "MEDIUM",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": 2
+            },
+            {
+              "categorisation": "CLEAN",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": 0
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "arm64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_legacy,_nopkg,_prod,_slim,base,server,cloud,aws,multipath,iscsi,nvme,gardener",
+                "platform": "aws"
+              },
+              "artefact_name": "rootfs",
+              "artefact_type": "application/tar+vm-image-rootfs",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "MEDIUM",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": 2
+            },
+            {
+              "categorisation": "CLEAN",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": 0
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_legacy,_nopkg,_prod,_slim,base,server,cloud,azure,multipath,iscsi,nvme,gardener",
+                "platform": "azure"
+              },
+              "artefact_name": "gardenlinux",
+              "artefact_type": "virtual_machine_image",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "MEDIUM",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": 2
+            },
+            {
+              "categorisation": "CLEAN",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": 0
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_legacy,_nopkg,_prod,_slim,base,server,cloud,azure,multipath,iscsi,nvme,gardener",
+                "platform": "azure"
+              },
+              "artefact_name": "rootfs",
+              "artefact_type": "application/tar+vm-image-rootfs",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "MEDIUM",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": 2
+            },
+            {
+              "categorisation": "CLEAN",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": 0
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "arm64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_legacy,_nopkg,_prod,_slim,base,server,cloud,azure,multipath,iscsi,nvme,gardener",
+                "platform": "azure"
+              },
+              "artefact_name": "gardenlinux",
+              "artefact_type": "virtual_machine_image",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "MEDIUM",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": 2
+            },
+            {
+              "categorisation": "CLEAN",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": 0
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "arm64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_legacy,_nopkg,_prod,_slim,base,server,cloud,azure,multipath,iscsi,nvme,gardener",
+                "platform": "azure"
+              },
+              "artefact_name": "rootfs",
+              "artefact_type": "application/tar+vm-image-rootfs",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "MEDIUM",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": 2
+            },
+            {
+              "categorisation": "CLEAN",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": 0
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_legacy,_nopkg,_prod,_slim,base,server,cloud,gcp,multipath,iscsi,nvme,gardener",
+                "platform": "gcp"
+              },
+              "artefact_name": "gardenlinux",
+              "artefact_type": "virtual_machine_image",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "MEDIUM",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": 2
+            },
+            {
+              "categorisation": "CLEAN",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": 0
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_legacy,_nopkg,_prod,_slim,base,server,cloud,gcp,multipath,iscsi,nvme,gardener",
+                "platform": "gcp"
+              },
+              "artefact_name": "rootfs",
+              "artefact_type": "application/tar+vm-image-rootfs",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "MEDIUM",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": 2
+            },
+            {
+              "categorisation": "CLEAN",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": 0
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "arm64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_legacy,_nopkg,_prod,_slim,base,server,cloud,gcp,multipath,iscsi,nvme,gardener",
+                "platform": "gcp"
+              },
+              "artefact_name": "gardenlinux",
+              "artefact_type": "virtual_machine_image",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "MEDIUM",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": 2
+            },
+            {
+              "categorisation": "CLEAN",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": 0
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "arm64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_legacy,_nopkg,_prod,_slim,base,server,cloud,gcp,multipath,iscsi,nvme,gardener",
+                "platform": "gcp"
+              },
+              "artefact_name": "rootfs",
+              "artefact_type": "application/tar+vm-image-rootfs",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "MEDIUM",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": 2
+            },
+            {
+              "categorisation": "CLEAN",
+              "scanStatus": "ok",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": 0
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_legacy,_nopkg,_prod,_slim,base,server,cloud,multipath,iscsi,nvme,gardener,openstackCloud,openstack",
+                "platform": "openstack",
+                "platform_variant": "vmware"
+              },
+              "artefact_name": "gardenlinux",
+              "artefact_type": "virtual_machine_image",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_legacy,_nopkg,_prod,_slim,base,server,cloud,multipath,iscsi,nvme,gardener,openstackCloud,openstack",
+                "platform": "openstack",
+                "platform_variant": "vmware"
+              },
+              "artefact_name": "rootfs",
+              "artefact_type": "application/tar+vm-image-rootfs",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,openstackMetal,sap,ssh,_fwcfg,_legacy,_nopkg,_prod,_slim,base,server,openstack,metal,multipath,iscsi,nvme,gardener",
+                "platform": "openstack",
+                "platform_variant": "metal"
+              },
+              "artefact_name": "gardenlinux",
+              "artefact_type": "virtual_machine_image",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,openstackMetal,sap,ssh,_fwcfg,_legacy,_nopkg,_prod,_slim,base,server,openstack,metal,multipath,iscsi,nvme,gardener",
+                "platform": "openstack",
+                "platform_variant": "metal"
+              },
+              "artefact_name": "rootfs",
+              "artefact_type": "application/tar+vm-image-rootfs",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nocrypt,_nopkg,_prod,_slim,base,server,cloud,aws,multipath,iscsi,nvme,gardener,_unsigned,_usi",
+                "platform": "aws"
+              },
+              "artefact_name": "gardenlinux",
+              "artefact_type": "virtual_machine_image",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nocrypt,_nopkg,_prod,_slim,base,server,cloud,aws,multipath,iscsi,nvme,gardener,_unsigned,_usi",
+                "platform": "aws"
+              },
+              "artefact_name": "rootfs",
+              "artefact_type": "application/tar+vm-image-rootfs",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "arm64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nocrypt,_nopkg,_prod,_slim,base,server,cloud,aws,multipath,iscsi,nvme,gardener,_unsigned,_usi",
+                "platform": "aws"
+              },
+              "artefact_name": "gardenlinux",
+              "artefact_type": "virtual_machine_image",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "arm64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nocrypt,_nopkg,_prod,_slim,base,server,cloud,aws,multipath,iscsi,nvme,gardener,_unsigned,_usi",
+                "platform": "aws"
+              },
+              "artefact_name": "rootfs",
+              "artefact_type": "application/tar+vm-image-rootfs",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nocrypt,_nopkg,_prod,_slim,base,server,cloud,azure,multipath,iscsi,nvme,gardener,_unsigned,_usi",
+                "platform": "azure"
+              },
+              "artefact_name": "gardenlinux",
+              "artefact_type": "virtual_machine_image",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nocrypt,_nopkg,_prod,_slim,base,server,cloud,azure,multipath,iscsi,nvme,gardener,_unsigned,_usi",
+                "platform": "azure"
+              },
+              "artefact_name": "rootfs",
+              "artefact_type": "application/tar+vm-image-rootfs",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "arm64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nocrypt,_nopkg,_prod,_slim,base,server,cloud,azure,multipath,iscsi,nvme,gardener,_unsigned,_usi",
+                "platform": "azure"
+              },
+              "artefact_name": "gardenlinux",
+              "artefact_type": "virtual_machine_image",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "arm64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nocrypt,_nopkg,_prod,_slim,base,server,cloud,azure,multipath,iscsi,nvme,gardener,_unsigned,_usi",
+                "platform": "azure"
+              },
+              "artefact_name": "rootfs",
+              "artefact_type": "application/tar+vm-image-rootfs",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nocrypt,_nopkg,_prod,_slim,base,server,cloud,gcp,multipath,iscsi,nvme,gardener,_unsigned,_usi",
+                "platform": "gcp"
+              },
+              "artefact_name": "gardenlinux",
+              "artefact_type": "virtual_machine_image",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nocrypt,_nopkg,_prod,_slim,base,server,cloud,gcp,multipath,iscsi,nvme,gardener,_unsigned,_usi",
+                "platform": "gcp"
+              },
+              "artefact_name": "rootfs",
+              "artefact_type": "application/tar+vm-image-rootfs",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "arm64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nocrypt,_nopkg,_prod,_slim,base,server,cloud,gcp,multipath,iscsi,nvme,gardener,_unsigned,_usi",
+                "platform": "gcp"
+              },
+              "artefact_name": "gardenlinux",
+              "artefact_type": "virtual_machine_image",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "arm64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nocrypt,_nopkg,_prod,_slim,base,server,cloud,gcp,multipath,iscsi,nvme,gardener,_unsigned,_usi",
+                "platform": "gcp"
+              },
+              "artefact_name": "rootfs",
+              "artefact_type": "application/tar+vm-image-rootfs",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nocrypt,_nopkg,_prod,_slim,base,server,cloud,multipath,iscsi,nvme,gardener,openstackCloud,openstack,_unsigned,_usi",
+                "platform": "openstack",
+                "platform_variant": "vmware"
+              },
+              "artefact_name": "gardenlinux",
+              "artefact_type": "virtual_machine_image",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nocrypt,_nopkg,_prod,_slim,base,server,cloud,multipath,iscsi,nvme,gardener,openstackCloud,openstack,_unsigned,_usi",
+                "platform": "openstack",
+                "platform_variant": "vmware"
+              },
+              "artefact_name": "rootfs",
+              "artefact_type": "application/tar+vm-image-rootfs",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,openstackMetal,sap,ssh,_fwcfg,_nocrypt,_nopkg,_prod,_slim,base,server,openstack,metal,multipath,iscsi,nvme,gardener,_unsigned,_usi",
+                "platform": "openstack",
+                "platform_variant": "metal"
+              },
+              "artefact_name": "gardenlinux",
+              "artefact_type": "virtual_machine_image",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,openstackMetal,sap,ssh,_fwcfg,_nocrypt,_nopkg,_prod,_slim,base,server,openstack,metal,multipath,iscsi,nvme,gardener,_unsigned,_usi",
+                "platform": "openstack",
+                "platform_variant": "metal"
+              },
+              "artefact_name": "rootfs",
+              "artefact_type": "application/tar+vm-image-rootfs",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nopkg,_prod,_slim,base,server,cloud,aws,multipath,iscsi,nvme,gardener,_tpm2,_usi,_trustedboot",
+                "platform": "aws"
+              },
+              "artefact_name": "gardenlinux",
+              "artefact_type": "virtual_machine_image",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nopkg,_prod,_slim,base,server,cloud,aws,multipath,iscsi,nvme,gardener,_tpm2,_usi,_trustedboot",
+                "platform": "aws"
+              },
+              "artefact_name": "rootfs",
+              "artefact_type": "application/tar+vm-image-rootfs",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "arm64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nopkg,_prod,_slim,base,server,cloud,aws,multipath,iscsi,nvme,gardener,_tpm2,_usi,_trustedboot",
+                "platform": "aws"
+              },
+              "artefact_name": "gardenlinux",
+              "artefact_type": "virtual_machine_image",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "arm64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nopkg,_prod,_slim,base,server,cloud,aws,multipath,iscsi,nvme,gardener,_tpm2,_usi,_trustedboot",
+                "platform": "aws"
+              },
+              "artefact_name": "rootfs",
+              "artefact_type": "application/tar+vm-image-rootfs",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nopkg,_prod,_slim,base,server,cloud,azure,multipath,iscsi,nvme,gardener,_tpm2,_usi,_trustedboot",
+                "platform": "azure"
+              },
+              "artefact_name": "gardenlinux",
+              "artefact_type": "virtual_machine_image",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nopkg,_prod,_slim,base,server,cloud,azure,multipath,iscsi,nvme,gardener,_tpm2,_usi,_trustedboot",
+                "platform": "azure"
+              },
+              "artefact_name": "rootfs",
+              "artefact_type": "application/tar+vm-image-rootfs",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "arm64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nopkg,_prod,_slim,base,server,cloud,azure,multipath,iscsi,nvme,gardener,_tpm2,_usi,_trustedboot",
+                "platform": "azure"
+              },
+              "artefact_name": "gardenlinux",
+              "artefact_type": "virtual_machine_image",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "arm64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nopkg,_prod,_slim,base,server,cloud,azure,multipath,iscsi,nvme,gardener,_tpm2,_usi,_trustedboot",
+                "platform": "azure"
+              },
+              "artefact_name": "rootfs",
+              "artefact_type": "application/tar+vm-image-rootfs",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nopkg,_prod,_slim,base,server,cloud,gcp,multipath,iscsi,nvme,gardener,_tpm2,_usi,_trustedboot",
+                "platform": "gcp"
+              },
+              "artefact_name": "gardenlinux",
+              "artefact_type": "virtual_machine_image",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "amd64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nopkg,_prod,_slim,base,server,cloud,gcp,multipath,iscsi,nvme,gardener,_tpm2,_usi,_trustedboot",
+                "platform": "gcp"
+              },
+              "artefact_name": "rootfs",
+              "artefact_type": "application/tar+vm-image-rootfs",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "arm64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nopkg,_prod,_slim,base,server,cloud,gcp,multipath,iscsi,nvme,gardener,_tpm2,_usi,_trustedboot",
+                "platform": "gcp"
+              },
+              "artefact_name": "gardenlinux",
+              "artefact_type": "virtual_machine_image",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {
+                "architecture": "arm64",
+                "feature-flags": "log,sap,ssh,_fwcfg,_nopkg,_prod,_slim,base,server,cloud,gcp,multipath,iscsi,nvme,gardener,_tpm2,_usi,_trustedboot",
+                "platform": "gcp"
+              },
+              "artefact_name": "rootfs",
+              "artefact_type": "application/tar+vm-image-rootfs",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "resource",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "artefact": {
+            "artefact": {
+              "artefact_extra_id": {},
+              "artefact_name": "gardenlinux",
+              "artefact_type": "git",
+              "artefact_version": "2150.10.0"
+            },
+            "artefact_kind": "source",
+            "component_name": "github.com/gardenlinux/gardenlinux",
+            "component_version": "2150.10.0",
+            "references": []
+          },
+          "entries": [
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/vulnerability",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "bdba",
+              "type": "finding/license",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "clamav",
+              "type": "finding/malware",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "codeql",
+              "type": "finding/codeql",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "sast",
+              "type": "finding/sast",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "crypto",
+              "type": "finding/crypto",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "osid",
+              "type": "finding/osid",
+              "value": -1
+            },
+            {
+              "categorisation": "UNKNOWN",
+              "scanStatus": "no_data",
+              "source": "ghas",
+              "type": "finding/ghas",
+              "value": -1
+            }
+          ]
+        }
+      ],
+      "componentId": {
+        "name": "github.com/gardenlinux/gardenlinux",
+        "version": "2150.10.0"
+      },
+      "entries": [
+        {
+          "categorisation": "MEDIUM",
+          "scanStatus": "ok",
+          "source": "bdba",
+          "type": "finding/vulnerability",
+          "value": 2
+        },
+        {
+          "categorisation": "CLEAN",
+          "scanStatus": "ok",
+          "source": "bdba",
+          "type": "finding/license",
+          "value": 0
+        },
+        {
+          "categorisation": "UNKNOWN",
+          "scanStatus": "no_data",
+          "source": "clamav",
+          "type": "finding/malware",
+          "value": -1
+        },
+        {
+          "categorisation": "UNKNOWN",
+          "scanStatus": "no_data",
+          "source": "codeql",
+          "type": "finding/codeql",
+          "value": -1
+        },
+        {
+          "categorisation": "UNKNOWN",
+          "scanStatus": "no_data",
+          "source": "sast",
+          "type": "finding/sast",
+          "value": -1
+        },
+        {
+          "categorisation": "UNKNOWN",
+          "scanStatus": "no_data",
+          "source": "crypto",
+          "type": "finding/crypto",
+          "value": -1
+        },
+        {
+          "categorisation": "UNKNOWN",
+          "scanStatus": "no_data",
+          "source": "osid",
+          "type": "finding/osid",
+          "value": -1
+        },
+        {
+          "categorisation": "UNKNOWN",
+          "scanStatus": "no_data",
+          "source": "ghas",
+          "type": "finding/ghas",
+          "value": -1
+        }
+      ]
+    }
+  ]
+}
