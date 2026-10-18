@@ -13,7 +13,7 @@ dependencies = [
     # (see .github/renovate.json5).
     "bdba-client==0.15.0",
     "odg-client==0.13.0",
-    "aiohttp==3.14.4",
+    "aiohttp==3.14.5",
     "aiohttp-swagger3==0.10.0",
     "awesomeversion==25.8.0",
     "boto3==1.43.111",
