@@ -186,6 +186,11 @@ installation:
     helm_chart_name: extensions
     value: true
     value_type: literal
+  - default: '*/5 * * * *'
+    helm_attribute: artefact-enumerator.schedule
+    helm_chart_name: extensions
+    value: ${artefact_enumerator}
+    value_type: python-string-template
 name: artefact-enumerator
 outputs: []
 ---
@@ -212,6 +217,11 @@ installation:
     helm_chart_name: extensions
     value: true
     value_type: literal
+  - default: '*/10 * * * *'
+    helm_attribute: cache-manager.schedule
+    helm_chart_name: extensions
+    value: ${cache_manager}
+    value_type: python-string-template
 name: cache-manager
 outputs: []
 ---
@@ -238,6 +248,11 @@ installation:
     helm_chart_name: extensions
     value: true
     value_type: literal
+  - default: '*/10 * * * *'
+    helm_attribute: access-manager.schedule
+    helm_chart_name: extensions
+    value: ${access_manager}
+    value_type: python-string-template
 name: access-manager
 outputs: []
 ---
@@ -449,6 +464,11 @@ installation:
     helm_chart_name: extensions
     value: true
     value_type: literal
+  - default: '0 0 * * *'
+    helm_attribute: delivery-db-backup.schedule
+    helm_chart_name: extensions
+    value: ${delivery_db_backup}
+    value_type: python-string-template
 name: delivery-db-backup
 outputs: []
 ---
@@ -475,6 +495,11 @@ installation:
     helm_chart_name: extensions
     value: true
     value_type: literal
+  - default: '0 0 * * *'
+    helm_attribute: ghas.schedule
+    helm_chart_name: extensions
+    value: ${ghas}
+    value_type: python-string-template
 name: ghas
 outputs: []
 ---
@@ -592,5 +617,15 @@ installation:
     helm_chart_name: extensions
     value: true
     value_type: literal
+  - default: '0 0 * * *'
+    helm_attribute: sla-violation-profiler.schedule
+    helm_chart_name: extensions
+    value: ${sla_violation_profiler}
+    value_type: python-string-template
+  - default: '0 2 * * *'
+    helm_attribute: sla-violation-profiler.scheduleReport
+    helm_chart_name: extensions
+    value: ${sla_report}
+    value_type: python-string-template
 name: sla-violation-profiler
 outputs: []

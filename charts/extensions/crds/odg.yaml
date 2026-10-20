@@ -37,6 +37,23 @@ spec:
                     keep_clusterwide_objects:
                       type: boolean
                       default: false
+                    schedule_overwrites:
+                      type: object
+                      properties:
+                        access_manager:
+                          type: string
+                        artefact_enumerator:
+                          type: string
+                        cache_manager:
+                          type: string
+                        delivery_db_backup:
+                          type: string
+                        ghas:
+                          type: string
+                        sla_report:
+                          type: string
+                        sla_violation_profiler:
+                          type: string
                   required:
                     - base_url
                     - target_namespace

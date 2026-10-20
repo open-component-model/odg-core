@@ -601,7 +601,8 @@ def reconcile(
                     'namespace': odg_raw['metadata']['namespace'],
                     'uid': odg_raw['metadata']['uid'],
                     'generation': odg_raw['metadata']['generation'],
-                    'context': odg_raw['spec']['context'],
+                    'context': odg_raw['spec']['context']
+                    | odg_raw['spec']['context'].get('schedule_overwrites', {}),
                     'extensions': odg_raw['spec']['extensions'],
                     'annotations': odg_raw['metadata'].get('annotations', {}),
                     'status': odg_raw.get('status', {}),
