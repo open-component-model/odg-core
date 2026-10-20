@@ -10,10 +10,10 @@ deployment:
   annotations: []
   resources:
     requests:
-      memory: 1Gi
+      memory: 2Gi
       cpu: 100m
     limits:
-      memory: 6Gi
+      memory: 12Gi
 gateway:
   annotations: {}
   className: envoy-gateway
