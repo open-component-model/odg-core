@@ -63,6 +63,9 @@ def db_session_middleware(
         if not _db_url:
             return await handler(request)
 
+        if request.path in ('/ready', '/metrics'):
+            return await handler(request)
+
         request[consts.REQUEST_DB_URL] = _db_url
         request[consts.REQUEST_DB_SESSION] = await deliverydb.sqlalchemy_session_async(
             db_url=_db_url,
