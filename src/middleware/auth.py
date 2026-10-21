@@ -950,28 +950,42 @@ class OpenIDJwks(aiohttp.web.View):
         )
 
 
-def jwt_from_signing_cfg(
-    signing_cfg: secret_mgmt.signing_cfg.SigningCfg,
+@functools.lru_cache(maxsize=32)
+def _jwt_from_signing_cfg_fields(
+    key_id: str,
+    algorithm: str,
+    public_key: str,
+    private_key: str,
 ) -> odg_client.jwt.JSONWebKey:
-    algorithm = odg_client.jwt.Algorithm(signing_cfg.algorithm.upper())
+    alg = odg_client.jwt.Algorithm(algorithm.upper())
     use = odg_client.jwt.Use.SIGNATURE
-    kid = signing_cfg.id
 
-    if algorithm is odg_client.jwt.Algorithm.RS256:
-        public_key = Crypto.PublicKey.RSA.import_key(signing_cfg.public_key)
+    if alg is odg_client.jwt.Algorithm.RS256:
+        rsa_key = Crypto.PublicKey.RSA.import_key(public_key)
 
         return odg_client.jwt.RSAPublicKey(
             use=use,
-            kid=kid,
-            n=odg_client.jwt.encodeBase64urlUInt(public_key.n),
-            e=odg_client.jwt.encodeBase64urlUInt(public_key.e),
+            kid=key_id,
+            n=odg_client.jwt.encodeBase64urlUInt(rsa_key.n),
+            e=odg_client.jwt.encodeBase64urlUInt(rsa_key.e),
         )
-    elif algorithm is odg_client.jwt.Algorithm.HS256:
+    elif alg is odg_client.jwt.Algorithm.HS256:
         return odg_client.jwt.SymmetricKey(
             use=use,
-            kid=kid,
-            k=odg_client.jwt.encodeBase64url(signing_cfg.private_key.encode('utf-8')),
+            kid=key_id,
+            k=odg_client.jwt.encodeBase64url(private_key.encode('utf-8')),
         )
+
+
+def jwt_from_signing_cfg(
+    signing_cfg: secret_mgmt.signing_cfg.SigningCfg,
+) -> odg_client.jwt.JSONWebKey:
+    return _jwt_from_signing_cfg_fields(
+        key_id=signing_cfg.id,
+        algorithm=signing_cfg.algorithm,
+        public_key=signing_cfg.public_key,
+        private_key=signing_cfg.private_key,
+    )
 
 
 def retrieve_role_bindings(
@@ -1033,11 +1047,16 @@ def auth_middleware(
             key_id=decoded_jwt.get('key_id'),
         )
 
-        decode_jwt(
-            token=token,
-            issuer=issuer,
-            signing_cfg=signing_cfg,
-            verify_signature=True,
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            functools.partial(
+                decode_jwt,
+                token=token,
+                issuer=issuer,
+                signing_cfg=signing_cfg,
+                verify_signature=True,
+            ),
         )
 
         validate_jwt_payload(decoded_jwt)
