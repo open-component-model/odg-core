@@ -317,11 +317,10 @@ class ComponentDependencies(aiohttp.web.View):
         response = aiohttp.web.StreamResponse(
             headers={'Content-Type': 'application/json'},
         )
-        await response.prepare(self.request)
-
-        await response.write(b'{"componentDependencies":[')
         first = True
         try:
+            await response.prepare(self.request)
+            await response.write(b'{"componentDependencies":[')
             async for component_node in component_dependencies:
                 if populate == 'componentReferences':
                     component_dependency = {
