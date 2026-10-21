@@ -162,9 +162,12 @@ def dbcached_function(
                     id=descriptor.id,
                 )
             ):
-                return dcu.deserialise_cache_value(
-                    value=value,
-                    encoding_format=encoding_format,
+                loop = asyncio.get_running_loop()
+                return await loop.run_in_executor(
+                    None,
+                    dcu.deserialise_cache_value,
+                    value,
+                    encoding_format,
                 )
 
             start = datetime.datetime.now()
@@ -175,9 +178,12 @@ def dbcached_function(
                 # don't store result in cache if it is explicitly excluded
                 return result
 
-            value = dcu.serialise_cache_value(
-                value=result,
-                encoding_format=encoding_format,
+            loop = asyncio.get_running_loop()
+            value = await loop.run_in_executor(
+                None,
+                dcu.serialise_cache_value,
+                result,
+                encoding_format,
             )
 
             if max_size_octets > 0 and len(value) > max_size_octets:
@@ -267,9 +273,12 @@ def dbcached_route(
                     id=descriptor.id,
                 )
             ):
-                return dcu.deserialise_cache_value(
-                    value=value,
-                    encoding_format=encoding_format,
+                loop = asyncio.get_running_loop()
+                return await loop.run_in_executor(
+                    None,
+                    dcu.deserialise_cache_value,
+                    value,
+                    encoding_format,
                 )
 
             start = datetime.datetime.now()
@@ -280,9 +289,12 @@ def dbcached_route(
                 # don't cache error responses -> those might only be temporarily
                 return result
 
-            value = dcu.serialise_cache_value(
-                value=result,
-                encoding_format=encoding_format,
+            loop = asyncio.get_running_loop()
+            value = await loop.run_in_executor(
+                None,
+                dcu.serialise_cache_value,
+                result,
+                encoding_format,
             )
 
             if max_size_octets > 0 and len(value) > max_size_octets:

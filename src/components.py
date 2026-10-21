@@ -1,3 +1,4 @@
+import asyncio
 import collections.abc
 import dataclasses
 import datetime
@@ -333,11 +334,15 @@ class ComponentDependencies(aiohttp.web.View):
             ]
             filtered_component_dependencies.append(component_dependency)
 
-        return aiohttp.web.json_response(
-            data={
-                'componentDependencies': filtered_component_dependencies,
-            },
-            dumps=util.dict_to_json_factory,
+        loop = asyncio.get_running_loop()
+        data = await loop.run_in_executor(
+            None,
+            util.dict_to_json_factory,
+            {'componentDependencies': filtered_component_dependencies},
+        )
+        return aiohttp.web.Response(
+            body=data.encode(),
+            content_type='application/json',
         )
 
 
