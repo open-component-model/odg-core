@@ -1,4 +1,3 @@
-import asyncio
 import collections.abc
 import dataclasses
 import datetime
@@ -304,6 +303,9 @@ class ComponentDependencies(aiohttp.web.View):
                 db_session=self.request.get(consts.REQUEST_DB_SESSION),
             )
 
+        if populate not in ('all', 'componentReferences'):
+            raise aiohttp.web.HTTPBadRequest(text=f'{populate} not implemented')
+
         component_dependencies = resolve_component_dependencies(
             component_name=component_name,
             component_version=version,
@@ -311,39 +313,46 @@ class ComponentDependencies(aiohttp.web.View):
             ocm_repo=ocm_repo,
         )
 
-        filtered_component_dependencies = []
-        async for component_node in component_dependencies:
-            if populate == 'componentReferences':
-                component_dependency = {
-                    'name': component_node.component.name,
-                    'version': component_node.component.version,
-                    'repositoryContexts': component_node.component.repositoryContexts,
-                }
-            elif populate == 'all':
-                component_dependency = dataclasses.asdict(component_node.component)
-            else:
-                raise aiohttp.web.HTTPBadRequest(text=f'{populate} not implemented')
-
-            component_dependency['comp_ref'] = [
-                {
-                    'name': ref.component.name,
-                    'version': ref.component.version,
-                    'repositoryContexts': ref.component.repositoryContexts,
-                }
-                for ref in component_node.path
-            ]
-            filtered_component_dependencies.append(component_dependency)
-
-        loop = asyncio.get_running_loop()
-        data = await loop.run_in_executor(
-            None,
-            util.dict_to_json_factory,
-            {'componentDependencies': filtered_component_dependencies},
+        # stream items incrementally to avoid materialising the full dependency tree in memory
+        response = aiohttp.web.StreamResponse(
+            headers={'Content-Type': 'application/json'},
         )
-        return aiohttp.web.Response(
-            body=data.encode(),
-            content_type='application/json',
-        )
+        await response.prepare(self.request)
+
+        await response.write(b'{"componentDependencies":[')
+        first = True
+        try:
+            async for component_node in component_dependencies:
+                if populate == 'componentReferences':
+                    component_dependency = {
+                        'name': component_node.component.name,
+                        'version': component_node.component.version,
+                        'repositoryContexts': component_node.component.repositoryContexts,
+                    }
+                else:
+                    component_dependency = dataclasses.asdict(component_node.component)
+
+                component_dependency['comp_ref'] = [
+                    {
+                        'name': ref.component.name,
+                        'version': ref.component.version,
+                        'repositoryContexts': ref.component.repositoryContexts,
+                    }
+                    for ref in component_node.path
+                ]
+                if not first:
+                    await response.write(b',')
+                first = False
+                await response.write(
+                    util.dict_to_json_factory(component_dependency).encode(),
+                )
+            await response.write(b']}')
+            await response.write_eof()
+        except Exception:
+            response.force_close()
+            raise
+
+        return response
 
 
 class ComponentResponsibles(aiohttp.web.View):
