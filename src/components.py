@@ -1405,7 +1405,7 @@ class DownloadSBOM(aiohttp.web.View):
                     while True:
                         result = await conn.exec_driver_sql(
                             statement='SELECT loread(%(fd)s, %(len)s)',
-                            parameters={'fd': lo_fd, 'len': 4096},
+                            parameters={'fd': lo_fd, 'len': 262144},  # 256 KiB
                         )
 
                         if not (buffer := result.scalar()):
