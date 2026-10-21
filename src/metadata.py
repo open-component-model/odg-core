@@ -1,7 +1,9 @@
 import collections.abc
 import datetime
 import http
+import logging
 import typing
+import uuid
 
 import aiohttp.web
 import dacite
@@ -22,6 +24,9 @@ import middleware.cors
 import odg.findings
 import odg.model
 import util
+
+
+logger = logging.getLogger(__name__)
 
 
 _FIELD_TO_COL = {
@@ -1191,6 +1196,12 @@ class ArtefactMetadata(aiohttp.web.View):
         if not entries:
             return aiohttp.web.Response()
 
+        correlation_id = str(uuid.uuid4())
+
+        logger.info(
+            f'[{correlation_id}] Received PUT /artefacts/metadata request with {len(entries)=}',
+        )
+
         artefact_metadata = [
             odg.model.ArtefactMetadata.from_dict(_fill_default_values(entry)) for entry in entries
         ]
@@ -1222,7 +1233,7 @@ class ArtefactMetadata(aiohttp.web.View):
         db_stream = await db_session.stream(db_statement)
 
         # order entries to increase chances to find matching existing entry as soon as possible
-        existing_entries = sorted(
+        all_existing_entries = sorted(
             [entry[0] async for partition in db_stream.partitions(size=50) for entry in partition],
             key=lambda entry: entry.meta.get(
                 'last_update',
@@ -1231,45 +1242,66 @@ class ArtefactMetadata(aiohttp.web.View):
             reverse=True,
         )
 
-        existing_artefact_versions = {
-            existing_entry.artefact_version for existing_entry in existing_entries
-        }
+        logger.info(
+            f'[{correlation_id}] Loaded {len(all_existing_entries)} existing entries from DB',
+        )
 
-        created_artefacts: list[dm.ArtefactMetaData] = []
+        incoming_ids = {artefact_metadatum.id for artefact_metadatum in artefact_metadata}
+
+        created_by_id: dict[str, dm.ArtefactMetaData] = {}
+        created_by_group: dict[tuple, dm.ArtefactMetaData] = {}
         cache_ids_to_invalidate: set[str] = set()
 
         finding_cfgs = features.get_feature(features.FeatureFindingConfigurations).finding_cfgs
 
-        def find_entry_and_discovery_date(
-            existing_entry: dm.ArtefactMetaData,
-            new_entry: dm.ArtefactMetaData,
-            reuse_discovery_date: odg.findings.ReuseDiscoveryDate,
-        ) -> tuple[dm.ArtefactMetaData | None, datetime.date | None]:
-            if (
-                existing_entry.type != new_entry.type
-                or existing_entry.component_name != new_entry.component_name
-                or existing_entry.artefact_name != new_entry.artefact_name
-                or odg.model.normalise_artefact_extra_id(
-                    artefact_extra_id=existing_entry.artefact_extra_id,
-                    omit_version=True,
-                )
-                != odg.model.normalise_artefact_extra_id(
-                    artefact_extra_id=new_entry.artefact_extra_id,
-                    omit_version=True,
-                )
-            ):
-                return None, None
+        reuse_discovery_date_by_type: dict[str, odg.findings.ReuseDiscoveryDate] = {
+            finding_cfg.type: finding_cfg.reuse_discovery_date for finding_cfg in finding_cfgs
+        }
 
-            reusable_discovery_date = reuse_discovery_date_if_possible(
-                old_metadata=existing_entry,
-                new_metadata=metadata_entry,
-                reuse_discovery_date=reuse_discovery_date,
+        def _group_key(entry: dm.ArtefactMetaData) -> tuple | None:
+            """
+            Returns the shared key for artefact metadata entries that should share the same
+            discovery date. Returns None if discovery date reuse is not configured for this type.
+            """
+            reuse_discovery_date = reuse_discovery_date_by_type.get(
+                entry.type,
+                odg.findings.ReuseDiscoveryDate(),
+            )
+            if not (data_key := discovery_date_data_key(entry, reuse_discovery_date)):
+                # according to cfg, the discovery date should not be reused -> no need to store entry
+                return None
+
+            return (
+                entry.type,
+                entry.component_name,
+                entry.artefact_name,
+                odg.model.normalise_artefact_extra_id(
+                    artefact_extra_id=entry.artefact_extra_id,
+                    omit_version=True,
+                ),
+                data_key,
             )
 
-            if existing_entry.id != metadata_entry.id:
-                return None, reusable_discovery_date
+        # keep entries whose id matches an incoming entry (exact-update targets),
+        # plus only the latest entry per (type, component_name, artefact_name, normalised_extra_id,
+        # data key), this is necessary to keep entries to re-use existing discovery dates
+        existing_by_id: dict[str, dm.ArtefactMetaData] = {}
+        existing_by_group: dict[tuple, dm.ArtefactMetaData] = {}
+        for entry in all_existing_entries:
+            group_key = _group_key(entry)
 
-            return existing_entry, reusable_discovery_date
+            if entry.id in incoming_ids:
+                existing_by_id[entry.id] = entry
+
+            if group_key and group_key not in existing_by_group:
+                existing_by_group[group_key] = entry
+
+        del all_existing_entries  # free up memory
+
+        logger.info(
+            f'[{correlation_id}] Filtered entries to {len(existing_by_id)=} and '
+            f'{len(existing_by_group)=}',
+        )
 
         try:
             for artefact_metadatum in artefact_metadata:
@@ -1277,65 +1309,33 @@ class ArtefactMetadata(aiohttp.web.View):
                     artefact_metadata=artefact_metadatum,
                 )
 
-                for finding_cfg in finding_cfgs:
-                    if finding_cfg.type == metadata_entry.type:
-                        reuse_discovery_date = finding_cfg.reuse_discovery_date
-                        break
-                else:
-                    reuse_discovery_date = odg.findings.ReuseDiscoveryDate()
-
-                found = None
-                discovery_date = None
-
-                for existing_entry in created_artefacts:
-                    found, reusable_discovery_date = find_entry_and_discovery_date(
-                        existing_entry=existing_entry,
-                        new_entry=metadata_entry,
-                        reuse_discovery_date=reuse_discovery_date,
-                    )
-
-                    if not discovery_date:
-                        discovery_date = reusable_discovery_date
-
-                    if found:
-                        break
-
-                if not found:
-                    for existing_entry in existing_entries:
-                        if (
-                            discovery_date
-                            and metadata_entry.artefact_version not in existing_artefact_versions
-                        ):
-                            # there is no need to search any further -> we won't find any existing
-                            # entry with the same artefact version and we don't have to find any
-                            # reusable discovery date (anymore)
-                            break
-
-                        found, reusable_discovery_date = find_entry_and_discovery_date(
-                            existing_entry=existing_entry,
-                            new_entry=metadata_entry,
-                            reuse_discovery_date=reuse_discovery_date,
-                        )
-
-                        if not discovery_date:
-                            discovery_date = reusable_discovery_date
-
-                        if found:
-                            break
+                # exact id match: check created-in-batch first, then existing db entries
+                existing_entry = created_by_id.get(metadata_entry.id) or existing_by_id.get(
+                    metadata_entry.id,
+                )
 
                 _collect_compliance_summary_cache_ids(
                     artefact_metadata=metadata_entry,
                     cache_ids=cache_ids_to_invalidate,
                 )
 
-                if not found:
+                if not existing_entry:
                     # did not find existing database entry that matches the supplied metadata entry
                     # -> create new entry (and re-use discovery date if possible)
-                    if discovery_date:
-                        metadata_entry.discovery_date = discovery_date
+                    if group_key := _group_key(metadata_entry):
+                        group_candidate = created_by_group.get(group_key) or existing_by_group.get(
+                            group_key,
+                        )
+                        discovery_date = (
+                            group_candidate.discovery_date if group_candidate is not None else None
+                        )
+
+                        if discovery_date:
+                            metadata_entry.discovery_date = discovery_date
 
                     db_session.add(metadata_entry)
-                    created_artefacts.append(metadata_entry)
+                    created_by_id[metadata_entry.id] = metadata_entry
+                    created_by_group[group_key] = metadata_entry
                     continue
 
                 # update actual payload
@@ -1365,6 +1365,8 @@ class ArtefactMetadata(aiohttp.web.View):
         except:
             await db_session.rollback()
             raise
+
+        logger.info(f'[{correlation_id}] Finished updating artefact metadata')
 
         return aiohttp.web.Response(
             status=http.HTTPStatus.CREATED,
@@ -1434,62 +1436,45 @@ class ArtefactMetadata(aiohttp.web.View):
         )
 
 
-def reuse_discovery_date_if_possible(
-    old_metadata: dm.ArtefactMetaData,
-    new_metadata: dm.ArtefactMetaData,
+def discovery_date_data_key(
+    artefact_metadatum: dm.ArtefactMetaData,
     reuse_discovery_date: odg.findings.ReuseDiscoveryDate,
-) -> datetime.date | None:
+) -> str | None:
     if not reuse_discovery_date.enabled:
         return None
 
     if reuse_discovery_date.max_reuse_time:
-        last_update = datetime.datetime.fromisoformat(old_metadata.meta.get('last_update'))
+        last_update = datetime.datetime.fromisoformat(artefact_metadatum.meta.get('last_update'))
         if last_update + reuse_discovery_date.max_reuse_time < datetime.datetime.now():
             return None
 
-    if new_metadata.type == odg.model.Datatype.VULNERABILITY_FINDING:
-        if new_metadata.data.get('package_name') == old_metadata.data.get(
-            'package_name',
-        ) and new_metadata.data.get('cve') == old_metadata.data.get('cve'):
-            # found the same cve in existing entry, independent of the component-/
-            # resource-/package-version, so we must re-use its discovery date
-            return old_metadata.discovery_date
+    if artefact_metadatum.type == odg.model.Datatype.VULNERABILITY_FINDING:
+        return odg.model._as_key(
+            artefact_metadatum.data.get('package_name'),
+            artefact_metadatum.data.get('cve'),
+        )
 
-    elif new_metadata.type == odg.model.Datatype.LICENSE_FINDING:
-        if new_metadata.data.get('package_name') == old_metadata.data.get(
-            'package_name',
-        ) and new_metadata.data.get('license').get('name') == old_metadata.data.get('license').get(
-            'name',
-        ):
-            # found the same license in existing entry, independent of the component-/
-            # resource-/package-version, so we must re-use its discovery date
-            return old_metadata.discovery_date
+    elif artefact_metadatum.type == odg.model.Datatype.LICENSE_FINDING:
+        return odg.model._as_key(
+            artefact_metadatum.data.get('package_name'),
+            artefact_metadatum.data.get('license').get('name'),
+        )
 
-    elif new_metadata.type == odg.model.Datatype.IP_FINDING:
-        if (
-            new_metadata.data.get('package_name') == old_metadata.data.get('package_name')
-            and new_metadata.data.get('license').get('name')
-            == old_metadata.data.get('license').get('name')
-            and sorted(new_metadata.data.get('labels')) == sorted(old_metadata.data.get('labels'))
-            and new_metadata.data.get('policy_violation').get('name')
-            == old_metadata.data.get('policy_violation').get('name')
-        ):
-            # found the same license in existing entry, independent of the component-/
-            # resource-/package-version, so we must re-use its discovery date
-            return old_metadata.discovery_date
+    elif artefact_metadatum.type == odg.model.Datatype.IP_FINDING:
+        return odg.model._as_key(
+            artefact_metadatum.data.get('package_name'),
+            artefact_metadatum.data.get('license').get('name'),
+            sorted(artefact_metadatum.data.get('labels')),
+            artefact_metadatum.data.get('policy_violation').get('name'),
+        )
 
-    elif new_metadata.type == odg.model.Datatype.OSID_FINDING:
-        if new_metadata.data.get('osid').get('VERSION_ID') == old_metadata.data.get('osid').get(
-            'VERSION_ID',
-        ) and new_metadata.data.get('osid').get('NAME') == old_metadata.data.get('osid').get('NAME'):
-            # found the same version and name in existing entry, so we must re-use its discovery date
-            return old_metadata.discovery_date
+    elif artefact_metadatum.type == odg.model.Datatype.OSID_FINDING:
+        return odg.model._as_key(
+            artefact_metadatum.data.get('osid').get('VERSION_ID'),
+            artefact_metadatum.data.get('osid').get('NAME'),
+        )
 
-    elif new_metadata.data_key == old_metadata.data_key:
-        # found the same finding in existing entry, so we must re-use its discovery date
-        return old_metadata.discovery_date
-
-    return None
+    return artefact_metadatum.data_key
 
 
 def _fill_default_values(
