@@ -1,7 +1,9 @@
 import collections.abc
 import datetime
 import http
+import logging
 import typing
+import uuid
 
 import aiohttp.web
 import dacite
@@ -22,6 +24,9 @@ import middleware.cors
 import odg.findings
 import odg.model
 import util
+
+
+logger = logging.getLogger(__name__)
 
 
 _FIELD_TO_COL = {
@@ -1191,6 +1196,12 @@ class ArtefactMetadata(aiohttp.web.View):
         if not entries:
             return aiohttp.web.Response()
 
+        correlation_id = str(uuid.uuid4())
+
+        logger.info(
+            f'[{correlation_id}] Received PUT /artefacts/metadata request with {len(entries)=}',
+        )
+
         artefact_metadata = [
             odg.model.ArtefactMetadata.from_dict(_fill_default_values(entry)) for entry in entries
         ]
@@ -1229,6 +1240,10 @@ class ArtefactMetadata(aiohttp.web.View):
                 datetime.datetime.fromtimestamp(0, datetime.UTC).isoformat(),
             ),
             reverse=True,
+        )
+
+        logger.info(
+            f'[{correlation_id}] Loaded {len(all_existing_entries)} existing entries from DB',
         )
 
         incoming_ids = {artefact_metadatum.id for artefact_metadatum in artefact_metadata}
@@ -1282,6 +1297,11 @@ class ArtefactMetadata(aiohttp.web.View):
                 existing_by_group[group_key] = entry
 
         del all_existing_entries  # free up memory
+
+        logger.info(
+            f'[{correlation_id}] Filtered entries to {len(existing_by_id)=} and '
+            f'{len(existing_by_group)=}',
+        )
 
         try:
             for artefact_metadatum in artefact_metadata:
@@ -1345,6 +1365,8 @@ class ArtefactMetadata(aiohttp.web.View):
         except:
             await db_session.rollback()
             raise
+
+        logger.info(f'[{correlation_id}] Finished updating artefact metadata')
 
         return aiohttp.web.Response(
             status=http.HTTPStatus.CREATED,
