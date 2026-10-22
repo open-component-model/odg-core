@@ -4,10 +4,10 @@ import dataclasses
 import datetime
 import functools
 import http
-import json
 import logging
 
 import aiohttp.web
+import orjson
 import dacite
 import jsonpath_ng
 import sqlalchemy as sa
@@ -891,7 +891,7 @@ class Rescore(aiohttp.web.View):
         artefact_name = util.param(params, 'artefactName', required=True)
         artefact_version = util.param(params, 'artefactVersion', required=True)
         artefact_type = util.param(params, 'artefactType', required=True)
-        artefact_extra_id = json.loads(util.param(params, 'artefactExtraId', default='{}'))
+        artefact_extra_id = orjson.loads(util.param(params, 'artefactExtraId', default='{}'))
         type_filter = params.getall('type', default=[])
 
         if component_version == 'greatest':

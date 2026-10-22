@@ -3,13 +3,13 @@ import dataclasses
 import datetime
 import enum
 import functools
-import json
 import logging
 import re
 import urllib.parse
 
 import aiohttp.web
 import dateutil.parser
+import orjson
 import semver
 import yaml
 
@@ -97,7 +97,7 @@ def dict_serialisation(data) -> dict:
 
 
 def dict_to_json_factory(data: dict) -> str:
-    return json.dumps(dict_serialisation(data))
+    return orjson.dumps(dict_serialisation(data)).decode('utf-8')
 
 
 async def retrieve_component_descriptor(

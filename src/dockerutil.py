@@ -1,7 +1,7 @@
 import base64
-import json
 import os
 
+import orjson
 import util
 
 
@@ -30,5 +30,5 @@ def prepare_docker_cfg(
     )
     docker_cfg_dir = os.path.dirname(docker_cfg_path)
     os.makedirs(docker_cfg_dir, exist_ok=True)
-    with open(docker_cfg_path, 'w') as f:
-        json.dump(docker_cfg, f)
+    with open(docker_cfg_path, 'wb') as f:
+        f.write(orjson.dumps(docker_cfg))

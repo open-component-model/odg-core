@@ -1,5 +1,4 @@
 import dataclasses
-import json
 import logging
 import os
 import subprocess
@@ -8,6 +7,7 @@ import tempfile
 
 import ocm_util
 import odg.extensions_cfg
+import orjson
 import scanner_utils.scanner
 import secret_mgmt.oci_registry
 
@@ -62,8 +62,8 @@ class TrivyScanner(scanner_utils.scanner.Scanner):
 
     def scan_sbom(self, data: dict) -> dict:
         logger.debug('Preparing SBOM scan')
-        with tempfile.NamedTemporaryFile(suffix='.json', mode='w', delete=False) as f:
-            json.dump(data, f)
+        with tempfile.NamedTemporaryFile(suffix='.json', mode='wb', delete=False) as f:
+            f.write(orjson.dumps(data))
             tmp_path = f.name
         logger.debug(f'scanning SBOM from {tmp_path!r}')
         try:
@@ -113,7 +113,7 @@ def _run_trivy(
             logger.info(line.strip())
         else:
             logger.debug(line.strip())
-    cyclonedx = json.loads(result.stdout)
+    cyclonedx = orjson.loads(result.stdout)
     logger.debug(
         f'trivy {subcommand} returned {len(cyclonedx.get("vulnerabilities") or [])} CVE(s) '
         f'across {len(cyclonedx.get("components") or [])} component(s)',

@@ -2,9 +2,9 @@ import collections.abc
 import dataclasses
 import datetime
 import enum
-import json
 import pickle
 
+import orjson
 import yaml
 
 import deliverydb_cache.model as dcm
@@ -89,7 +89,7 @@ def serialise_cache_value(
         return pickle.dumps(value, protocol)
 
     elif encoding_format is dcm.EncodingFormat.JSON:
-        return json.dumps(value).encode('utf-8')
+        return orjson.dumps(value)
 
     elif encoding_format is dcm.EncodingFormat.YAML:
         return yaml.dump(value).encode('utf-8')
@@ -107,7 +107,7 @@ def deserialise_cache_value(
         return pickle.loads(value)
 
     elif encoding_format is dcm.EncodingFormat.JSON:
-        return json.loads(value)
+        return orjson.loads(value)
 
     elif encoding_format is dcm.EncodingFormat.YAML:
         return yaml.safe_load(value)

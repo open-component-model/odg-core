@@ -7,6 +7,7 @@ import tarfile
 import zlib
 
 import aiohttp.web
+import orjson
 import cnudie.retrieve
 import cnudie.retrieve_async
 import cnudie.util
@@ -374,7 +375,7 @@ class ComponentDependencies(aiohttp.web.View):
                     await response.write(b',')
                 first = False
                 await response.write(
-                    util.dict_to_json_factory(component_dependency).encode(),
+                    orjson.dumps(util.dict_serialisation(component_dependency)),
                 )
             await response.write(b']}')
             await response.write_eof()
@@ -1294,7 +1295,7 @@ class ComplianceSummary(aiohttp.web.View):
                     await response.write(b',')
                 first = False
                 await response.write(
-                    util.dict_to_json_factory(component_summary).encode(),
+                    orjson.dumps(util.dict_serialisation(component_summary)),
                 )
             await response.write(b']}')
             await response.write_eof()

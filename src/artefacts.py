@@ -1,4 +1,4 @@
-import json
+import orjson
 import zlib
 
 import aiohttp.web
@@ -69,7 +69,7 @@ class ArtefactBlob(aiohttp.web.View):
 
         artefact = util.param(params, 'artefact', required=True).strip()
         if artefact.startswith('{'):
-            artefact = json.loads(artefact)
+            artefact = orjson.loads(artefact)
 
             # special-handling for name/version (should refactor in ocm)
             artefact_name = artefact.pop('name', None)

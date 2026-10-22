@@ -1,11 +1,11 @@
 import http
-import json
 import logging
 import textwrap
 import threading
 import time
 import traceback
 
+import orjson
 import kubernetes.client.rest
 
 import k8s.model
@@ -26,9 +26,9 @@ def read_logs_and_remove(level: int) -> list[dict]:
     log_filename = log_filename_for_level(level=level)
     try:
         with open(log_filename, 'r+') as file:
-            logs = json.loads(f'[{file.read().rstrip().removesuffix(",")}]')
+            logs = orjson.loads(f'[{file.read().rstrip().removesuffix(",")}]')
             file.truncate(0)
-    except json.decoder.JSONDecodeError as jde:
+    except orjson.JSONDecodeError as jde:
         logger.warning(f'caugt error while reading logs: {jde}')
         logs = []
     except FileNotFoundError:
@@ -45,14 +45,14 @@ def write_logs_to_file(
     with open(log_filename, 'r+') as file:
         content = file.read()
         file.seek(0, 0)
-        file.write(',\n'.join([json.dumps(log) for log in logs]) + ',\n' + content)
+        file.write(',\n'.join([orjson.dumps(log).decode('utf-8') for log in logs]) + ',\n' + content)
 
 
 def trim_logs_to_fit_max_storage_size(
     logs: list[dict],
     max_storage_size_bytes: int = 750000,
 ) -> list[dict]:
-    while len(json.dumps(logs).encode('utf-8')) > max_storage_size_bytes:
+    while len(orjson.dumps(logs)) > max_storage_size_bytes:
         logs = logs[1:]
     return logs
 
@@ -283,11 +283,11 @@ def init_logging_thread(
 
 class JSONFormatter(logging.Formatter):
     def formatMessage(self, record) -> str:
-        # Check if json module was already cleared during interpreter shutdown
-        if json is None:
-            record.message = '"json module already unloaded during interpreter shutdown"'
+        # Check if orjson module was already cleared during interpreter shutdown
+        if orjson is None:
+            record.message = '"orjson module already unloaded during interpreter shutdown"'
         else:
-            record.message = json.dumps(record.message)
+            record.message = orjson.dumps(record.message).decode('utf-8')
         if (size := len(record.message.encode('utf-8'))) > 10000:
             record.message = f'"Request entity body is too large: {size} bytes"'
         return super().formatMessage(record)

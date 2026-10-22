@@ -7,7 +7,7 @@ import collections.abc
 import dataclasses
 import datetime
 import enum
-import json
+import orjson
 import logging
 import typing
 
@@ -260,7 +260,7 @@ class BDIO:
     entries: list[dict[str, typing.Any]]
 
     def as_blackduck_bytes(self) -> bytes:
-        return json.dumps(
+        return orjson.dumps(
             {
                 '@id': self.id,
                 'name': self.name,
@@ -268,8 +268,8 @@ class BDIO:
                 'publisherVersion': self.publisher_version,
                 '@graph': self.entries,
             },
-            indent=2,
-        ).encode('utf-8')
+            option=orjson.OPT_INDENT_2,
+        )
 
 
 #############################################################################

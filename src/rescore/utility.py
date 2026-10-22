@@ -1,11 +1,11 @@
 import collections.abc
 import copy
 import datetime
-import json
 import re
 import urllib.parse
 
 import ocm.iter
+import orjson
 
 import consts
 import odg.cvss
@@ -348,7 +348,7 @@ def delivery_dashboard_rescoring_url(
         )
 
         if artefact_id.artefact_extra_id:
-            rescore_artefacts += f'|{json.dumps(artefact_id.artefact_extra_id)}'
+            rescore_artefacts += f'|{orjson.dumps(artefact_id.artefact_extra_id).decode("utf-8")}'
 
         query_params['rescoreArtefacts'] = rescore_artefacts
 

@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import subprocess
@@ -6,6 +5,7 @@ import tempfile
 
 import oci.client
 import ocm
+import orjson
 
 import syft
 import odg.extensions_cfg
@@ -54,7 +54,7 @@ def create_cbom(
         e.add_note(f'{e.stderr=}')
         raise
 
-    return json.loads(cbom_raw)
+    return orjson.loads(cbom_raw)
 
 
 def find_cbom_or_create(

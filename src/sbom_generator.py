@@ -2,7 +2,6 @@
 import dataclasses
 import datetime
 import hashlib
-import json
 import logging
 import os
 import tempfile
@@ -11,6 +10,7 @@ import time
 import ci.log
 import cnudie.retrieve
 import oci.client
+import orjson
 import requests.exceptions
 
 import bdba.client
@@ -77,7 +77,7 @@ def fetch_ocm_sbom(
             secret_factory=secret_factory,
         ),
     )
-    raw = json.loads(b''.join(descriptor.content))
+    raw = orjson.loads(b''.join(descriptor.content))
     return SBOM(sbom_raw=raw, sbom_format=_detect_sbom_format(raw))
 
 
@@ -101,7 +101,7 @@ def generate_sbom_with_syft(
             sbom_output_format=output_format,
         )
 
-    return SBOM(sbom_raw=json.loads(sbom_raw), sbom_format=output_format)
+    return SBOM(sbom_raw=orjson.loads(sbom_raw), sbom_format=output_format)
 
 
 def get_or_create_bdba_scan(
@@ -396,13 +396,12 @@ def generate_sbom_for_artefact(
                 )
 
     with tempfile.NamedTemporaryFile(
-        mode='w',
+        mode='wb',
         suffix='.json',
-        encoding='utf-8',
         delete=False,
     ) as tmp:
         tmp_path = tmp.name
-        json.dump(sbom_result.sbom_raw, tmp, indent=2, ensure_ascii=False)
+        tmp.write(orjson.dumps(sbom_result.sbom_raw, option=orjson.OPT_INDENT_2))
 
     try:
         sha256_hash = hashlib.sha256()

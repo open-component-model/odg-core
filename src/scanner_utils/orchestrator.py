@@ -1,10 +1,10 @@
 import dataclasses
 import datetime
-import json
 import logging
 
 import cnudie.retrieve
 import oci.client
+import orjson
 
 import k8s.util
 import odg.extensions_cfg
@@ -48,8 +48,8 @@ def _fetch_sbom(
             continue
         sbom_bytes = delivery_service_client.get_blob(digest=digest)
         try:
-            sbom = json.loads(sbom_bytes)
-        except json.JSONDecodeError, UnicodeDecodeError:
+            sbom = orjson.loads(sbom_bytes)
+        except orjson.JSONDecodeError, UnicodeDecodeError:
             logger.info(f'SBOM for {artefact} is not valid JSON, ignoring')
             continue
         if not isinstance(sbom, dict) or not _is_supported_sbom_format(sbom):

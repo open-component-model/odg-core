@@ -1,6 +1,5 @@
 import abc
 import collections.abc
-import json
 import logging
 import os
 import tempfile
@@ -8,6 +7,7 @@ import tempfile
 import oci.client
 import oci.model
 import ocm
+import orjson
 import ocm.iter
 
 import ocm_util
@@ -281,4 +281,4 @@ def _fetch_oci_sbom(
         image_reference=access.imageReference,
         digest=layer.digest,
     )
-    return json.loads(blob.content)
+    return orjson.loads(blob.content)

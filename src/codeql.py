@@ -2,12 +2,12 @@
 import collections.abc
 import datetime
 import functools
-import json
 import logging
 import urllib.parse
 
 import ci.log
 import cnudie.retrieve
+import orjson
 
 import github_util
 import k8s.util
@@ -121,7 +121,7 @@ def fetch_repo_info(
         env = analysis.get('environment', {})
         if isinstance(env, str):
             try:
-                env = json.loads(env)
+                env = orjson.loads(env)
             except Exception as e:
                 logger.warning(f'Failed to parse environment field {env!r}: {e}')
                 continue
