@@ -2,7 +2,7 @@ import collections.abc
 import datetime
 import enum
 import io
-import json as _json
+import json as js
 import typing
 import urllib.parse
 import zlib
@@ -46,7 +46,7 @@ def encode_request(
         elif isinstance(obj, dict):
             if encoding == 'utf-8':
                 return orjson.dumps(obj)
-            return _json.dumps(obj).encode(encoding=encoding)
+            return js.dumps(obj).encode(encoding=encoding)
         else:
             raise ValueError(f'Encoding of type {type(obj)} is not (yet) supported')
 
