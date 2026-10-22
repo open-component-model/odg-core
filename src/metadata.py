@@ -1133,24 +1133,7 @@ class ArtefactMetadataQuery(aiohttp.web.View):
 
         finding_cfgs = features.get_feature(features.FeatureFindingConfigurations).finding_cfgs
 
-        artefact_metadata = []
-        async for partition in db_stream.partitions(size=50):
-            for row in partition:
-                artefact_metadatum = du.db_artefact_metadata_row_to_dso(row)
-
-                # only yield findings which were not explicitly filtered-out by central finding-cfg
-                for finding_cfg in finding_cfgs:
-                    if finding_cfg.type == artefact_metadatum.meta.type and not finding_cfg.matches(
-                        artefact_metadatum.artefact,
-                    ):
-                        # artefact metadatum is filtered-out, do not include it
-                        break
-                else:
-                    # artefact metadatum was not explicitly filtered-out by central finding-cfg
-                    artefact_metadata.append(await serialise_and_enrich_finding(artefact_metadatum))
-
-        data = util.dict_to_json_factory(artefact_metadata)
-
+        # stream items as they arrive from DB to avoid materialising the full result set in memory
         response = aiohttp.web.StreamResponse(
             headers={
                 'Content-Type': 'application/json',
@@ -1160,8 +1143,35 @@ class ArtefactMetadataQuery(aiohttp.web.View):
         )
         response.enable_compression()
         await response.prepare(self.request)
-        await response.write(data.encode('utf-8'))
-        await response.write_eof()
+
+        await response.write(b'[')
+        first = True
+        try:
+            async for partition in db_stream.partitions(size=50):
+                for row in partition:
+                    artefact_metadatum = du.db_artefact_metadata_row_to_dso(row)
+
+                    # only yield findings not explicitly filtered-out by central finding-cfg
+                    for finding_cfg in finding_cfgs:
+                        type_matches = finding_cfg.type == artefact_metadatum.meta.type
+                        if type_matches and not finding_cfg.matches(artefact_metadatum.artefact):
+                            # artefact metadatum is filtered-out, do not include it
+                            break
+                    else:
+                        # artefact metadatum was not explicitly filtered-out by central finding-cfg
+                        if not first:
+                            await response.write(b',')
+                        first = False
+                        await response.write(
+                            util.dict_to_json_factory(
+                                await serialise_and_enrich_finding(artefact_metadatum),
+                            ).encode(),
+                        )
+            await response.write(b']')
+            await response.write_eof()
+        except Exception:
+            response.force_close()
+            raise
 
         return response
 

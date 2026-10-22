@@ -158,6 +158,9 @@ def inject_github_users(
             yield info
 
         for gh_name, username in addressbook_entry.github.items():
+            if not username:
+                continue
+
             gh_hostname = util.normalise_url_to_second_and_tld(
                 _github_url(
                     github_name=gh_name,

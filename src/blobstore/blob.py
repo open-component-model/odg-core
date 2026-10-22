@@ -16,7 +16,7 @@ import util
 logger: logging.Logger = logging.getLogger(name=__name__)
 
 DIGEST_PARAM: str = 'digest'
-CHUNK_SIZE: int = 4096
+CHUNK_SIZE: int = 262144  # 256 KiB
 
 
 # Supported hash algorithms, value contains length of the hexdigest for validation
