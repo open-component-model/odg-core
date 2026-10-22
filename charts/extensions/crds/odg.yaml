@@ -26,6 +26,9 @@ spec:
                 context:
                   type: object
                   properties:
+                    alertmanagerEnabled:
+                      type: boolean
+                      default: false
                     base_url:
                       type: string
                     deliveryServiceMaxReplicas:
