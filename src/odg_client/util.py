@@ -43,7 +43,9 @@ def encode_request(
         elif isinstance(obj, str):
             return obj.encode(encoding=encoding)
         elif isinstance(obj, dict):
-            return orjson.dumps(obj)
+            if encoding == 'utf-8':
+                return orjson.dumps(obj)
+            return json.dumps(obj).encode(encoding=encoding)
         else:
             raise ValueError(f'Encoding of type {type(obj)} is not (yet) supported')
 
