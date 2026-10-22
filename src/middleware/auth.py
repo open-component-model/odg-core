@@ -2,7 +2,6 @@ import asyncio
 import collections.abc
 import datetime
 import enum
-import functools
 import logging
 import re
 import urllib.parse
@@ -117,9 +116,10 @@ def noauth(cls):
     return cls
 
 
-@functools.cache
-def token_payload_schema():
-    return yaml.safe_load(open(paths.token_jsonschema_path, 'rb'))
+_token_payload_schema: dict = yaml.safe_load(open(paths.token_jsonschema_path, 'rb'))
+_token_payload_validator: jsonschema.protocols.Validator = jsonschema.Draft202012Validator(
+    _token_payload_schema,
+)
 
 
 @noauth
@@ -1395,7 +1395,7 @@ def check_jwt_header_content(header: dict[str, str]):
 
 def validate_jwt_payload(decoded_jwt: dict):
     try:
-        jsonschema.validate(decoded_jwt, token_payload_schema())
+        _token_payload_validator.validate(decoded_jwt)
     except jsonschema.exceptions.ValidationError as e:
         raise aiohttp.web.HTTPUnauthorized(text=e.message)
 
