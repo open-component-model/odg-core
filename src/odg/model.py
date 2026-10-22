@@ -7,7 +7,8 @@ import hashlib
 import textwrap
 import typing
 
-import dacite
+import mashumaro.codecs
+import mashumaro.types
 import ocm
 import ocm.iter
 import structlog
@@ -178,7 +179,16 @@ class UserIdentity:
     Collection of identities that refer to the same user
     """
 
-    identifiers: list[EmailAddress | GithubUser | MetaOrigin | PersonalName | UserIdentifierBase]
+    identifiers: list[
+        typing.Annotated[
+            EmailAddress | GithubUser | MetaOrigin | PersonalName | UserIdentifierBase,
+            mashumaro.types.Discriminator(
+                field='type',
+                include_supertypes=True,
+                include_subtypes=True,
+            ),
+        ]
+    ]
 
 
 class SastStatus(enum.StrEnum):
@@ -1018,7 +1028,10 @@ class CustomRescoring:
     )
     referenced_type: str
     severity: str
-    user: BDBAUser | GitHubUser | User
+    user: typing.Annotated[
+        BDBAUser | GitHubUser | User,
+        mashumaro.types.Discriminator(field='type', include_supertypes=True, include_subtypes=True),
+    ]
     matching_rules: list[str] = dataclasses.field(default_factory=list)
     comment: str | None = None
     allowed_processing_time: str | None = None
@@ -1770,15 +1783,6 @@ MetaModels = (
     | dict
 )
 
-_DACITE_CFG = dacite.Config(
-    type_hooks={
-        datetime.datetime: datetime.datetime.fromisoformat,
-        datetime.date: lambda date: datetime.datetime.fromisoformat(date).date(),
-    },
-    cast=[enum.StrEnum, MatchCondition],
-    strict=True,
-)
-
 
 @dataclasses.dataclass
 class ArtefactMetadata:
@@ -1805,39 +1809,26 @@ class ArtefactMetadata:
 
     @staticmethod
     def from_dict(raw: dict):
-        # Performance: for vulnerability findings, rescorings, artefact_scan_info) we bypass
-        # dacite's O(n) structural union matching across all ~20 *Models members, and
-        # construct Metadata directly to avoid its datetime | str union resolution on every
-        # call. All other types fall back to the full dacite path.
+        # mashumaro silently ignores unknown keys (dacite strict=True would reject them);
+        # acceptable since payloads come from the delivery-db, not untrusted input.
         meta_type = raw['meta']['type']
 
         if meta_type == Datatype.VULNERABILITY_FINDING:
             # BDBAVulnerabilityFinding and VulnerabilityFinding share the same Datatype;
             # presence of 'base_url' (a BDBAMixin field) distinguishes them.
-            data_class: type | None = (
-                BDBAVulnerabilityFinding if 'base_url' in raw['data'] else VulnerabilityFinding
+            data = (
+                _decoders[1].decode(raw['data'])
+                if 'base_url' in raw['data']
+                else _decoders[2].decode(raw['data'])
             )
         elif meta_type == Datatype.RESCORING:
-            data_class = CustomRescoring
+            data = _decoders[4].decode(raw['data'])
         elif meta_type == Datatype.ARTEFACT_SCAN_INFO:
-            data_class = None  # arbitrary dict, no fixed schema — pass through unchanged
+            data = raw['data']
         else:
-            return dacite.from_dict(
-                data_class=ArtefactMetadata,
-                data=raw,
-                config=_DACITE_CFG,
-            )
+            return _decoders[0].decode(raw)
 
-        data = (
-            dacite.from_dict(data_class=data_class, data=raw['data'], config=_DACITE_CFG)
-            if data_class is not None
-            else raw['data']
-        )
-        artefact = dacite.from_dict(
-            data_class=ComponentArtefactId,
-            data=raw['artefact'],
-            config=_DACITE_CFG,
-        )
+        artefact = _decoders[3].decode(raw['artefact'])
         raw_meta = raw['meta']
         responsibles_raw = raw_meta.get('responsibles')
         meta = Metadata(
@@ -1854,10 +1845,7 @@ class ArtefactMetadata:
                 else None
             ),
             responsibles=(
-                [
-                    dacite.from_dict(data_class=UserIdentity, data=r, config=_DACITE_CFG)
-                    for r in responsibles_raw
-                ]
+                [_decoders[5].decode(r) for r in responsibles_raw]
                 if responsibles_raw is not None
                 else None
             ),
@@ -1920,6 +1908,16 @@ class ArtefactMetadata:
 
     def __hash__(self) -> int:
         return hash(self.key)
+
+
+_decoders = (
+    mashumaro.codecs.BasicDecoder(ArtefactMetadata),  # [0]
+    mashumaro.codecs.BasicDecoder(BDBAVulnerabilityFinding),  # [1]
+    mashumaro.codecs.BasicDecoder(VulnerabilityFinding),  # [2]
+    mashumaro.codecs.BasicDecoder(ComponentArtefactId),  # [3]
+    mashumaro.codecs.BasicDecoder(CustomRescoring),  # [4]
+    mashumaro.codecs.BasicDecoder(UserIdentity),  # [5]
+)
 
 
 def artefact_scan_info(

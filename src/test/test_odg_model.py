@@ -136,3 +136,32 @@ def test_artefact_metadata_id():
 def test_from_dict_dispatch(meta_type, data, expected_type):
     am = odg.model.ArtefactMetadata.from_dict(_artefact_envelope(meta_type, data))
     assert type(am.data) is expected_type
+
+
+def test_from_dict_hot_path_with_responsibles():
+    raw = _artefact_envelope(
+        odg.model.Datatype.VULNERABILITY_FINDING,
+        {
+            'package_name': 'curl',
+            'package_version': '8.0.0',
+            'severity': 'MEDIUM',
+            'cve': 'CVE-2025-9999',
+            'cvss_score': 5.3,
+        },
+    )
+    raw['meta']['responsibles'] = [
+        {
+            'identifiers': [
+                {
+                    'source': 'codeowners',
+                    'type': 'githubUser',
+                    'username': 'jdoe',
+                    'github_hostname': 'github.com',
+                },
+            ],
+        },
+    ]
+    am = odg.model.ArtefactMetadata.from_dict(raw)
+    assert len(am.meta.responsibles) == 1
+    assert isinstance(am.meta.responsibles[0], odg.model.UserIdentity)
+    assert isinstance(am.meta.responsibles[0].identifiers[0], odg.model.GithubUser)

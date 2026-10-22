@@ -163,6 +163,20 @@ wheels = [
 ]
 
 [[package]]
+name = "alembic"
+version = "1.20.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "mako" },
+    { name = "sqlalchemy" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/93/1c/00909e0fbebad2121d916fdcab044cae988146680e9ee4387ba25fef8747/alembic-1.20.1.tar.gz", hash = "sha256:83490def1f723413db5096591f7609ac52544805be93849170088ed04f5a2e0b", size = 2103576, upload-time = "2026-10-22T03:24:35.93Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/11/3c/8740f5b4e1bd57333e4f84265b9b6363da4f7cf70f5622dd1e2fde7a0bd5/alembic-1.20.1-py3-none-any.whl", hash = "sha256:9970712cfb81ea26c8658d378aaa5b8f6ff9146e5bb111d70497c164016cf598", size = 270355, upload-time = "2026-10-22T03:24:37.667Z" },
+]
+
+[[package]]
 name = "anyio"
 version = "4.15.1"
 source = { registry = "https://pypi.org/simple" }
@@ -334,11 +348,11 @@ wheels = [
 
 [[package]]
 name = "cachetools"
-version = "7.2.6"
+version = "7.2.7"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/f2/0f/e02be8857e0fc519a12337568f0bf4b0aad4f3a95d7303e9e9d9fbcca8c2/cachetools-7.2.6.tar.gz", hash = "sha256:1096513bdeed468ba505df3d123e4578a5a22c955f4a9ba3912fd71f3f95363a", size = 46662, upload-time = "2026-10-26T21:46:43.818Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/40/3a/bce69b9ecf4658dcd3599abe5122a9031386f8f94bd85c6525fca9109db7/cachetools-7.2.7.tar.gz", hash = "sha256:e2154c809ce9e1247120258c36821467597b5663d44c3255a9790785f23c2b1e", size = 47240, upload-time = "2026-10-28T22:15:17.189Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/53/98/c8201d54b354857a3050a52751ca482eb143c404b387ab2c41a0f981b610/cachetools-7.2.6-py3-none-any.whl", hash = "sha256:8722e08fc36ae0838a9a0a2ab9935554720de3343a62dad7aae7c595854c8623", size = 19523, upload-time = "2026-10-26T21:46:42.277Z" },
+    { url = "https://files.pythonhosted.org/packages/dc/68/211287b89b122a6842b3f078ffecc5a2abd3c0e4362748586f765e2fb3c5/cachetools-7.2.7-py3-none-any.whl", hash = "sha256:88e6b53373a96786d20894fed9ce623ae5b73cbc07421b7a73098db088be69ae", size = 19654, upload-time = "2026-10-28T22:15:15.555Z" },
 ]
 
 [[package]]
@@ -1539,6 +1553,7 @@ source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
     { name = "aiohttp-swagger3" },
+    { name = "alembic" },
     { name = "awesomeversion" },
     { name = "bdba-client" },
     { name = "boto3" },
@@ -1590,11 +1605,12 @@ dev = [
 requires-dist = [
     { name = "aiohttp", specifier = "==3.14.5" },
     { name = "aiohttp-swagger3", specifier = "==0.10.0" },
+    { name = "alembic", specifier = "==1.20.1" },
     { name = "awesomeversion", specifier = "==25.8.0" },
     { name = "bdba-client", editable = "packages/bdba-client" },
     { name = "boto3", specifier = "==1.43.122" },
     { name = "brotli", specifier = "==1.2.1" },
-    { name = "cachetools", specifier = "==7.2.6" },
+    { name = "cachetools", specifier = "==7.2.7" },
     { name = "cyclonedx-python-lib", specifier = "==11.12.0" },
     { name = "dacite", specifier = "==1.9.2" },
     { name = "dataclasses-json", specifier = "==0.6.7" },
