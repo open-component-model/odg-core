@@ -1,4 +1,4 @@
-.PHONY: help setup lint lint-staged format format-staged test build-clients build-core build-docker build-docker-local build-docker-debug-local build-helm-local .check-build-prereqs run-db run clean
+.PHONY: help setup lint lint-staged format format-staged test test-perf test_perf build-clients build-core build-docker build-docker-local build-docker-debug-local build-helm-local .check-build-prereqs run-db run clean
 
 # Configuration variables with defaults
 DB_PASSWORD ?= MyPassword
@@ -149,6 +149,14 @@ test-perf:
 		echo "Errors were found whilst executing performance tests (see above)"; \
 		exit 1; \
 	fi
+
+# Microbenchmarks (pytest-benchmark)
+test_perf:
+	@echo "Running performance benchmarks..."
+	@PYTHONPATH="$(CURDIR):$$PYTHONPATH" uv run pytest "$(CURDIR)/src/test/perf" \
+		--benchmark-sort=name \
+		--benchmark-columns=mean,ops,rounds \
+		-v
 
 # Build client packages (bdba and odg)
 build-clients:

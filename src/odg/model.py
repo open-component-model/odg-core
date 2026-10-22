@@ -1770,6 +1770,15 @@ MetaModels = (
     | dict
 )
 
+_DACITE_CFG = dacite.Config(
+    type_hooks={
+        datetime.datetime: datetime.datetime.fromisoformat,
+        datetime.date: lambda date: datetime.datetime.fromisoformat(date).date(),
+    },
+    cast=[enum.StrEnum, MatchCondition],
+    strict=True,
+)
+
 
 @dataclasses.dataclass
 class ArtefactMetadata:
@@ -1796,20 +1805,79 @@ class ArtefactMetadata:
 
     @staticmethod
     def from_dict(raw: dict):
-        return dacite.from_dict(
-            data_class=ArtefactMetadata,
-            data=raw,
-            config=dacite.Config(
-                type_hooks={
-                    datetime.datetime: datetime.datetime.fromisoformat,
-                    datetime.date: lambda date: datetime.datetime.fromisoformat(date).date(),
-                },
-                cast=[
-                    enum.StrEnum,
-                    MatchCondition,
-                ],
-                strict=True,
+        # Performance: for vulnerability findings, rescorings, artefact_scan_info) we bypass
+        # dacite's O(n) structural union matching across all ~20 *Models members, and
+        # construct Metadata directly to avoid its datetime | str union resolution on every
+        # call. All other types fall back to the full dacite path.
+        meta_type = raw['meta']['type']
+
+        if meta_type == Datatype.VULNERABILITY_FINDING:
+            # BDBAVulnerabilityFinding and VulnerabilityFinding share the same Datatype;
+            # presence of 'base_url' (a BDBAMixin field) distinguishes them.
+            data_class: type | None = (
+                BDBAVulnerabilityFinding if 'base_url' in raw['data'] else VulnerabilityFinding
+            )
+        elif meta_type == Datatype.RESCORING:
+            data_class = CustomRescoring
+        elif meta_type == Datatype.ARTEFACT_SCAN_INFO:
+            data_class = None  # arbitrary dict, no fixed schema — pass through unchanged
+        else:
+            return dacite.from_dict(
+                data_class=ArtefactMetadata,
+                data=raw,
+                config=_DACITE_CFG,
+            )
+
+        data = (
+            dacite.from_dict(data_class=data_class, data=raw['data'], config=_DACITE_CFG)
+            if data_class is not None
+            else raw['data']
+        )
+        artefact = dacite.from_dict(
+            data_class=ComponentArtefactId,
+            data=raw['artefact'],
+            config=_DACITE_CFG,
+        )
+        raw_meta = raw['meta']
+        responsibles_raw = raw_meta.get('responsibles')
+        meta = Metadata(
+            datasource=raw_meta['datasource'],
+            type=raw_meta['type'],
+            creation_date=(
+                datetime.datetime.fromisoformat(raw_meta['creation_date'])
+                if raw_meta.get('creation_date')
+                else None
             ),
+            last_update=(
+                datetime.datetime.fromisoformat(raw_meta['last_update'])
+                if raw_meta.get('last_update')
+                else None
+            ),
+            responsibles=(
+                [
+                    dacite.from_dict(data_class=UserIdentity, data=r, config=_DACITE_CFG)
+                    for r in responsibles_raw
+                ]
+                if responsibles_raw is not None
+                else None
+            ),
+            assignee_mode=(
+                ResponsibleAssigneeModes(raw_meta['assignee_mode'])
+                if raw_meta.get('assignee_mode') is not None
+                else None
+            ),
+        )
+        discovery_date_raw = raw.get('discovery_date')
+        return ArtefactMetadata(
+            artefact=artefact,
+            meta=meta,
+            data=data,
+            discovery_date=(
+                datetime.datetime.fromisoformat(discovery_date_raw).date()
+                if discovery_date_raw
+                else None
+            ),
+            allowed_processing_time=raw.get('allowed_processing_time'),
         )
 
     @property
