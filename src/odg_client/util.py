@@ -2,10 +2,11 @@ import collections.abc
 import datetime
 import enum
 import io
-import json as js
 import typing
 import urllib.parse
 import zlib
+
+import orjson
 
 
 class EncodingMethod(enum.StrEnum):
@@ -34,7 +35,7 @@ def encode_request(
         raise ValueError('`data` of type `dict` is not supported for gzip encoding')
 
     if json is not None:
-        data = js.dumps(json)
+        data = orjson.dumps(json)
 
     def _encode(obj, encoding: str = 'utf-8') -> bytes:
         if isinstance(obj, bytes):
@@ -42,7 +43,7 @@ def encode_request(
         elif isinstance(obj, str):
             return obj.encode(encoding=encoding)
         elif isinstance(obj, dict):
-            return js.dumps(obj).encode(encoding=encoding)
+            return orjson.dumps(obj)
         else:
             raise ValueError(f'Encoding of type {type(obj)} is not (yet) supported')
 
