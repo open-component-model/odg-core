@@ -8,7 +8,8 @@ import logging
 import textwrap
 import typing
 
-import dacite
+import mashumaro.codecs
+import mashumaro.types
 import ocm
 import ocm.iter
 import typing_extensions
@@ -178,7 +179,16 @@ class UserIdentity:
     Collection of identities that refer to the same user
     """
 
-    identifiers: list[EmailAddress | GithubUser | MetaOrigin | PersonalName | UserIdentifierBase]
+    identifiers: list[
+        typing.Annotated[
+            EmailAddress | GithubUser | MetaOrigin | PersonalName | UserIdentifierBase,
+            mashumaro.types.Discriminator(
+                field='type',
+                include_supertypes=True,
+                include_subtypes=True,
+            ),
+        ]
+    ]
 
 
 class SastStatus(enum.StrEnum):
@@ -1018,7 +1028,10 @@ class CustomRescoring:
     )
     referenced_type: str
     severity: str
-    user: BDBAUser | GitHubUser | User
+    user: typing.Annotated[
+        BDBAUser | GitHubUser | User,
+        mashumaro.types.Discriminator(field='type', include_supertypes=True, include_subtypes=True),
+    ]
     matching_rules: list[str] = dataclasses.field(default_factory=list)
     comment: str | None = None
     allowed_processing_time: str | None = None
@@ -1796,20 +1809,63 @@ class ArtefactMetadata:
 
     @staticmethod
     def from_dict(raw: dict):
-        return dacite.from_dict(
-            data_class=ArtefactMetadata,
-            data=raw,
-            config=dacite.Config(
-                type_hooks={
-                    datetime.datetime: datetime.datetime.fromisoformat,
-                    datetime.date: lambda date: datetime.datetime.fromisoformat(date).date(),
-                },
-                cast=[
-                    enum.StrEnum,
-                    MatchCondition,
-                ],
-                strict=True,
+        # mashumaro silently ignores unknown keys (dacite strict=True would reject them);
+        # acceptable since payloads come from the delivery-db, not untrusted input.
+        meta_type = raw['meta']['type']
+
+        if meta_type == Datatype.VULNERABILITY_FINDING:
+            # BDBAVulnerabilityFinding and VulnerabilityFinding share the same Datatype;
+            # presence of 'base_url' (a BDBAMixin field) distinguishes them.
+            data = (
+                _decoders[1].decode(raw['data'])
+                if 'base_url' in raw['data']
+                else _decoders[2].decode(raw['data'])
+            )
+        elif meta_type == Datatype.RESCORING:
+            data = _decoders[4].decode(raw['data'])
+        elif meta_type == Datatype.ARTEFACT_SCAN_INFO:
+            data = raw['data']
+        else:
+            return _decoders[0].decode(raw)
+
+        artefact = _decoders[3].decode(raw['artefact'])
+        raw_meta = raw['meta']
+        responsibles_raw = raw_meta.get('responsibles')
+        meta = Metadata(
+            datasource=raw_meta['datasource'],
+            type=raw_meta['type'],
+            creation_date=(
+                datetime.datetime.fromisoformat(raw_meta['creation_date'])
+                if raw_meta.get('creation_date')
+                else None
             ),
+            last_update=(
+                datetime.datetime.fromisoformat(raw_meta['last_update'])
+                if raw_meta.get('last_update')
+                else None
+            ),
+            responsibles=(
+                [_decoders[5].decode(r) for r in responsibles_raw]
+                if responsibles_raw is not None
+                else None
+            ),
+            assignee_mode=(
+                ResponsibleAssigneeModes(raw_meta['assignee_mode'])
+                if raw_meta.get('assignee_mode') is not None
+                else None
+            ),
+        )
+        discovery_date_raw = raw.get('discovery_date')
+        return ArtefactMetadata(
+            artefact=artefact,
+            meta=meta,
+            data=data,
+            discovery_date=(
+                datetime.datetime.fromisoformat(discovery_date_raw).date()
+                if discovery_date_raw
+                else None
+            ),
+            allowed_processing_time=raw.get('allowed_processing_time'),
         )
 
     @property
@@ -1852,6 +1908,16 @@ class ArtefactMetadata:
 
     def __hash__(self) -> int:
         return hash(self.key)
+
+
+_decoders = (
+    mashumaro.codecs.BasicDecoder(ArtefactMetadata),  # [0]
+    mashumaro.codecs.BasicDecoder(BDBAVulnerabilityFinding),  # [1]
+    mashumaro.codecs.BasicDecoder(VulnerabilityFinding),  # [2]
+    mashumaro.codecs.BasicDecoder(ComponentArtefactId),  # [3]
+    mashumaro.codecs.BasicDecoder(CustomRescoring),  # [4]
+    mashumaro.codecs.BasicDecoder(UserIdentity),  # [5]
+)
 
 
 def artefact_scan_info(

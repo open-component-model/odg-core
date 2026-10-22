@@ -1,4 +1,4 @@
-.PHONY: help setup lint lint-staged format format-staged test build-clients build-core build-docker build-docker-local build-helm-local .check-build-prereqs run-db run clean
+.PHONY: help setup lint lint-staged format format-staged test test_perf build-clients build-core build-docker build-docker-local build-helm-local .check-build-prereqs run-db run clean
 
 # Configuration variables with defaults
 DB_PASSWORD ?= MyPassword
@@ -132,12 +132,19 @@ format-staged:
 # Testing
 test:
 	@echo "Running tests..."
-	@if PYTHONPATH="$(CURDIR):$$PYTHONPATH" uv run pytest "$(CURDIR)"; then \
+	@if PYTHONPATH="$(CURDIR):$$PYTHONPATH" uv run pytest "$(CURDIR)" --benchmark-disable; then \
 		echo "Unittest executions succeeded"; \
 	else \
 		echo "Errors were found whilst executing unittests (see above)"; \
 		exit 1; \
 	fi
+
+test_perf:
+	@echo "Running performance benchmarks..."
+	@PYTHONPATH="$(CURDIR):$$PYTHONPATH" uv run pytest "$(CURDIR)/src/test/perf" \
+		--benchmark-sort=name \
+		--benchmark-columns=mean,ops,rounds \
+		-v
 
 # Build client packages (bdba and odg)
 build-clients:

@@ -21,6 +21,7 @@ dependencies = [
     "cachetools==7.2.1",
     "cyclonedx-python-lib==11.12.0",
     "dacite==1.9.2",
+    "mashumaro==3.23",
     "dataclasses-json==0.6.7",
     "gardener-cicd-libs==1.2847.0",
     "github3.py==4.0.1",
@@ -62,7 +63,12 @@ dev = [
     "bandit==1.9.4",
     "semver==3.1.0",
     "setuptools==84.0.0",
+    "pytest-benchmark>=5.3.0",
 ]
+
+[tool.pytest.ini_options]
+asyncio_mode = "strict"
+python_files = ["test_*.py", "bench_*.py", "*_test.py"]
 
 [tool.bandit]
 exclude_dirs = ['test', '.venv']
