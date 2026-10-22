@@ -1,3 +1,5 @@
+import asyncio
+
 import aiohttp.typedefs
 import aiohttp.web
 import cachetools
@@ -63,16 +65,13 @@ def db_session_middleware(
         if not _db_url:
             return await handler(request)
 
+        if request.path in ('/ready', '/metrics'):
+            return await handler(request)
+
         request[consts.REQUEST_DB_URL] = _db_url
         request[consts.REQUEST_DB_SESSION] = await deliverydb.sqlalchemy_session_async(
             db_url=_db_url,
             pool_timeout=5,
-        )
-        request[consts.REQUEST_DB_SESSION_LOW_PRIO] = await deliverydb.sqlalchemy_session_async(
-            db_url=_db_url,
-            pool_size=deliverydb.DB_POOL_LOW_PRIO_SIZE,
-            max_overflow=deliverydb.DB_POOL_LOW_PRIO_MAX_OVERFLOW,
-            pool_timeout=deliverydb.DB_POOL_LOW_PRIO_TIMEOUT,
         )
 
         try:
@@ -80,6 +79,8 @@ def db_session_middleware(
         except sqlalchemy.exc.TimeoutError:
             # 503 error can be reacted upon by a load balancer to forward req to next pod
             raise aiohttp.web.HTTPServiceUnavailable
+        except asyncio.CancelledError:
+            raise  # rollback handled by finally block below
         except Exception:
             raise
         finally:
@@ -88,11 +89,6 @@ def db_session_middleware(
                     await db_session.rollback()
                 finally:
                     await db_session.close()
-            if db_session_low_prio := request.get(consts.REQUEST_DB_SESSION_LOW_PRIO):
-                try:
-                    await db_session_low_prio.rollback()
-                finally:
-                    await db_session_low_prio.close()
 
         return response
 

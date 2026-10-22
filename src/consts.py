@@ -15,8 +15,6 @@ APP_OCI_CLIENT = 'oci_client'
 
 # `db_session` is intended to be used for tasks which have to be finished in a timely manner
 REQUEST_DB_SESSION = 'db_session'
-# `db_session_low_prio` has a small connection pool with a long timeout for low prio tasks
-REQUEST_DB_SESSION_LOW_PRIO = 'db_session_low_prio'
 # `db_url` key to create sessions outside the request-scoped ones
 REQUEST_DB_URL = 'db_url'
 REQUEST_USER_ID = 'user_id'
