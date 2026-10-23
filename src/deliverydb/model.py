@@ -72,6 +72,18 @@ sa.Index(
     ArtefactMetaData.artefact_type,
 )
 
+sa.Index(
+    None,
+    ArtefactMetaData.type,
+    ArtefactMetaData.datasource,
+)
+
+sa.Index(
+    None,
+    ArtefactMetaData.artefact_name,
+    ArtefactMetaData.artefact_version,
+)
+
 
 class DBCache(Base):
     __tablename__ = 'cache'
