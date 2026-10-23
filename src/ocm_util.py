@@ -7,13 +7,13 @@ import tarfile
 
 import dacite
 
-import cnudie.retrieve_async
 import oci.client
 import oci.client_async
 import oci.model
 import ocm
 import ocm.iter
 import ocm.oci
+import ocm.retrieve_async
 import tarutil
 
 import odg.labels
@@ -385,7 +385,7 @@ def extract_tar_archive_contents(
 
 
 async def find_artefact_node_async(
-    component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,
     ocm_repository_lookup: ocm.OcmRepositoryLookup,
     artefact: odg.model.ComponentArtefactId,
     absent_ok: bool = False,

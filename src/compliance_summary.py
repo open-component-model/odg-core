@@ -8,8 +8,8 @@ import logging
 
 import sqlalchemy.ext.asyncio as sqlasync
 
-import cnudie.retrieve_async
 import ocm
+import ocm.retrieve_async
 
 import deliverydb.cache_async
 import deliverydb.util
@@ -262,7 +262,7 @@ async def component_datatype_summaries(
     finding_type: odg.model.Datatype,
     datasource: odg.model.Datasource,
     db_session: sqlasync.session.AsyncSession,
-    component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,
     ocm_repo: ocm.OciOcmRepository | None = None,
     shortcut_cache: bool = False,
 ) -> list[tuple[odg.model.ComponentArtefactId, ComplianceSummaryEntry]]:
@@ -359,7 +359,7 @@ async def component_compliance_summary(
     component: ocm.ComponentIdentity,
     finding_cfgs: collections.abc.Sequence[odg.findings.Finding],
     db_session: sqlasync.session.AsyncSession,
-    component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,
     ocm_repo: ocm.OciOcmRepository | None = None,
     shortcut_cache: bool = False,
 ) -> ComponentComplianceSummary:

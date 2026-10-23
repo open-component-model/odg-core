@@ -4,14 +4,13 @@ import hashlib
 
 import dacite
 import sqlalchemy as sa
-import sqlalchemy.ext.declarative
 import sqlalchemy.orm
 import sqlalchemy.orm.decl_api
 
 import secret_mgmt.oauth_cfg
 
 
-Base: sqlalchemy.orm.decl_api.DeclarativeMeta = sqlalchemy.ext.declarative.declarative_base()
+Base: sqlalchemy.orm.decl_api.DeclarativeMeta = sqlalchemy.orm.declarative_base()
 
 uuid = str
 unix_epoch = int

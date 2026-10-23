@@ -9,12 +9,12 @@ import tarfile
 
 import ci.log
 import cnudie.purge
-import cnudie.retrieve
-import cnudie.util
 import oci.auth
 import oci.client
 import ocm
+import ocm.access
 import ocm.iter
+import ocm.retrieve
 import ocm.upload
 import version
 
@@ -158,7 +158,7 @@ def iter_components_to_purge(
     oci_client: oci.client.Client,
     lookup,
 ) -> collections.abc.Generator[ocm.Component, None, None]:
-    oci_ref = cnudie.util.oci_ref(component=component)
+    oci_ref = ocm.access.oci_ref(component=component)
     all_versions = oci_client.tags(oci_ref.ref_without_tag)
 
     sorted_versions = sorted(
@@ -221,12 +221,12 @@ def delete_old_backup_versions(
 
     oci_client = oci.client.Client(
         credentials_lookup=oci_cfg_lookup,
-        tag_preprocessing_callback=cnudie.util.sanitise_version,
-        tag_postprocessing_callback=cnudie.util.desanitise_version,
+        tag_preprocessing_callback=version.sanitise_version,
+        tag_postprocessing_callback=version.desanitise_version,
     )
 
-    lookup = cnudie.retrieve.oci_component_descriptor_lookup(
-        ocm_repository_lookup=cnudie.retrieve.ocm_repository_lookup(ocm_repo),
+    lookup = ocm.retrieve.oci_component_descriptor_lookup(
+        ocm_repository_lookup=ocm.retrieve.ocm_repository_lookup(ocm_repo),
         oci_client=oci_client,
     )
 
@@ -341,7 +341,7 @@ def main():
             additional_args=additional_args,
         )
 
-    target_ref = cnudie.util.oci_artefact_reference(
+    target_ref = ocm.access.oci_artefact_reference(
         component=f'{component_name}:{component_version}',
         ocm_repository=ocm_repo,
     )
@@ -379,7 +379,7 @@ def main():
 
     delete_old_backup_versions(
         backup_retention_count=backup_retention_count,
-        oci_ref=cnudie.util.oci_ref(component),
+        oci_ref=ocm.access.oci_ref(component),
         secret_factory=secret_factory,
         ocm_repo=ocm_repo,
         component=component,

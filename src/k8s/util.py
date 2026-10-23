@@ -12,7 +12,6 @@ import kubernetes.config
 import kubernetes.dynamic
 import yaml
 
-import cnudie.retrieve
 import ocm
 import ocm.iter
 
@@ -202,7 +201,7 @@ def scale_replicas(
 
 
 def get_ocm_node(
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     artefact: odg.model.ComponentArtefactId,
     absent_ok: bool = False,
 ) -> ocm.iter.ResourceNode | ocm.iter.SourceNode | None:

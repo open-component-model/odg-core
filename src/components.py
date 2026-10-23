@@ -7,17 +7,17 @@ import tarfile
 import zlib
 
 import aiohttp.web
-import cnudie.retrieve
-import cnudie.retrieve_async
-import cnudie.util
 import dacite.exceptions
 import dataclasses_json
 import github.pullrequest
 import oci.client_async
 import oci.model as om
 import ocm
+import ocm.diff
 import ocm.iter
 import ocm.iter_async
+import ocm.retrieve
+import ocm.retrieve_async
 import sqlalchemy as sa
 import sqlalchemy.ext.asyncio as sqlasync
 
@@ -101,7 +101,7 @@ async def greatest_version_if_none(
 
 async def _component_descriptor(
     params: dict,
-    component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,
     db_session: sqlasync.session.AsyncSession = None,
 ) -> ocm.ComponentDescriptor:
     component_name = util.param(params, 'component_name', required=True)
@@ -133,7 +133,7 @@ async def _component_descriptor(
     )
 
     if ignore_lookup:
-        ocm_repository_lookup = cnudie.retrieve.ocm_repository_lookup(ocm_repo)
+        ocm_repository_lookup = ocm.retrieve.ocm_repository_lookup(ocm_repo)
     else:
         ocm_repository_lookup = lookups.extended_ocm_repository_lookup(ocm_repo)
 
@@ -150,7 +150,7 @@ async def _component_descriptor(
                     oci_client=oci_client,
                 )
 
-            return await cnudie.retrieve_async.component_descriptor_from_oci(
+            return await ocm.retrieve_async.component_descriptor_from_oci(
                 component_id=component_id,
                 ocm_repos=ocm_repos,
                 oci_client=oci_client,
@@ -575,14 +575,14 @@ async def component_versions(
             continue
 
         try:
-            versions = await cnudie.retrieve_async.component_versions(
+            versions = await ocm.retrieve_async.component_versions(
                 component_name=component_name,
                 ocm_repo=ocm_repository_cfg.ocm_repository,
                 oci_client=oci_client,
             )
         except aiohttp.ClientResponseError as e:
             image_reference = ocm_repository_cfg.ocm_repository.component_oci_ref(component_name)
-            if e.status == cnudie.retrieve.error_code_indicating_not_found(
+            if e.status == ocm.retrieve.error_code_indicating_not_found(
                 image_reference=image_reference,
             ):
                 continue  # no versions found
@@ -620,7 +620,7 @@ async def greatest_component_version(
 
 async def greatest_component_versions(
     component_name: str,
-    component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,
     ocm_repo: ocm.OcmRepository = None,
     max_versions: int = 5,
     greatest_version: str = None,
@@ -1075,7 +1075,7 @@ class ComponentDescriptorDiff(aiohttp.web.View):
         )
 
         try:
-            diff = await cnudie.retrieve_async.component_diff(
+            diff = await ocm.retrieve_async.component_diff(
                 left_component=left_descriptor,
                 right_component=right_descriptor,
                 component_descriptor_lookup=component_descriptor_lookup,
@@ -1096,7 +1096,7 @@ class ComponentDescriptorDiff(aiohttp.web.View):
             return {'name': component.name, 'version': component.version}
 
         def changed_component_info(left_comp: ocm.Component, right_comp: ocm.Component):
-            resource_diff: cnudie.util.ResourceDiff = cnudie.util.diff_resources(
+            resource_diff: ocm.diff.ResourceDiff = ocm.diff.diff_resources(
                 left_component=left_comp,
                 right_component=right_comp,
             )
@@ -1112,7 +1112,7 @@ class ComponentDescriptorDiff(aiohttp.web.View):
                     for left_resource, right_resource in resource_diff.resourcepairs_version_changed
                 ],
             }
-            right['label_diff'] = cnudie.util.diff_labels(left_comp.labels, right_comp.labels)
+            right['label_diff'] = ocm.diff.diff_labels(left_comp.labels, right_comp.labels)
 
             return {
                 'left': left,
@@ -1120,7 +1120,7 @@ class ComponentDescriptorDiff(aiohttp.web.View):
             }
 
         def changed_resource_info(left_resource: ocm.Resource, right_resource: ocm.Resource):
-            label_diff: cnudie.util.LabelDiff = cnudie.util.diff_labels(
+            label_diff: ocm.diff.LabelDiff = ocm.diff.diff_labels(
                 left_labels=left_resource.labels,
                 right_labels=right_resource.labels,
             )

@@ -3,8 +3,8 @@ import datetime
 import json
 import logging
 
-import cnudie.retrieve
 import oci.client
+import ocm
 
 import k8s.util
 import odg.extensions_cfg
@@ -63,7 +63,7 @@ def run_scan(
     artefact: odg.model.ComponentArtefactId,
     extension_cfg: odg.extensions_cfg.BacklogItemMixins,
     vulnerability_cfg: odg.findings.Finding | None,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_service_client: odg_client.DeliveryServiceClient,
     oci_client: oci.client.Client,
     scanner: scanner_utils.scanner.Scanner,

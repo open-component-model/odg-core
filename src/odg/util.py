@@ -9,8 +9,8 @@ import sys
 import time
 import uuid
 
-import cnudie.retrieve
 import oci.client
+import ocm
 
 import consts
 import ctx_util
@@ -130,7 +130,7 @@ def process_backlog_items(
         [
             odg.model.ComponentArtefactId,
             object,  # extension_cfg
-            cnudie.retrieve.ComponentDescriptorLookupById,
+            ocm.ComponentDescriptorLookup,
             odg_client.DeliveryServiceClient | None,
             oci.client.Client,
             secret_mgmt.SecretFactory,
@@ -146,7 +146,7 @@ def process_backlog_items(
 
         - `artefact`: odg.model.ComponentArtefactId
         - `extension_cfg`: object
-        - `component_descriptor_lookup`: cnudie.retrieve.ComponentDescriptorLookup
+        - `component_descriptor_lookup`: ocm.retrieve.ComponentDescriptorLookup
         - `delivery_service_client`: odg_client.DeliveryServiceClient
         - `oci_client`: oci.client.Client
         - `secret_factory`: secret_mgmt.SecretFactory

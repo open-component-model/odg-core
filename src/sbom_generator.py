@@ -9,25 +9,25 @@ import tempfile
 import time
 
 import ci.log
-import cnudie.retrieve
 import oci.client
+import ocm
+import ocm.iter
 import requests.exceptions
 
 import bdba.client
 import bdba.model
 import bdba_utils.scan
 import bdba_utils.util
-import k8s.util
 import k8s.logging
-import ocm.iter
+import k8s.util
 import ocm_util
+import odg.extensions_cfg
 import odg.model
 import odg.util
-import odg.extensions_cfg
 import odg_client
-import syft
 import secret_mgmt
 import secret_mgmt.bdba
+import syft
 
 logger = logging.getLogger(__name__)
 ci.log.configure_default_logging()
@@ -243,7 +243,7 @@ def find_existing_sbom_metadata(
 def generate_sbom_for_artefact(
     artefact: odg.model.ComponentArtefactId,
     extension_cfg: odg.extensions_cfg.SBOMGeneratorConfig,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_service_client: odg_client.DeliveryServiceClient,
     oci_client: oci.client.Client,
     secret_factory: secret_mgmt.SecretFactory,
