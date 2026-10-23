@@ -1,9 +1,14 @@
+import orjson
 import sqlalchemy
 import sqlalchemy.dialects.postgresql as sap
 import sqlalchemy.ext.asyncio as sqlasync
 import sqlalchemy.orm.session
+from psycopg.types.json import set_json_dumps, set_json_loads
 
 import deliverydb.model as dm
+
+set_json_loads(orjson.loads)
+set_json_dumps(orjson.dumps)
 
 
 def do_raise(self):
