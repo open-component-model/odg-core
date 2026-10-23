@@ -1,4 +1,29 @@
+import pytest
 import odg.model
+
+
+def _artefact_envelope(meta_type: str, data: dict) -> dict:
+    return {
+        'artefact': {
+            'component_name': 'example.org/component',
+            'component_version': '1.0.0',
+            'artefact_kind': 'resource',
+            'artefact': {
+                'artefact_name': 'my-image',
+                'artefact_type': 'ociImage',
+                'artefact_version': '1.0.0',
+                'artefact_extra_id': {},
+            },
+        },
+        'meta': {
+            'datasource': 'bdba',
+            'type': meta_type,
+            'creation_date': '2025-01-01T00:00:00+00:00',
+        },
+        'data': data,
+        'discovery_date': '2025-01-01',
+        'allowed_processing_time': '30d',
+    }
 
 
 def test_artefact_metadata_id():
@@ -44,3 +69,70 @@ def test_artefact_metadata_id():
 
     assert artefact_metadatum_1.id == 'de25c7bf37c6031b6d38ef14288b0e2b'
     assert artefact_metadatum_2.id == 'e7645c972e93cdf01526df135253584d'
+
+
+@pytest.mark.parametrize(
+    'meta_type,data,expected_type',
+    [
+        (
+            odg.model.Datatype.VULNERABILITY_FINDING,
+            {
+                'package_name': 'openssl',
+                'package_version': '3.0.7',
+                'base_url': 'https://bdba.example.com',
+                'report_url': 'https://bdba.example.com/products/42/',
+                'product_id': 42,
+                'group_id': 7,
+                'severity': 'HIGH',
+                'cve': 'CVE-2023-0286',
+                'cvss_score': 7.4,
+            },
+            odg.model.BDBAVulnerabilityFinding,
+        ),
+        (
+            odg.model.Datatype.VULNERABILITY_FINDING,
+            {
+                'package_name': 'curl',
+                'package_version': '8.0.0',
+                'severity': 'MEDIUM',
+                'cve': 'CVE-2025-9999',
+                'cvss_score': 5.3,
+            },
+            odg.model.VulnerabilityFinding,
+        ),
+        (
+            odg.model.Datatype.RESCORING,
+            {
+                'finding': {'package_name': 'openssl', 'cve': 'CVE-2023-0286'},
+                'referenced_type': 'finding/vulnerability',
+                'severity': 'LOW',
+                'user': {
+                    'username': 'jdoe',
+                    'type': 'bdba-user',
+                    'email': 'jdoe@example.com',
+                    'firstname': 'Jane',
+                    'lastname': 'Doe',
+                },
+            },
+            odg.model.CustomRescoring,
+        ),
+        (
+            odg.model.Datatype.ARTEFACT_SCAN_INFO,
+            {'referenced_type': 'finding/vulnerability'},
+            dict,
+        ),
+        (
+            odg.model.Datatype.RESPONSIBLES,
+            {'referenced_type': 'finding/vulnerability'},
+            odg.model.ResponsibleInfo,
+        ),
+        (
+            odg.model.Datatype.COMPLIANCE_SNAPSHOTS,
+            {'state': []},
+            odg.model.ComplianceSnapshot,
+        ),
+    ],
+)
+def test_from_dict_dispatch(meta_type, data, expected_type):
+    am = odg.model.ArtefactMetadata.from_dict(_artefact_envelope(meta_type, data))
+    assert type(am.data) is expected_type

@@ -62,7 +62,12 @@ dev = [
     "bandit==1.9.4",
     "semver==3.1.0",
     "setuptools==84.0.0",
+    "pytest-benchmark>=5.3.0",
 ]
+
+[tool.pytest.ini_options]
+asyncio_mode = "strict"
+python_files = ["test_*.py", "bench_*.py", "*_test.py"]
 
 [tool.bandit]
 exclude_dirs = ['test', '.venv']
