@@ -1,5 +1,8 @@
 {{- $podName := "backlog-controller" }}
 
+{{- include "odg.rbac" . }}
+---
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,6 +22,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      serviceAccountName: {{ .Chart.Name }}
       containers:
         - name: {{ $podName }}
           image: {{ include "image" .Values.global.image }}

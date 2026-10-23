@@ -52,14 +52,10 @@ def parse_args():
     parser.add_argument('--delivery-db-url', default=None)
     parser.add_argument('--cache-dir', default=default_cache_dir)
     parser.add_argument(
-        '--k8s-cfg-name',
-        help='specify kubernetes cluster to interact with extensions (and logs)',
-    )
-    parser.add_argument(
         '--kubeconfig',
         help="""
-            specify kubernetes cluster to interact with extensions (and logs); if both
-            `k8s-cfg-name` and `kubeconfig` are set, `k8s-cfg-name` takes precedence
+            specify kubernetes cluster to interact with extensions (and logs); defaults
+            to in-cluster service account token if not set
         """,
     )
     parser.add_argument(

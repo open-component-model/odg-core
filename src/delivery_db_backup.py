@@ -260,7 +260,6 @@ def delete_old_backup_versions(
 def main():
     parsed_arguments = odg.util.parse_args(
         arguments=(
-            odg.util.Arguments.K8S_CFG_NAME,
             odg.util.Arguments.KUBECONFIG,
             odg.util.Arguments.K8S_NAMESPACE,
             odg.util.Arguments.EXTENSIONS_CFG_PATH,

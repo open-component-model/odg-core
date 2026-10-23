@@ -14,7 +14,6 @@ import cachetools
 import dacite
 import yaml
 
-import ctx_util
 import k8s.util
 import lookups
 import middleware.auth
@@ -228,7 +227,6 @@ class FeatureAddressbook(FeatureBase):
 class FeatureClusterAccess(FeatureBase):
     name: str = 'cluster-access'
     namespace: str = None
-    kubernetes_cfg_name: str = None
     kubeconfig_path: str = None
 
     def get_namespace(self) -> str:
@@ -236,12 +234,7 @@ class FeatureClusterAccess(FeatureBase):
 
     @functools.cache
     def get_kubernetes_api(self) -> str:
-        if not self.kubernetes_cfg_name:
-            return k8s.util.kubernetes_api(kubeconfig_path=self.kubeconfig_path)
-
-        secret_factory = ctx_util.secret_factory()
-        kubernetes_cfg = secret_factory.kubernetes(self.kubernetes_cfg_name)
-        return k8s.util.kubernetes_api(kubernetes_cfg=kubernetes_cfg)
+        return k8s.util.kubernetes_api(kubeconfig_path=self.kubeconfig_path)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -893,9 +886,6 @@ async def init_features(parsed_arguments):
     global feature_cfgs
     feature_cfgs = []
 
-    if not (k8s_cfg_name := parsed_arguments.k8s_cfg_name):
-        k8s_cfg_name = os.environ.get('K8S_CFG_NAME')
-
     if not (k8s_namespace := parsed_arguments.k8s_namespace):
         k8s_namespace = os.environ.get('K8S_TARGET_NAMESPACE')
 
@@ -903,14 +893,12 @@ async def init_features(parsed_arguments):
         cluster_access_feature = FeatureClusterAccess(
             state=FeatureStates.AVAILABLE,
             namespace=k8s_namespace,
-            kubernetes_cfg_name=k8s_cfg_name,
             kubeconfig_path=parsed_arguments.kubeconfig,
         )
     else:
         cluster_access_feature = FeatureClusterAccess(FeatureStates.UNAVAILABLE)
         logger.warning(
-            'required cfgs for cluster access feature missing, will be disabled; '
-            f'{k8s_cfg_name=}, {k8s_namespace=}',
+            f'required cfgs for cluster access feature missing, will be disabled; {k8s_namespace=}',
         )
 
     feature_cfgs.append(cluster_access_feature)

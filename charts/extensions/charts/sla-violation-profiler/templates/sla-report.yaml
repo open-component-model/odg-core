@@ -1,5 +1,35 @@
 {{- $podName := "sla-report" }}
 
+{{/* sla-report writes logs to LogCollection CRDs via init_logging_thread -> needs its own SA + Role */}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $podName }}
+  namespace: {{ .Values.target_namespace | default .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $podName }}
+  namespace: {{ .Values.target_namespace | default .Release.Namespace }}
+rules:
+  - apiGroups: [delivery-gear.gardener.cloud]
+    resources: [logcollections]
+    verbs: [create, get, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $podName }}
+  namespace: {{ .Values.target_namespace | default .Release.Namespace }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $podName }}
+roleRef:
+  kind: Role
+  name: {{ $podName }}
+  apiGroup: rbac.authorization.k8s.io
+---
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -23,6 +53,7 @@ spec:
           imagePullSecrets:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          serviceAccountName: {{ $podName }}
           containers:
           - name: {{ $podName }}
             image: {{ include "image" .Values.global.image }}

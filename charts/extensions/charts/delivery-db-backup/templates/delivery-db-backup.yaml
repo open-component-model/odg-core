@@ -1,5 +1,8 @@
 {{- $podName := "delivery-db-backup" }}
 
+{{- include "odg.rbac" . }}
+---
+
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -23,6 +26,7 @@ spec:
           imagePullSecrets:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          serviceAccountName: {{ .Chart.Name }}
           containers:
           - name: {{ $podName }}
             image: {{ include "image" .Values.global.image }}
