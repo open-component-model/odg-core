@@ -3,8 +3,6 @@ import sqlalchemy.dialects.postgresql as sap
 import sqlalchemy.ext.asyncio as sqlasync
 import sqlalchemy.orm.session
 
-import deliverydb.model as dm
-
 
 def do_raise(self):
     raise RuntimeError('JSONB is not allowed, use JSON instead')
@@ -52,9 +50,6 @@ async def _sqlalchemy_sessionmaker_async(
             'options': '-c idle_in_transaction_session_timeout=1800000',
         },
     )
-
-    async with engine.begin() as conn:
-        await conn.run_sync(dm.Base.metadata.create_all)
 
     sessionmaker = sqlasync.async_sessionmaker(bind=engine)
     sessionmakers_async[(pool_size, max_overflow, pool_timeout)] = sessionmaker
@@ -105,8 +100,6 @@ def _sqlalchemy_sessionmaker(
             'options': '-c idle_in_transaction_session_timeout=1800000',
         },
     )
-
-    dm.Base.metadata.create_all(engine)
 
     sessionmaker = sqlalchemy.orm.sessionmaker(bind=engine)
     sessionmakers[(pool_size, max_overflow, pool_timeout)] = sessionmaker
