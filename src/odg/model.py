@@ -150,7 +150,7 @@ class EmailAddress(UserIdentifierBase):
 @dataclasses.dataclass(kw_only=True)
 class GithubUser(UserIdentifierBase):
     username: str
-    github_hostname: str
+    github_hostname: str | None
     type: UserTypes = UserTypes.GITHUB_USER
 
 

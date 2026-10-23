@@ -1212,9 +1212,16 @@ class ArtefactMetadata(aiohttp.web.View):
             f'[{correlation_id}] Received PUT /artefacts/metadata request with {len(entries)=}',
         )
 
-        artefact_metadata = [
-            odg.model.ArtefactMetadata.from_dict(_fill_default_values(entry)) for entry in entries
-        ]
+        try:
+            artefact_metadata = [
+                odg.model.ArtefactMetadata.from_dict(_fill_default_values(entry))
+                for entry in entries
+            ]
+        except (dacite.DaciteError, KeyError, ValueError) as e:
+            logger.error(f'[{correlation_id}] Failed to deserialize entry {entry}: {e}')
+            raise aiohttp.web.HTTPUnprocessableEntity(
+                text='Failed to deserialize entry',
+            )
 
         # determine all artefact/type combinations to query them at once afterwards
         artefacts = dict()
