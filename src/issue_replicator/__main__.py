@@ -1,9 +1,12 @@
+import argparse
 import collections.abc
 import dataclasses
+import enum
 import functools
 import logging
 
 import cachetools
+import dacite
 import github3.repos
 
 import ci.log
@@ -13,6 +16,8 @@ import github.user
 import github_util
 import issue_replicator.github
 import k8s.logging
+import k8s.model
+import k8s.util
 import odg.extensions_cfg
 import odg.findings
 import odg.model
@@ -467,12 +472,73 @@ def replicate_issue_for_finding_type(
         )
 
 
+def cleanup_redundant_backlog_items(
+    artefact: odg.model.ComponentArtefactId,
+    finding_cfgs: collections.abc.Sequence[odg.findings.Finding],
+    parsed_arguments: argparse.Namespace,
+):
+    kubernetes_api = odg.util.kubernetes_api(parsed_arguments)
+    namespace = parsed_arguments.k8s_namespace
+
+    labels = {
+        k8s.model.LABEL_SERVICE: odg.extensions_cfg.Services.ISSUE_REPLICATOR,
+    }
+    label_selector = k8s.util.create_label_selector(labels=labels)
+
+    backlog_crds = kubernetes_api.custom_kubernetes_api.list_namespaced_custom_object(
+        group=k8s.model.BacklogItemCrd.DOMAIN,
+        version=k8s.model.BacklogItemCrd.VERSION,
+        plural=k8s.model.BacklogItemCrd.PLURAL_NAME,
+        namespace=namespace,
+        label_selector=label_selector,
+    ).get('items')
+
+    if not backlog_crds:
+        return
+
+    already_processed_artefact_groups = {
+        finding_cfg.issues.strip_artefact(
+            artefact=artefact,
+            keep_group_attributes=True,
+        )
+        for finding_cfg in finding_cfgs
+    }
+
+    for backlog_crd in backlog_crds:
+        backlog_item_artefact = dacite.from_dict(
+            data_class=odg.model.ComponentArtefactId,
+            data=backlog_crd['spec']['artefact'],
+            config=dacite.Config(
+                cast=[enum.Enum],
+            ),
+        )
+
+        unprocessed_artefact_groups = {
+            finding_cfg.issues.strip_artefact(
+                artefact=backlog_item_artefact,
+                keep_group_attributes=True,
+            )
+            for finding_cfg in finding_cfgs
+        }
+
+        if unprocessed_artefact_groups <= already_processed_artefact_groups:
+            name = backlog_crd['metadata']['name']
+            k8s.util.delete_custom_resource(
+                crd=k8s.model.BacklogItemCrd,
+                name=name,
+                namespace=namespace,
+                kubernetes_api=kubernetes_api,
+            )
+            logger.info(f'deleted redundant backlog item {name}')
+
+
 def replicate_issue(
     artefact: odg.model.ComponentArtefactId,
     extension_cfg: odg.extensions_cfg.IssueReplicatorConfig,
     finding_cfgs: collections.abc.Sequence[odg.findings.Finding],
     component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
     delivery_service_client: odg_client.DeliveryServiceClient,
+    parsed_arguments: argparse.Namespace,
     **kwargs,
 ):
     logger.info(f'starting issue replication of {artefact}')
@@ -519,6 +585,12 @@ def replicate_issue(
 
     logger.info(f'finished issue replication of {artefact}')
 
+    cleanup_redundant_backlog_items(
+        artefact=artefact,
+        finding_cfgs=finding_cfgs,
+        parsed_arguments=parsed_arguments,
+    )
+
 
 def main():
     parsed_arguments = odg.util.parse_args()
@@ -532,6 +604,7 @@ def main():
     replicate_issue_callback = functools.partial(
         replicate_issue,
         finding_cfgs=finding_cfgs,
+        parsed_arguments=parsed_arguments,
     )
 
     odg.util.process_backlog_items(
