@@ -1623,7 +1623,7 @@ requires-dist = [
     { name = "mako", specifier = "==1.4.3" },
     { name = "numpy", specifier = "==2.5.4" },
     { name = "odg-client", editable = "packages/odg-client" },
-    { name = "orjson", specifier = ">=3.13.0" },
+    { name = "orjson", specifier = "==3.13.0" },
     { name = "prometheus-client", specifier = "==0.26.0" },
     { name = "psycopg", extras = ["binary"], specifier = "==3.3.6" },
     { name = "pyjwt", specifier = "==2.15.1" },
