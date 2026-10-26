@@ -13,7 +13,7 @@ version = "0.13.0"
 requires-python = ">=3.14"
 dependencies = [
     "dacite==1.9.2",
-    "gardener-ocm==1.2847.0",
+    "gardener-ocm==1.2863.0",
     "pycryptodome==3.24.0",
     "pyjwt==2.15.1",
     "requests==2.34.2",

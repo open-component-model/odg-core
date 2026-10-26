@@ -807,7 +807,7 @@ sdist = { url = "https://files.pythonhosted.org/packages/04/0b/4506cb2e831cea4b0
 
 [[package]]
 name = "gardener-cicd-libs"
-version = "1.2847.0"
+version = "1.2863.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cachecontrol" },
@@ -824,6 +824,7 @@ dependencies = [
     { name = "github3-py" },
     { name = "gitpython" },
     { name = "html2text" },
+    { name = "hvac" },
     { name = "jq" },
     { name = "jsonpath-ng" },
     { name = "jsonschema" },
@@ -846,12 +847,12 @@ dependencies = [
     { name = "yamllint" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/64/db/ce8be224635f937e27259974c16c72a8a65418851b3ced80d5cbd75f249b/gardener_cicd_libs-1.2847.0-py3-none-any.whl", hash = "sha256:8bb3a6bf1b6fdccb509d05530e715ddc0f4485e452aa078aef5c9f4ae00e7440", size = 230158, upload-time = "2026-09-15T08:56:52.642Z" },
+    { url = "https://files.pythonhosted.org/packages/cd/76/0a5425ee10bd14d24e838384502cbc74f4c2be7c8d146ad6581ea6aec173/gardener_cicd_libs-1.2863.0-py3-none-any.whl", hash = "sha256:51ef1080c644cc76b425b5e69274fb982ea922909de4fb2b13aeae65bf96f2d7", size = 249679, upload-time = "2026-10-21T08:56:31.887Z" },
 ]
 
 [[package]]
 name = "gardener-oci"
-version = "1.2847.0"
+version = "1.2863.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "dacite" },
@@ -860,12 +861,12 @@ dependencies = [
     { name = "www-authenticate" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a3/06/05568a2d5d7fbeb401dedff4c348e2c11e57243aba2761f85f5b8e7d422a/gardener_oci-1.2847.0-py3-none-any.whl", hash = "sha256:712803ffac8cfcb74f8dfb2a0f667aa2741d9322a5c4da1b4ad2c6921e05e9b6", size = 57962, upload-time = "2026-09-15T08:56:55.768Z" },
+    { url = "https://files.pythonhosted.org/packages/95/7e/21ec0be57301e8641a7332bacd2a5acd8cc39eb44b95660b00e3ce38e996/gardener_oci-1.2863.0-py3-none-any.whl", hash = "sha256:1bbe676ecf04eb795872a881ab3d99417f5aac7028e62705ddb93f1a4f5f04ee", size = 58933, upload-time = "2026-10-21T08:56:35.411Z" },
 ]
 
 [[package]]
 name = "gardener-ocm"
-version = "1.2847.0"
+version = "1.2863.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cachetools" },
@@ -879,7 +880,7 @@ dependencies = [
     { name = "semver" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ce/21/05fac2f3edfbd5ef86254d44a3bbdcbfe25eeb0153a320d8e8f2f1df41a1/gardener_ocm-1.2847.0-py3-none-any.whl", hash = "sha256:55484371e5e9d4d71ccec263cd2988718a9e5ea0500a5a52a67c523cc8bd4f70", size = 160123, upload-time = "2026-09-15T08:56:57.037Z" },
+    { url = "https://files.pythonhosted.org/packages/c4/3c/cf20101efb418c00a4dd574b1728e793219feba0b44db0cf844618cfb6e7/gardener_ocm-1.2863.0-py3-none-any.whl", hash = "sha256:5ca12d9607db4676d9ef9eaaae94966c06633d3fc643dd5fb783f298ccf8d387", size = 164212, upload-time = "2026-10-21T08:56:36.765Z" },
 ]
 
 [[package]]
@@ -1012,6 +1013,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/47/4f/6c57a2817e4f20c1ed8dcca24ee036f981ed036f4b36d07a0100303db96a/htmllistparse-0.6.1.tar.gz", hash = "sha256:6dc8a6bf03c843b9d325843a26a2351a795b573cd92a2c9b8271621019c64082", size = 10035, upload-time = "2023-06-03T11:48:41.189Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/43/fb/fed3185cb09dd7b7e06207a8b33767f1a3f9765e856394ad84b538a1b6ca/htmllistparse-0.6.1-py3-none-any.whl", hash = "sha256:ed027107de47bf18c7059db156075267947a828d3d72ab02823fbef0f39481a9", size = 9967, upload-time = "2023-06-03T11:48:38.706Z" },
+]
+
+[[package]]
+name = "hvac"
+version = "2.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e2/57/b46c397fb3842cfb02a44609aa834c887f38dd75f290c2fc5a34da4b2fee/hvac-2.4.0.tar.gz", hash = "sha256:e0056ad9064e7923e874e6769015b032580b639e29246f5ab1044f7959c1c7e0", size = 332543, upload-time = "2025-10-30T12:57:47.512Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/55/33/71e45a6bd6875f44a26f99da31c63b6840123e88bedf2c0b1ce429b8be12/hvac-2.4.0-py3-none-any.whl", hash = "sha256:008db5efd8c2f77bd37d2368ea5f713edceae1c65f11fd608393179478649e0f", size = 155921, upload-time = "2025-10-30T12:57:46.253Z" },
 ]
 
 [[package]]
@@ -1544,7 +1557,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "dacite", specifier = "==1.9.2" },
-    { name = "gardener-ocm", specifier = "==1.2847.0" },
+    { name = "gardener-ocm", specifier = "==1.2863.0" },
     { name = "pycryptodome", specifier = "==3.24.0" },
     { name = "pyjwt", specifier = "==2.15.1" },
     { name = "requests", specifier = "==2.34.2" },
@@ -1612,7 +1625,7 @@ requires-dist = [
     { name = "cyclonedx-python-lib", specifier = "==11.12.0" },
     { name = "dacite", specifier = "==1.9.2" },
     { name = "dataclasses-json", specifier = "==0.6.7" },
-    { name = "gardener-cicd-libs", specifier = "==1.2847.0" },
+    { name = "gardener-cicd-libs", specifier = "==1.2863.0" },
     { name = "github3-py", specifier = "==4.0.1" },
     { name = "greenlet", specifier = "==3.5.6" },
     { name = "htmllistparse", specifier = "==0.6.1" },

@@ -22,7 +22,7 @@ dependencies = [
     "cyclonedx-python-lib==11.12.0",
     "dacite==1.9.2",
     "dataclasses-json==0.6.7",
-    "gardener-cicd-libs==1.2847.0",
+    "gardener-cicd-libs==1.2863.0",
     "github3.py==4.0.1",
     "greenlet==3.5.6",
     "htmllistparse==0.6.1",
