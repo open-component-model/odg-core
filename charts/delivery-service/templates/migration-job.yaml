@@ -1,0 +1,42 @@
+{{- $podName := "delivery-service-migrate" }}
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $podName }}
+  namespace: {{ .Values.target_namespace | default .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    # no hook-delete-policy: keep failed Jobs around so one can inspect their logs
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        # reuse delivery-service labels so the existing network policies
+        # (default-deny + allow-egress-from-delivery-service) apply to this pod
+        app: delivery-service
+        component: migrate
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: {{ $podName }}
+          image: {{ include "image" .Values.image }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - python3
+            - -m
+            - migrations.bootstrap
+          env:
+            - name: SECRET_FACTORY_PATH
+              value: /secrets
+            - name: K8S_TARGET_NAMESPACE
+              value: {{ .Values.target_namespace | default .Release.Namespace }}
+          volumeMounts:
+            - name: delivery-db
+              mountPath: /secrets/delivery-db
+      volumes:
+        - name: delivery-db
+          secret:
+            secretName: {{ .Values.deliveryDb.secretName }}
