@@ -8,7 +8,6 @@ import json
 import logging
 
 import aiohttp.web
-import dacite
 import jsonpath_ng
 import sqlalchemy as sa
 import sqlalchemy.ext.asyncio as sqlasync
@@ -71,7 +70,7 @@ class RescoringProposal:
     finding_type: odg.model.Datatype
     severity: str
     matching_rules: list[str]
-    applicable_rescorings: tuple[dict, ...]  # "..." for dacite.from_dict
+    applicable_rescorings: tuple[dict, ...]
     discovery_date: str
     due_date: str | None
     sprint: dict[str, str] | None
@@ -474,32 +473,29 @@ async def _iter_rescoring_proposals(
 
                     matching_rule_names = [rule.name for rule in rescoring_rules]
 
-                yield dacite.from_dict(
-                    data_class=RescoringProposal,
-                    data={
-                        'finding': {
-                            'package_name': package_name,
-                            'package_versions': package_versions,
-                            'severity': severity,
-                            'cve': cve,
-                            'cvss_score': cvss_score,
-                            'cvss_v3_score': cvss_score,
-                            'cvss': f'{cvss}' if cvss is not None else None,
-                            'rating_source': am.data.rating_source,
-                            'summary': am.data.summary,
-                            'recommendation': am.data.recommendation,
-                            'urls': am.data.urls,
-                            'filesystem_paths': filesystem_paths,
-                        },
-                        'finding_type': finding_cfg.type,
-                        'severity': current_severity,
-                        'matching_rules': matching_rule_names,
-                        'applicable_rescorings': serialised_current_rescorings,
-                        'discovery_date': am.discovery_date.isoformat(),
-                        'due_date': due_date,
-                        'sprint': sprint,
-                        'pending_scanner_writebacks': pending_scanner_writebacks,
-                    },
+                yield RescoringProposal(
+                    finding=VulnerabilityFinding(
+                        package_name=package_name,
+                        package_versions=package_versions,
+                        severity=severity,
+                        cve=cve,
+                        cvss_score=cvss_score,
+                        cvss_v3_score=cvss_score,
+                        cvss=f'{cvss}' if cvss is not None else None,
+                        rating_source=am.data.rating_source,
+                        summary=am.data.summary,
+                        recommendation=am.data.recommendation,
+                        urls=am.data.urls,
+                        filesystem_paths=filesystem_paths,
+                    ),
+                    finding_type=finding_cfg.type,
+                    severity=current_severity,
+                    matching_rules=matching_rule_names,
+                    applicable_rescorings=serialised_current_rescorings,
+                    discovery_date=am.discovery_date.isoformat(),
+                    due_date=due_date,
+                    sprint=sprint,
+                    pending_scanner_writebacks=pending_scanner_writebacks,
                 )
 
             elif finding_cfg.type is odg.model.Datatype.LICENSE_FINDING:
@@ -534,25 +530,22 @@ async def _iter_rescoring_proposals(
                     ),
                 )
 
-                yield dacite.from_dict(
-                    data_class=RescoringProposal,
-                    data={
-                        'finding': {
-                            'package_name': package_name,
-                            'package_versions': package_versions,
-                            'severity': severity,
-                            'license': license,
-                            'filesystem_paths': filesystem_paths,
-                        },
-                        'finding_type': finding_cfg.type,
-                        'severity': current_severity,
-                        'matching_rules': matching_rule_names,
-                        'applicable_rescorings': serialised_current_rescorings,
-                        'discovery_date': am.discovery_date.isoformat(),
-                        'due_date': due_date,
-                        'sprint': sprint,
-                        'pending_scanner_writebacks': pending_scanner_writebacks,
-                    },
+                yield RescoringProposal(
+                    finding=LicenseFinding(
+                        package_name=package_name,
+                        package_versions=package_versions,
+                        severity=severity,
+                        license=license,
+                        filesystem_paths=filesystem_paths,
+                    ),
+                    finding_type=finding_cfg.type,
+                    severity=current_severity,
+                    matching_rules=matching_rule_names,
+                    applicable_rescorings=serialised_current_rescorings,
+                    discovery_date=am.discovery_date.isoformat(),
+                    due_date=due_date,
+                    sprint=sprint,
+                    pending_scanner_writebacks=pending_scanner_writebacks,
                 )
             elif finding_cfg.type is odg.model.Datatype.IP_FINDING:
                 license = am.data.license
@@ -593,45 +586,36 @@ async def _iter_rescoring_proposals(
                     ),
                 )
 
-                yield dacite.from_dict(
-                    data_class=RescoringProposal,
-                    data={
-                        'finding': {
-                            'package_name': package_name,
-                            'package_versions': package_versions,
-                            'severity': severity,
-                            'licenses': licenses,
-                            'policy_violations': policy_violations,
-                            'labels': am.data.labels,
-                        },
-                        'finding_type': finding_cfg.type,
-                        'severity': current_severity,
-                        'matching_rules': matching_rule_names,
-                        'applicable_rescorings': serialised_current_rescorings,
-                        'discovery_date': am.discovery_date.isoformat(),
-                        'due_date': due_date,
-                        'sprint': sprint,
-                        'pending_scanner_writebacks': pending_scanner_writebacks,
-                    },
+                yield RescoringProposal(
+                    finding=IPFinding(
+                        package_name=package_name,
+                        package_versions=package_versions,
+                        severity=severity,
+                        licenses=licenses,
+                        policy_violations=policy_violations,
+                        labels=am.data.labels,
+                    ),
+                    finding_type=finding_cfg.type,
+                    severity=current_severity,
+                    matching_rules=matching_rule_names,
+                    applicable_rescorings=serialised_current_rescorings,
+                    discovery_date=am.discovery_date.isoformat(),
+                    due_date=due_date,
+                    sprint=sprint,
+                    pending_scanner_writebacks=pending_scanner_writebacks,
                 )
 
         else:
-            yield dacite.from_dict(
-                data_class=RescoringProposal,
-                data={
-                    'finding': dataclasses.asdict(am.data),
-                    'finding_type': finding_cfg.type,
-                    'severity': current_severity,
-                    'matching_rules': matching_rule_names,
-                    'applicable_rescorings': serialised_current_rescorings,
-                    'discovery_date': am.discovery_date.isoformat(),
-                    'due_date': due_date,
-                    'sprint': sprint,
-                    'pending_scanner_writebacks': None,
-                },
-                config=dacite.Config(
-                    strict=True,
-                ),
+            yield RescoringProposal(
+                finding=am.data,
+                finding_type=finding_cfg.type,
+                severity=current_severity,
+                matching_rules=matching_rule_names,
+                applicable_rescorings=serialised_current_rescorings,
+                discovery_date=am.discovery_date.isoformat(),
+                due_date=due_date,
+                sprint=sprint,
+                pending_scanner_writebacks=None,
             )
 
         seen_ids.add(am.id)
