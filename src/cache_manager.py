@@ -18,11 +18,11 @@ import sqlalchemy.ext.asyncio as sqlasync
 import sqlalchemy.sql.elements
 
 import ci.log
-import cnudie.retrieve_async
 import oci.client_async
 import ocm
 import ocm.iter
 import ocm.iter_async
+import ocm.retrieve_async
 
 import compliance_summary
 import components as components_module
@@ -133,7 +133,7 @@ async def prune_cache(
 
 async def prefill_compliance_summary_cache(
     component_id: ocm.ComponentIdentity,
-    component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,
     finding_cfgs: collections.abc.Sequence[odg.findings.Finding],
     db_session: sqlasync.session.AsyncSession,
 ):
@@ -152,7 +152,7 @@ async def prefill_compliance_summary_cache(
 
 async def prefill_compliance_summary_caches(
     components: collections.abc.Iterable[odg.extensions_cfg.Component],
-    component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,
     oci_client: oci.client_async.Client,
     finding_cfgs: collections.abc.Sequence[odg.findings.Finding],
     db_session: sqlasync.session.AsyncSession,
@@ -215,7 +215,7 @@ async def prefill_component_versions_caches(
 async def prefill_function_caches(
     function_names: collections.abc.Iterable[odg.extensions_cfg.FunctionNames],
     components: collections.abc.Iterable[odg.extensions_cfg.Component],
-    component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,
     oci_client: oci.client_async.Client,
     finding_cfgs: collections.abc.Sequence[odg.findings.Finding],
     db_session: sqlasync.session.AsyncSession,

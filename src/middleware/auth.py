@@ -12,6 +12,7 @@ import aiohttp
 import aiohttp.typedefs
 import aiohttp.web
 import Crypto.PublicKey.RSA
+import cryptography.hazmat.primitives.asymmetric.rsa
 import jsonschema
 import jsonschema.exceptions
 import jwt
@@ -117,9 +118,19 @@ def noauth(cls):
     return cls
 
 
-@functools.cache
-def token_payload_schema():
-    return yaml.safe_load(open(paths.token_jsonschema_path, 'rb'))
+_token_payload_schema: dict = yaml.safe_load(open(paths.token_jsonschema_path, 'rb'))
+_token_payload_validator: jsonschema.protocols.Validator = jsonschema.Draft202012Validator(
+    _token_payload_schema,
+)
+
+
+@functools.lru_cache(maxsize=32)
+def _prepared_signing_key(
+    private_key: str,
+    algorithm: str,
+) -> cryptography.hazmat.primitives.asymmetric.rsa.RSAPrivateKey | bytes:
+    alg_obj = jwt.get_algorithm_by_name(algorithm)
+    return alg_obj.prepare_key(private_key)
 
 
 @noauth
@@ -610,7 +621,7 @@ async def set_session_and_refresh_token(
         name=odg_client.jwt.JWT_KEY,
         value=jwt.encode(
             session_token,
-            signing_cfg.private_key,
+            _prepared_signing_key(signing_cfg.private_key, signing_cfg.algorithm),
             algorithm=signing_cfg.algorithm,
         ),
         httponly=True,
@@ -950,28 +961,42 @@ class OpenIDJwks(aiohttp.web.View):
         )
 
 
-def jwt_from_signing_cfg(
-    signing_cfg: secret_mgmt.signing_cfg.SigningCfg,
+@functools.lru_cache(maxsize=32)
+def _jwt_from_signing_cfg_fields(
+    key_id: str,
+    algorithm: str,
+    public_key: str,
+    private_key: str,
 ) -> odg_client.jwt.JSONWebKey:
-    algorithm = odg_client.jwt.Algorithm(signing_cfg.algorithm.upper())
+    alg = odg_client.jwt.Algorithm(algorithm.upper())
     use = odg_client.jwt.Use.SIGNATURE
-    kid = signing_cfg.id
 
-    if algorithm is odg_client.jwt.Algorithm.RS256:
-        public_key = Crypto.PublicKey.RSA.import_key(signing_cfg.public_key)
+    if alg is odg_client.jwt.Algorithm.RS256:
+        rsa_key = Crypto.PublicKey.RSA.import_key(public_key)
 
         return odg_client.jwt.RSAPublicKey(
             use=use,
-            kid=kid,
-            n=odg_client.jwt.encodeBase64urlUInt(public_key.n),
-            e=odg_client.jwt.encodeBase64urlUInt(public_key.e),
+            kid=key_id,
+            n=odg_client.jwt.encodeBase64urlUInt(rsa_key.n),
+            e=odg_client.jwt.encodeBase64urlUInt(rsa_key.e),
         )
-    elif algorithm is odg_client.jwt.Algorithm.HS256:
+    elif alg is odg_client.jwt.Algorithm.HS256:
         return odg_client.jwt.SymmetricKey(
             use=use,
-            kid=kid,
-            k=odg_client.jwt.encodeBase64url(signing_cfg.private_key.encode('utf-8')),
+            kid=key_id,
+            k=odg_client.jwt.encodeBase64url(private_key.encode('utf-8')),
         )
+
+
+def jwt_from_signing_cfg(
+    signing_cfg: secret_mgmt.signing_cfg.SigningCfg,
+) -> odg_client.jwt.JSONWebKey:
+    return _jwt_from_signing_cfg_fields(
+        key_id=signing_cfg.id,
+        algorithm=signing_cfg.algorithm,
+        public_key=signing_cfg.public_key,
+        private_key=signing_cfg.private_key,
+    )
 
 
 def retrieve_role_bindings(
@@ -1033,11 +1058,16 @@ def auth_middleware(
             key_id=decoded_jwt.get('key_id'),
         )
 
-        decode_jwt(
-            token=token,
-            issuer=issuer,
-            signing_cfg=signing_cfg,
-            verify_signature=True,
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            functools.partial(
+                decode_jwt,
+                token=token,
+                issuer=issuer,
+                signing_cfg=signing_cfg,
+                verify_signature=True,
+            ),
         )
 
         validate_jwt_payload(decoded_jwt)
@@ -1395,7 +1425,7 @@ def check_jwt_header_content(header: dict[str, str]):
 
 def validate_jwt_payload(decoded_jwt: dict):
     try:
-        jsonschema.validate(decoded_jwt, token_payload_schema())
+        _token_payload_validator.validate(decoded_jwt)
     except jsonschema.exceptions.ValidationError as e:
         raise aiohttp.web.HTTPUnauthorized(text=e.message)
 

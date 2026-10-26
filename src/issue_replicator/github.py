@@ -10,7 +10,6 @@ import logging
 import re
 import textwrap
 
-import cnudie.retrieve
 import github.limits
 import github.retry
 import github.util
@@ -18,6 +17,7 @@ import github3
 import github3.issues.issue
 import github3.issues.milestone
 import github3.repos
+import ocm
 import ocm.iter
 import ocm.util
 
@@ -77,7 +77,7 @@ class FindingGroup:
 
     def summary(
         self,
-        component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+        component_descriptor_lookup: ocm.ComponentDescriptorLookup,
         finding_cfg: odg.findings.Finding,
         delivery_dashboard_url: str | None = None,
         sprint: sm.Sprint | None = None,
@@ -244,7 +244,7 @@ def table_callback_to_table(
 def findings_summary(
     finding_cfg: odg.findings.Finding,
     finding_groups: list[FindingGroup],
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     findings_table_callback: TableCallback | None = None,
     historical_findings_table_callback: TableCallback | None = None,
     report_urls_callback: collections.abc.Callable[[FindingGroup], list[str]] | None = None,
@@ -315,7 +315,7 @@ def fallback_summary(
     finding_cfg: odg.findings.Finding,
     finding_groups: list[FindingGroup],
     known_issues: collections.abc.Sequence[github3.issues.issue.ShortIssue],
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_dashboard_url: str | None = None,
     sprint: sm.Sprint | None = None,
 ) -> tuple[str, str, str]:
@@ -389,7 +389,7 @@ def crypto_summary(
     finding_cfg: odg.findings.Finding,
     finding_groups: list[FindingGroup],
     known_issues: collections.abc.Sequence[github3.issues.issue.ShortIssue],
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_dashboard_url: str | None = None,
     sprint: sm.Sprint | None = None,
 ) -> tuple[str, str, str]:
@@ -448,7 +448,7 @@ def diki_summary(
     finding_cfg: odg.findings.Finding,
     finding_groups: list[FindingGroup],
     known_issues: collections.abc.Sequence[github3.issues.issue.ShortIssue],
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_dashboard_url: str | None = None,
     sprint: sm.Sprint | None = None,
 ) -> tuple[str, str, str]:
@@ -603,7 +603,7 @@ def falco_summary(
     finding_cfg: odg.findings.Finding,
     finding_groups: list[FindingGroup],
     known_issues: collections.abc.Sequence[github3.issues.issue.ShortIssue],
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_dashboard_url: str | None = None,
     sprint: sm.Sprint | None = None,
 ) -> tuple[str, str, str]:
@@ -707,7 +707,7 @@ def ghas_summary(
     finding_cfg: odg.findings.Finding,
     finding_groups: list[FindingGroup],
     known_issues: collections.abc.Sequence[github3.issues.issue.ShortIssue],
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_dashboard_url: str | None = None,
     sprint: sm.Sprint | None = None,
 ) -> tuple[str, str, str]:
@@ -771,7 +771,7 @@ def inventory_summary(
     finding_cfg: odg.findings.Finding,
     finding_groups: list[FindingGroup],
     known_issues: collections.abc.Sequence[github3.issues.issue.ShortIssue],
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_dashboard_url: str | None = None,
     sprint: sm.Sprint | None = None,
 ) -> tuple[str, str, str]:
@@ -835,7 +835,7 @@ def ip_summary(
     finding_cfg: odg.findings.Finding,
     finding_groups: list[FindingGroup],
     known_issues: collections.abc.Sequence[github3.issues.issue.ShortIssue],
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_dashboard_url: str | None = None,
     sprint: sm.Sprint | None = None,
 ) -> tuple[str, str, str]:
@@ -974,7 +974,7 @@ def kyverno_summary(
     finding_cfg: odg.findings.Finding,
     finding_groups: list[FindingGroup],
     known_issues: collections.abc.Sequence[github3.issues.issue.ShortIssue],
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_dashboard_url: str | None = None,
     sprint: sm.Sprint | None = None,
 ) -> tuple[str, str, str]:
@@ -1054,7 +1054,7 @@ def license_summary(
     finding_cfg: odg.findings.Finding,
     finding_groups: list[FindingGroup],
     known_issues: collections.abc.Sequence[github3.issues.issue.ShortIssue],
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_dashboard_url: str | None = None,
     sprint: sm.Sprint | None = None,
 ) -> tuple[str, str, str]:
@@ -1113,7 +1113,7 @@ def malware_summary(
     finding_cfg: odg.findings.Finding,
     finding_groups: list[FindingGroup],
     known_issues: collections.abc.Sequence[github3.issues.issue.ShortIssue],
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_dashboard_url: str | None = None,
     sprint: sm.Sprint | None = None,
 ) -> tuple[str, str, str]:
@@ -1162,7 +1162,7 @@ def osid_summary(
     finding_cfg: odg.findings.Finding,
     finding_groups: list[FindingGroup],
     known_issues: collections.abc.Sequence[github3.issues.issue.ShortIssue],
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_dashboard_url: str | None = None,
     sprint: sm.Sprint | None = None,
 ) -> tuple[str, str, str]:
@@ -1213,7 +1213,7 @@ def sast_summary(
     finding_cfg: odg.findings.Finding,
     finding_groups: list[FindingGroup],
     known_issues: collections.abc.Sequence[github3.issues.issue.ShortIssue],
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_dashboard_url: str | None = None,
     sprint: sm.Sprint | None = None,
 ) -> tuple[str, str, str]:
@@ -1272,7 +1272,7 @@ def vulnerability_summary(
     finding_cfg: odg.findings.Finding,
     finding_groups: list[FindingGroup],
     known_issues: collections.abc.Sequence[github3.issues.issue.ShortIssue],
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_dashboard_url: str | None = None,
     sprint: sm.Sprint | None = None,
 ) -> tuple[str, str, str]:
@@ -1436,7 +1436,7 @@ def template_issue_body(
     findings: collections.abc.Sequence[AggregatedFinding],
     historical_findings: collections.abc.Sequence[AggregatedFinding],
     sprint: sm.Sprint,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_dashboard_url: str,
 ) -> str:
     """
@@ -1759,7 +1759,7 @@ def create_issue(
 def _create_or_update_issue(
     mapping: odg.extensions_cfg.IssueReplicatorMapping,
     finding_cfg: odg.findings.Finding,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     artefacts: tuple[odg.model.ComponentArtefactId],
     known_issues: collections.abc.Sequence[github3.issues.issue.ShortIssue],
     findings: tuple[AggregatedFinding],
@@ -1860,7 +1860,7 @@ def _create_or_update_issue(
 def _create_or_update_or_close_issue_per_finding(
     mapping: odg.extensions_cfg.IssueReplicatorMapping,
     finding_cfg: odg.findings.Finding,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     artefacts: collections.abc.Iterable[odg.model.ComponentArtefactId],
     known_issues: collections.abc.Sequence[github3.issues.issue.ShortIssue],
     findings: tuple[AggregatedFinding],
@@ -1935,7 +1935,7 @@ def _create_or_update_or_close_issue_per_finding(
 def create_or_update_or_close_issue(
     mapping: odg.extensions_cfg.IssueReplicatorMapping,
     finding_cfg: odg.findings.Finding,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     artefacts: collections.abc.Iterable[odg.model.ComponentArtefactId],
     findings: tuple[AggregatedFinding],
     historical_findings: tuple[AggregatedFinding],

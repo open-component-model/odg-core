@@ -6,9 +6,8 @@ import dataclasses
 import datetime
 import logging
 
-import dacite
 import ci.log
-import cnudie.retrieve
+import dacite
 import ocm
 import ocm.util
 
@@ -292,7 +291,7 @@ def create_ghas_findings(
 
 def build_artefact_from_finding(
     finding: odg.model.GitHubSecretFinding,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_service_client: odg_client.DeliveryServiceClient,
 ) -> odg.model.ComponentArtefactId:
     """
@@ -346,7 +345,7 @@ def build_artefact_from_finding(
 def scan(
     ghas_config: odg.extensions_cfg.GHASConfig,
     ghas_finding_cfg: odg.findings.Finding,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_service_client: odg_client.DeliveryServiceClient,
     secret_factory: secret_mgmt.SecretFactory,
 ):

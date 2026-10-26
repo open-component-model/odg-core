@@ -395,7 +395,7 @@ async def test_verify_oidc_token_wrong_algorithm(oidc_cfg, jwks_client_mock):
                 ).timestamp(),
             ),
         },
-        'secret',
+        'secret-key-padded-to-32-bytes-min',
         algorithm='HS256',
     )
 
@@ -413,7 +413,7 @@ async def test_verify_oidc_token_wrong_algorithm(oidc_cfg, jwks_client_mock):
 def test_oidc_issuer_lookup_found(oidc_cfg):
     token = jwt.encode(
         {'iss': ISSUER, 'sub': SUB, 'aud': AUDIENCE},
-        'secret',
+        'secret-key-padded-to-32-bytes-min',
         algorithm='HS256',
     )
     result = middleware.auth.find_oidc_cfg(token=token, oidc_cfgs=[oidc_cfg])
@@ -423,7 +423,7 @@ def test_oidc_issuer_lookup_found(oidc_cfg):
 def test_oidc_issuer_lookup_not_found(oidc_cfg):
     token = jwt.encode(
         {'iss': 'https://unknown-issuer.com', 'sub': SUB, 'aud': AUDIENCE},
-        'secret',
+        'secret-key-padded-to-32-bytes-min',
         algorithm='HS256',
     )
     with pytest.raises(aiohttp.web.HTTPUnauthorized):

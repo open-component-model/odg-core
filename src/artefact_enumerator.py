@@ -5,7 +5,6 @@ import datetime
 import logging
 
 import ci.log
-import cnudie.retrieve
 import ocm
 import ocm.iter
 
@@ -73,7 +72,7 @@ def create_compliance_snapshot(
 def _iter_ocm_artefacts_for_single_component(
     component: odg.extensions_cfg.Component,
     delivery_service_client: odg_client.DeliveryServiceClient,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
 ) -> collections.abc.Generator[odg.model.ComponentArtefactId, None, None]:
     if resolved_version := component.resolved_version:
         # if an explicit version is specified, use it without any further implict lookup
@@ -113,7 +112,7 @@ def _iter_ocm_artefacts_for_single_component(
 def _iter_ocm_artefacts(
     components: collections.abc.Iterable[odg.extensions_cfg.Component],
     delivery_service_client: odg_client.DeliveryServiceClient,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
 ) -> collections.abc.Generator[odg.model.ComponentArtefactId, None, None]:
     for component in components:
         try:
@@ -518,7 +517,7 @@ def enumerate_artefacts(
     namespace: str,
     kubernetes_api: k8s.util.KubernetesApi,
     delivery_service_client: odg_client.DeliveryServiceClient,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
 ):
     """
     Retrieves first of all the unique artefacts referenced by the configured components and the

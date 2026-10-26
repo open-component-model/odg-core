@@ -150,5 +150,5 @@ def test_for_oidc_requires_token_or_lookup():
 def test_oidc_and_github_auth_are_mutually_exclusive():
     # The API enforces this by having separate factory methods — verify
     # the deprecated __init__ still validates the old-style combinations.
-    with pytest.raises(ValueError):
+    with pytest.warns(DeprecationWarning), pytest.raises(ValueError):
         _make_client(auth_token='gh-tok', auth_token_lookup=lambda api_url: 'gh-tok')
