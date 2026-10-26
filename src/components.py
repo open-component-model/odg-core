@@ -276,6 +276,16 @@ class ComponentDependencies(aiohttp.web.View):
             - all
             - componentReferences
             default: all
+        - in: query
+          name: ignore_missing
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: >-
+            If true, components that cannot be resolved are still included in `componentDependencies`
+            (with an `error` field and without component-specific fields) instead of aborting the
+            request. Their transitive dependencies remain unknown and are omitted.
         responses:
           "200":
             description: Success
@@ -283,12 +293,24 @@ class ComponentDependencies(aiohttp.web.View):
               application/json:
                 schema:
                   type: object
+                  required:
+                  - componentDependencies
+                  properties:
+                    componentDependencies:
+                      type: array
+                      description: >-
+                        All resolved (and, when `ignore_missing=true`, failed) component nodes.
+                        Each entry includes a `comp_ref` array with the path from the root
+                        component to this node. Failed entries additionally carry an `error` field.
+                      items:
+                        type: object
         """
         params = self.request.rel_url.query
 
         component_name = util.param(params, 'component_name', required=True)
 
         populate = util.param(params, 'populate', default='all')
+        ignore_missing = util.param_as_bool(params, 'ignore_missing')
 
         ocm_repo_url = util.param(params, 'ocm_repo_url')
         ocm_repo = ocm.OciOcmRepository(baseUrl=ocm_repo_url) if ocm_repo_url else None
@@ -306,11 +328,14 @@ class ComponentDependencies(aiohttp.web.View):
         if populate not in ('all', 'componentReferences'):
             raise aiohttp.web.HTTPBadRequest(text=f'{populate} not implemented')
 
-        component_dependencies = resolve_component_dependencies(
-            component_name=component_name,
-            component_version=version,
+        component_dependencies = iter_component_dependencies(
+            component_id=ocm.ComponentIdentity(
+                name=component_name,
+                version=version,
+            ),
             component_descriptor_lookup=self.request.app[consts.APP_COMPONENT_DESCRIPTOR_LOOKUP],
-            ocm_repo=ocm_repo,
+            ocm_repository_lookup=lookups.extended_ocm_repository_lookup(ocm_repo),
+            ignore_missing=ignore_missing,
         )
 
         # stream items incrementally to avoid materialising the full dependency tree in memory
@@ -318,18 +343,24 @@ class ComponentDependencies(aiohttp.web.View):
             headers={'Content-Type': 'application/json'},
         )
         first = True
+
         try:
             await response.prepare(self.request)
             await response.write(b'{"componentDependencies":[')
             async for component_node in component_dependencies:
+                component_or_error = component_node.component
+
                 if populate == 'componentReferences':
                     component_dependency = {
-                        'name': component_node.component.name,
-                        'version': component_node.component.version,
-                        'repositoryContexts': component_node.component.repositoryContexts,
+                        'name': component_or_error.name,
+                        'version': component_or_error.version,
+                        'repositoryContexts': component_or_error.repositoryContexts,
                     }
+
+                    if isinstance(component_or_error, ComponentResolutionError):
+                        component_dependency['error'] = component_or_error.error
                 else:
-                    component_dependency = dataclasses.asdict(component_node.component)
+                    component_dependency = dataclasses.asdict(component_or_error)
 
                 component_dependency['comp_ref'] = [
                     {
@@ -738,45 +769,86 @@ class GreatestComponentVersions(aiohttp.web.View):
         )
 
 
-async def resolve_component_dependencies(
-    component_name: str,
-    component_version: str,
-    component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById,
-    ocm_repo: ocm.OcmRepository = None,
+@dataclasses.dataclass
+class ComponentResolutionError:
+    name: str
+    version: str
+    error: str
+    repositoryContexts: list[ocm.OciOcmRepository] | None = None
+
+    @property
+    def component(self):
+        return self
+
+    def identity(self) -> ocm.ComponentIdentity:
+        return ocm.ComponentIdentity(
+            name=self.name,
+            version=self.version,
+        )
+
+
+async def iter_component_dependencies(
+    component_id: ocm.ComponentIdentity,
+    component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,
+    ocm_repository_lookup: ocm.OcmRepositoryLookup,
     recursion_depth: int = -1,
+    ignore_missing: bool = False,
+    path: tuple[ocm.iter.NodePathEntry] = (),
 ) -> collections.abc.AsyncGenerator[ocm.iter.ComponentNode, None, None]:
-    ocm_repository_lookup = lookups.extended_ocm_repository_lookup(ocm_repo)
-
-    component_descriptor = await util.retrieve_component_descriptor(
-        ocm.ComponentIdentity(
-            name=component_name,
-            version=component_version,
-        ),
-        component_descriptor_lookup=component_descriptor_lookup,
-        ocm_repository_lookup=ocm_repository_lookup,
-    )
-    component = component_descriptor.component
-
     try:
-        async for component_node in ocm.iter_async.iter(
-            component=component,
-            lookup=component_descriptor_lookup,
+        component_descriptor = await component_descriptor_lookup(
+            component_id,
+            ocm_repository_lookup=ocm_repository_lookup,
+        )
+    except om.OciImageNotFoundException:
+        ocm_repos = ', '.join(list(ocm_repository_lookup(component_id.name)))
+        error_message = (
+            f'Component descriptor "{component_id.name}" in version "{component_id.version}" not '
+            f'found in OCM repositories: {ocm_repos}'
+        )
+
+        logger.warning(error_message)
+
+        if not ignore_missing:
+            raise aiohttp.web.HTTPUnprocessableEntity(
+                text=error_message,
+            )
+
+        error = ComponentResolutionError(
+            name=component_id.name,
+            version=component_id.version,
+            error=error_message,
+        )
+
+        path = (*path, ocm.iter.NodePathEntry(error))
+        yield ocm.iter.ComponentNode(path=path)
+        return
+
+    component: ocm.Component = component_descriptor.component
+
+    path = (*path, ocm.iter.NodePathEntry(component))
+    yield ocm.iter.ComponentNode(path=path)
+
+    if recursion_depth == 0:
+        return  # stop resolving referenced components
+    elif recursion_depth > 0:
+        recursion_depth -= 1
+
+    for cref in component.componentReferences:
+        cref_id = ocm.ComponentIdentity(
+            name=cref.componentName,
+            version=cref.version,
+        )
+
+        async for component_node in iter_component_dependencies(
+            component_id=cref_id,
+            component_descriptor_lookup=component_descriptor_lookup,
+            ocm_repository_lookup=ocm_repository_lookup,
             recursion_depth=recursion_depth,
-            prune_unique=False,
-            node_filter=ocm.iter.Filter.components,
-            ocm_repo=ocm_repository_lookup,
+            ignore_missing=ignore_missing,
+            path=path,
         ):
             yield component_node
-    except dacite.exceptions.MissingValueError as e:
-        raise aiohttp.web.HTTPFailedDependency(text=str(e))
-    except om.OciImageNotFoundException:
-        err_str = (
-            f'Error occurred during retrieval of component dependencies of {component.identity()}'
-        )
-        logger.warning(err_str)
-        raise aiohttp.web.HTTPUnprocessableEntity(
-            text=err_str,
-        )
 
 
 class UpgradePRs(aiohttp.web.View):
@@ -1178,11 +1250,13 @@ class ComplianceSummary(aiohttp.web.View):
                 db_session=db_session,
             )
 
-        components_dependencies = resolve_component_dependencies(
-            component_name=component_name,
-            component_version=version,
+        components_dependencies = iter_component_dependencies(
+            component_id=ocm.ComponentIdentity(
+                name=component_name,
+                version=version,
+            ),
             component_descriptor_lookup=component_descriptor_lookup,
-            ocm_repo=ocm_repo,
+            ocm_repository_lookup=lookups.extended_ocm_repository_lookup(ocm_repo),
             recursion_depth=recursion_depth,
         )
 
