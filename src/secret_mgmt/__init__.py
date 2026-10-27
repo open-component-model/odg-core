@@ -63,10 +63,6 @@ def default_secret_type_to_class(secret_type: str) -> object:
             import secret_mgmt.github
 
             return secret_mgmt.github.GitHubApp
-        case 'kubernetes':
-            import secret_mgmt.kubernetes
-
-            return secret_mgmt.kubernetes.Kubernetes
         case 'ppms':
             import secret_mgmt.ppms
 

@@ -99,8 +99,6 @@ spec:
               mountPath: /secrets/github
             - name: github-app
               mountPath: /secrets/github-app
-            - name: kubernetes
-              mountPath: /secrets/kubernetes
             - name: oauth-cfg
               mountPath: /secrets/oauth-cfg
             - name: oidc-cfg
@@ -143,10 +141,6 @@ spec:
           secret:
             secretName: secret-factory-github-app
             optional: true
-        - name: kubernetes
-          secret:
-            secretName: secret-factory-kubernetes
-            optional: true # extensions in general are optional
         - name: oauth-cfg
           secret:
             secretName: secret-factory-oauth-cfg

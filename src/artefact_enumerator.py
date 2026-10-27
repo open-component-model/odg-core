@@ -634,7 +634,7 @@ def enumerate_artefacts(
 
 def main():
     parsed_arguments = odg.util.parse_args()
-    kubernetes_api = odg.util.kubernetes_api(parsed_arguments)
+    kubernetes_api = k8s.util.kubernetes_api(kubeconfig_path=parsed_arguments.kubeconfig)
     namespace = parsed_arguments.k8s_namespace
 
     k8s.logging.init_logging_thread(

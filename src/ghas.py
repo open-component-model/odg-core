@@ -14,6 +14,7 @@ import ocm.util
 import ctx_util
 import github_util
 import k8s.logging
+import k8s.util
 import lookups
 import odg.extensions_cfg
 import odg.findings
@@ -455,7 +456,7 @@ def main():
 
     namespace = parsed_arguments.k8s_namespace
     delivery_service_url = parsed_arguments.delivery_service_url
-    kubernetes_api = odg.util.kubernetes_api(parsed_arguments)
+    kubernetes_api = k8s.util.kubernetes_api(kubeconfig_path=parsed_arguments.kubeconfig)
 
     k8s.logging.init_logging_thread(
         service=odg.extensions_cfg.Services.GHAS,

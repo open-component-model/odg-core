@@ -477,7 +477,7 @@ def cleanup_redundant_backlog_items(
     finding_cfgs: collections.abc.Sequence[odg.findings.Finding],
     parsed_arguments: argparse.Namespace,
 ):
-    kubernetes_api = odg.util.kubernetes_api(parsed_arguments)
+    kubernetes_api = k8s.util.kubernetes_api(kubeconfig_path=parsed_arguments.kubeconfig)
     namespace = parsed_arguments.k8s_namespace
 
     labels = {

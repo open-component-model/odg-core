@@ -124,7 +124,7 @@ def main():
             odg.util.Arguments.EXTENSIONS_CFG_PATH,
         ),
     )
-    kubernetes_api = odg.util.kubernetes_api(parsed_arguments)
+    kubernetes_api = k8s.util.kubernetes_api(kubeconfig_path=parsed_arguments.kubeconfig)
     namespace = parsed_arguments.k8s_namespace
 
     k8s.logging.init_logging_thread(

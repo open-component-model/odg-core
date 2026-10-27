@@ -90,13 +90,6 @@ def parse_args(
     return parser.parse_args()
 
 
-def kubernetes_api(
-    parsed_arguments: argparse.Namespace,
-    secret_factory: secret_mgmt.SecretFactory | None = None,
-) -> k8s.util.KubernetesApi:
-    return k8s.util.kubernetes_api(kubeconfig_path=parsed_arguments.kubeconfig)
-
-
 def handle_termination_signal(*args):
     global wants_to_terminate
 
@@ -157,7 +150,7 @@ def process_backlog_items(
     namespace = parsed_arguments.k8s_namespace
 
     if not local_debug_artefact:
-        _kubernetes_api = kubernetes_api(parsed_arguments, secret_factory=secret_factory)
+        _kubernetes_api = k8s.util.kubernetes_api(kubeconfig_path=parsed_arguments.kubeconfig)
 
         k8s.logging.init_logging_thread(
             service=service,

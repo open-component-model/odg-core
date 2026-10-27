@@ -31,6 +31,7 @@ import deliverydb
 import deliverydb.model as dm
 import deliverydb.util as du
 import k8s.logging
+import k8s.util
 import lookups
 import odg.extensions_cfg
 import odg.findings
@@ -369,7 +370,7 @@ async def main():
     namespace = parsed_arguments.k8s_namespace
 
     secret_factory = ctx_util.secret_factory()
-    kubernetes_api = odg.util.kubernetes_api(parsed_arguments, secret_factory=secret_factory)
+    kubernetes_api = k8s.util.kubernetes_api(kubeconfig_path=parsed_arguments.kubeconfig)
 
     k8s.logging.init_logging_thread(
         service=odg.extensions_cfg.Services.CACHE_MANAGER,
