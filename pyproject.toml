@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools==84.2.0", "semver==3.1.0"]
+requires = ["setuptools==84.2.1", "semver==3.1.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -62,7 +62,7 @@ dev = [
     "ruff==0.17.1",
     "bandit==1.9.4",
     "semver==3.1.0",
-    "setuptools==84.2.0",
+    "setuptools==84.2.1",
 ]
 
 [tool.bandit]
