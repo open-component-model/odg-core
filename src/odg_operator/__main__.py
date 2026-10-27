@@ -145,6 +145,7 @@ CLUSTER_SCOPED_KINDS = frozenset(
         'ValidatingAdmissionPolicyBinding',
         'ValidatingWebhookConfiguration',
         'VolumeAttachment',
+        'ClusterSecretStore',
     ),
 )
 
