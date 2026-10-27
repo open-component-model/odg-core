@@ -122,6 +122,50 @@ def outputs_as_jsonpath(
     return dict(output_lookup)
 
 
+# kinds that must not receive a `metadata.namespace`
+CLUSTER_SCOPED_KINDS = frozenset(
+    (
+        'APIService',
+        'CSIDriver',
+        'CertificateSigningRequest',
+        'ClusterIssuer',
+        'ClusterRole',
+        'ClusterRoleBinding',
+        'CustomResourceDefinition',
+        'GatewayClass',
+        'IngressClass',
+        'MutatingWebhookConfiguration',
+        'Namespace',
+        'Node',
+        'PersistentVolume',
+        'PriorityClass',
+        'RuntimeClass',
+        'StorageClass',
+        'ValidatingAdmissionPolicy',
+        'ValidatingAdmissionPolicyBinding',
+        'ValidatingWebhookConfiguration',
+        'VolumeAttachment',
+    ),
+)
+
+
+def _default_namespace(
+    manifest: dict,
+    namespace: str,
+) -> dict:
+    """
+    `helm template` does not inject `--namespace` into namespaced manifests which do not set
+    `.metadata.namespace` (e.g. in subcharts). `helm install` applies such objects into the
+    release namespace, but gardener-resource-manager falls back to `default` which results in an
+    apply error.
+    """
+    if manifest.get('kind') in CLUSTER_SCOPED_KINDS:
+        return manifest
+
+    manifest.setdefault('metadata', {}).setdefault('namespace', namespace)
+    return manifest
+
+
 def _helm_template(
     helm_path: str,
     values: dict,
@@ -154,6 +198,9 @@ def _helm_template(
         if manifest is None:
             # gardener-resource-manager cannot process empty manifests
             continue
+
+        if namespace:
+            manifest = _default_namespace(manifest, namespace)
 
         yield manifest
 
