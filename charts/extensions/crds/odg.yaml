@@ -57,6 +57,17 @@ spec:
                           type: string
                         sla_violation_profiler:
                           type: string
+                    telemetry_backend:
+                      type: string
+                      enum:
+                        - debug
+                        - opensearch
+                        - btp
+                      default: debug
+                    opensearch_endpoint:
+                      type: string
+                    btp_endpoint:
+                      type: string
                   required:
                     - base_url
                     - target_namespace
@@ -87,6 +98,7 @@ spec:
                     - responsibles
                     - sast
                     - sbom-generator
+                    - telemetry
             status:
               type: object
               properties:
