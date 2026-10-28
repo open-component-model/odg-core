@@ -146,6 +146,7 @@ def _make_sync_lookup(path):
 def _make_oci_client_for_sbom(sbom_payload: dict) -> unittest.mock.MagicMock:
     layer = unittest.mock.MagicMock()
     layer.digest = 'sha256:deadbeef'
+    layer.size = 0
     manifest = unittest.mock.MagicMock(spec=['layers'])
     manifest.layers = [layer]
 
@@ -351,6 +352,7 @@ def test_generate_sbom_ocm_sbom_found_skips_generation():
 
     layer = unittest.mock.MagicMock()
     layer.digest = 'sha256:abc'
+    layer.size = 0
     manifest = unittest.mock.MagicMock(spec=['layers'])
     manifest.layers = [layer]
 
