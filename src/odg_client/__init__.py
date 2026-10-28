@@ -22,7 +22,10 @@ import odg_client.util
 
 logger = logging.getLogger(__name__)
 
-TRANSIENT_EXCEPTIONS: tuple[type[Exception], ...] = (
+# Exceptions from external dependencies (network failures, upstream HTTP errors).
+# Catch these at call sites to skip the current operation and continue,
+# rather than exiting the process over issues outside our control.
+EXTERNAL_DEPENDENCY_EXCEPTIONS: tuple[type[Exception], ...] = (
     requests.exceptions.ConnectionError,
     requests.exceptions.HTTPError,
     requests.exceptions.Timeout,

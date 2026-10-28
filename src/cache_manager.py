@@ -259,7 +259,7 @@ async def iter_sbom_artefacts(
                     max_versions=component.max_versions_limit,
                     ocm_repo=component.ocm_repo,
                 )
-            except odg_client.TRANSIENT_EXCEPTIONS as e:
+            except odg_client.EXTERNAL_DEPENDENCY_EXCEPTIONS as e:
                 logger.warning(
                     f'failed to retrieve versions for {component.component_name=}, skip: {e}',
                 )

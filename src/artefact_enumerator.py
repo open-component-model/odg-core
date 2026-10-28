@@ -344,7 +344,7 @@ def _process_compliance_snapshot_of_artefact(
                     type=odg.model.Datatype.ARTEFACT_SCAN_INFO,
                 ),
             )
-        except odg_client.TRANSIENT_EXCEPTIONS as e:
+        except odg_client.EXTERNAL_DEPENDENCY_EXCEPTIONS as e:
             logger.warning(f'failed to query scan info for {artefact=}, skip issue replicator: {e}')
         else:
             compliance_snapshot, uncommitted_backlog_item = _create_backlog_item(
@@ -510,7 +510,7 @@ def _process_inactive_compliance_snapshots(
     snapshot_count = len(deletable_compliance_snapshots)
     try:
         delivery_service_client.delete_metadata(data=deletable_compliance_snapshots)
-    except odg_client.TRANSIENT_EXCEPTIONS as e:
+    except odg_client.EXTERNAL_DEPENDENCY_EXCEPTIONS as e:
         logger.warning(
             f'failed to delete {snapshot_count=} inactive compliance snapshots, '
             f'will retry next scheduled run: {e}',
@@ -624,7 +624,7 @@ def enumerate_artefacts(
     logger.info(f'updating {len(updated_compliance_snapshots)} compliance snapshots in delivery-db')
     try:
         delivery_service_client.update_metadata(data=updated_compliance_snapshots)
-    except odg_client.TRANSIENT_EXCEPTIONS as e:
+    except odg_client.EXTERNAL_DEPENDENCY_EXCEPTIONS as e:
         logger.warning(f'failed to update compliance snapshots, will retry next scheduled run: {e}')
 
     for uncommitted_backlog_item in all_uncommitted_backlog_items:
