@@ -252,11 +252,15 @@ async def iter_sbom_artefacts(
             # if an explicit version is specified, use it without any further implict lookup
             versions = [resolved_version]
         else:
-            versions = delivery_service_client.greatest_component_versions(
-                component_name=component.component_name,
-                max_versions=component.max_versions_limit,
-                ocm_repo=component.ocm_repo,
-            )
+            try:
+                versions = delivery_service_client.greatest_component_versions(
+                    component_name=component.component_name,
+                    max_versions=component.max_versions_limit,
+                    ocm_repo=component.ocm_repo,
+                )
+            except Exception:
+                logger.warning(f'failed to retrieve versions for {component.component_name=}, skip')
+                continue
 
         ocm_repository_lookup = lookups.extended_ocm_repository_lookup(component.ocm_repo)
 

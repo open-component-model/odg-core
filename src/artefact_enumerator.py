@@ -337,12 +337,16 @@ def _process_compliance_snapshot_of_artefact(
 
     if extensions_cfg.issue_replicator and extensions_cfg.issue_replicator.enabled:
         # if the number of executed scans has changed, trigger an issue update
-        scan_count = len(
-            delivery_service_client.query_metadata(
-                artefacts=(artefact,),
-                type=odg.model.Datatype.ARTEFACT_SCAN_INFO,
-            ),
-        )
+        try:
+            scan_count = len(
+                delivery_service_client.query_metadata(
+                    artefacts=(artefact,),
+                    type=odg.model.Datatype.ARTEFACT_SCAN_INFO,
+                ),
+            )
+        except Exception:
+            logger.warning(f'failed to query scan info for {artefact=}, skip issue replicator')
+            return compliance_snapshot, uncommitted_backlog_items
 
         compliance_snapshot, uncommitted_backlog_item = _create_backlog_item(
             artefact=artefact,
@@ -504,7 +508,14 @@ def _process_inactive_compliance_snapshots(
     if not deletable_compliance_snapshots:
         return
 
-    delivery_service_client.delete_metadata(data=deletable_compliance_snapshots)
+    try:
+        delivery_service_client.delete_metadata(data=deletable_compliance_snapshots)
+    except Exception:
+        n = len(deletable_compliance_snapshots)
+        logger.warning(
+            f'failed to delete {n} inactive compliance snapshots, will retry next scheduled run',
+        )
+        return
     logger.info(
         f'deleted {len(deletable_compliance_snapshots)} inactive compliance snapshots in '
         f'delivery-db ({artefact=})',
