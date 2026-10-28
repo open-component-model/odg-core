@@ -38,6 +38,18 @@ import yp
 logger = logging.getLogger(__name__)
 
 
+def error_codes_indicating_repo_skippable(
+    image_reference: str | om.OciImageReference,
+) -> frozenset[int]:
+    return frozenset(
+        (
+            ocm.retrieve.error_code_indicating_not_found(image_reference=image_reference),
+            http.HTTPStatus.UNAUTHORIZED,
+            http.HTTPStatus.FORBIDDEN,
+        ),
+    )
+
+
 @dataclasses.dataclass(frozen=True)
 class ComponentVector:
     """
@@ -582,10 +594,10 @@ async def component_versions(
             )
         except aiohttp.ClientResponseError as e:
             image_reference = ocm_repository_cfg.ocm_repository.component_oci_ref(component_name)
-            if e.status == ocm.retrieve.error_code_indicating_not_found(
+            if e.status in error_codes_indicating_repo_skippable(
                 image_reference=image_reference,
             ):
-                continue  # no versions found
+                continue  # no versions found or no access to this repo
 
             raise
 
