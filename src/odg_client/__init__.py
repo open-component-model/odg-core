@@ -313,7 +313,7 @@ class DeliveryServiceClient:
             return _retry(f'caught {type(e).__name__}: {e}')
 
         if res.status_code >= 500 and remaining_retries > 0:
-            return _retry(f'delivery-service returned {res.status_code=}')
+            return _retry(f'delivery-service returned {res.status_code=}: {res.text}')
 
         return res
 
