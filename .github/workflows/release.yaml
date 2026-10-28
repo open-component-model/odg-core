@@ -1,13 +1,6 @@
 name: Release (ODG)
 on:
   workflow_dispatch:
-    inputs:
-      next-version:
-        type: choice
-        options:
-          - automatic
-          - bump-minor
-          - bump-patch
 
 jobs:
   check-branch:
@@ -44,7 +37,7 @@ jobs:
       id-token: write
     with:
       release-commit-target: branch
-      next-version: ${{ inputs.next-version }}
+      next-version: bump-patch
 
   pypi:
     runs-on: ubuntu-latest
