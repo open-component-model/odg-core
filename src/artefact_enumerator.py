@@ -4,7 +4,6 @@ import dataclasses
 import datetime
 import logging
 
-import requests
 import ci.log
 import ocm
 import ocm.iter
@@ -172,7 +171,7 @@ def _calculate_backlog_item_priority(
         service=service,
     )
 
-    if not current_state or (status and status != current_state.status):
+    if not current_state or (status is not None and status != current_state.status):
         return k8s.backlog.BacklogPriorities.HIGH
 
     elif now - current_state.timestamp >= datetime.timedelta(
@@ -345,24 +344,19 @@ def _process_compliance_snapshot_of_artefact(
                     type=odg.model.Datatype.ARTEFACT_SCAN_INFO,
                 ),
             )
-        except (
-            requests.exceptions.ConnectionError,
-            requests.exceptions.HTTPError,
-            requests.exceptions.Timeout,
-        ):
-            logger.warning(f'failed to query scan info for {artefact=}, skip issue replicator')
-            scan_count = None
-
-        compliance_snapshot, uncommitted_backlog_item = _create_backlog_item(
-            artefact=artefact,
-            compliance_snapshot=compliance_snapshot,
-            service=odg.extensions_cfg.Services.ISSUE_REPLICATOR,
-            interval_seconds=extensions_cfg.issue_replicator.interval,
-            now=now,
-            status=scan_count,
-        )
-        if uncommitted_backlog_item:
-            uncommitted_backlog_items.append(uncommitted_backlog_item)
+        except odg_client.TRANSIENT_EXCEPTIONS as e:
+            logger.warning(f'failed to query scan info for {artefact=}, skip issue replicator: {e}')
+        else:
+            compliance_snapshot, uncommitted_backlog_item = _create_backlog_item(
+                artefact=artefact,
+                compliance_snapshot=compliance_snapshot,
+                service=odg.extensions_cfg.Services.ISSUE_REPLICATOR,
+                interval_seconds=extensions_cfg.issue_replicator.interval,
+                now=now,
+                status=scan_count,
+            )
+            if uncommitted_backlog_item:
+                uncommitted_backlog_items.append(uncommitted_backlog_item)
 
     if extensions_cfg.responsibles and extensions_cfg.responsibles.enabled:
         compliance_snapshot, uncommitted_backlog_item = _create_backlog_item(
@@ -515,14 +509,11 @@ def _process_inactive_compliance_snapshots(
 
     try:
         delivery_service_client.delete_metadata(data=deletable_compliance_snapshots)
-    except (
-        requests.exceptions.ConnectionError,
-        requests.exceptions.HTTPError,
-        requests.exceptions.Timeout,
-    ):
-        n = len(deletable_compliance_snapshots)
+    except odg_client.TRANSIENT_EXCEPTIONS as e:
+        snapshot_count = len(deletable_compliance_snapshots)
         logger.warning(
-            f'failed to delete {n} inactive compliance snapshots, will retry next scheduled run',
+            f'failed to delete {snapshot_count=} inactive compliance snapshots, '
+            f'will retry next scheduled run: {e}',
         )
         return
     logger.info(

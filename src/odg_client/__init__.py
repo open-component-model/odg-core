@@ -22,6 +22,12 @@ import odg_client.util
 
 logger = logging.getLogger(__name__)
 
+TRANSIENT_EXCEPTIONS: tuple[type[Exception], ...] = (
+    requests.exceptions.ConnectionError,
+    requests.exceptions.HTTPError,
+    requests.exceptions.Timeout,
+)
+
 
 class DeliveryServiceRoutes:
     def __init__(self, base_url: str):
