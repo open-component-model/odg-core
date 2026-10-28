@@ -168,6 +168,7 @@ class DeliveryServiceClient:
         self.auth_credentials: dm.GitHubAuthCredentials = None  # filled lazily as needed
 
         self._bearer_token = None
+        self._max_retries = max_retries or 0
         self._session = requests.sessions.Session()
         adapter = requests.adapters.HTTPAdapter(
             max_retries=max_retries,
@@ -278,9 +279,13 @@ class DeliveryServiceClient:
         self,
         url: str,
         method: str = 'GET',
-        headers: dict = None,
+        headers: dict | None = None,
+        remaining_retries: int | None = None,
         **kwargs,
     ):
+        if remaining_retries is None:
+            remaining_retries = self._max_retries
+
         try:
             self._authenticate()
         except requests.exceptions.HTTPError as e:
@@ -290,12 +295,12 @@ class DeliveryServiceClient:
                 raise
             logger.info('delivery-service authentication feature is inactive')
 
-        headers = headers or {}
+        merged_headers = headers or {}
 
         if self._bearer_token:
-            headers = {
+            merged_headers = {
                 'Authorization': f'Bearer {self._bearer_token}',
-                **headers,
+                **merged_headers,
             }
 
         try:
@@ -303,13 +308,33 @@ class DeliveryServiceClient:
         except KeyError:
             timeout = (4, 31)
 
-        res = self._session.request(
-            method=method,
-            url=url,
-            headers=headers,
-            timeout=timeout,
-            **kwargs,
-        )
+        def _retry(log_msg: str):
+            logger.warning(log_msg + f' ({remaining_retries=}), retrying...')
+            time.sleep(min(2 ** (self._max_retries - remaining_retries), 30))
+            return self.request(
+                url=url,
+                method=method,
+                headers=headers,
+                remaining_retries=remaining_retries - 1,
+                timeout=timeout,
+                **kwargs,
+            )
+
+        try:
+            res = self._session.request(
+                method=method,
+                url=url,
+                headers=merged_headers,
+                timeout=timeout,
+                **kwargs,
+            )
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            if remaining_retries == 0:
+                raise
+            return _retry(f'caught {type(e).__name__}: {e}')
+
+        if res.status_code >= 500 and remaining_retries > 0:
+            return _retry(f'delivery-service returned {res.status_code=}')
 
         return res
 
