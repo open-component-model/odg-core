@@ -346,7 +346,7 @@ def _process_compliance_snapshot_of_artefact(
             )
         except Exception:
             logger.warning(f'failed to query scan info for {artefact=}, skip issue replicator')
-            return compliance_snapshot, uncommitted_backlog_items
+            scan_count = None
 
         compliance_snapshot, uncommitted_backlog_item = _create_backlog_item(
             artefact=artefact,

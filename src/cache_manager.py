@@ -246,6 +246,7 @@ async def iter_sbom_artefacts(
     sbom_generator_cfg: odg.extensions_cfg.SBOMGeneratorConfig,
     delivery_service_client: odg_client.DeliveryServiceClient,
     component_descriptor_lookup: ocm.ComponentDescriptorLookup,
+    skipped_components: list[str] | None = None,
 ) -> collections.abc.AsyncGenerator[odg.model.ComponentArtefactId, None]:
     for component in artefact_enumerator_cfg.components:
         if resolved_version := component.resolved_version:
@@ -260,6 +261,8 @@ async def iter_sbom_artefacts(
                 )
             except Exception:
                 logger.warning(f'failed to retrieve versions for {component.component_name=}, skip')
+                if skipped_components is not None:
+                    skipped_components.append(component.component_name)
                 continue
 
         ocm_repository_lookup = lookups.extended_ocm_repository_lookup(component.ocm_repo)
@@ -303,14 +306,23 @@ async def cleanup_sboms(
     retention_period_seconds: int,
 ):
     artefact_keys = set()
+    skipped_components = []
 
     async for artefact in iter_sbom_artefacts(
         artefact_enumerator_cfg=artefact_enumerator_cfg,
         sbom_generator_cfg=sbom_generator_cfg,
         delivery_service_client=delivery_service_client,
         component_descriptor_lookup=component_descriptor_lookup,
+        skipped_components=skipped_components,
     ):
         artefact_keys.add(artefact.key)
+
+    if skipped_components:
+        logger.warning(
+            f'skipping SBOM cleanup: enumeration incomplete due to failed version lookups for '
+            f'{skipped_components=}',
+        )
+        return
 
     db_statement = sqlalchemy.select(dm.ArtefactMetaData).where(
         dm.ArtefactMetaData.type == odg.model.Datatype.ARTEFACT_SCAN_INFO,
