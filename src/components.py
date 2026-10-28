@@ -38,18 +38,6 @@ import yp
 logger = logging.getLogger(__name__)
 
 
-def error_codes_indicating_repo_skippable(
-    image_reference: str | om.OciImageReference,
-) -> frozenset[int]:
-    return frozenset(
-        (
-            ocm.retrieve.error_code_indicating_not_found(image_reference=image_reference),
-            http.HTTPStatus.UNAUTHORIZED,
-            http.HTTPStatus.FORBIDDEN,
-        ),
-    )
-
-
 @dataclasses.dataclass(frozen=True)
 class ComponentVector:
     """
@@ -581,6 +569,7 @@ async def component_versions(
     ocm_repository_cfgs = lookups.resolve_ocm_repository_cfgs(ocm_repo)
 
     included_versions = set()
+    worst_skipped_auth_status: int | None = None
 
     for ocm_repository_cfg in ocm_repository_cfgs:
         if not ocm_repository_cfg.component_matches(component_name):
@@ -594,10 +583,14 @@ async def component_versions(
             )
         except aiohttp.ClientResponseError as e:
             image_reference = ocm_repository_cfg.ocm_repository.component_oci_ref(component_name)
-            if e.status in error_codes_indicating_repo_skippable(
+            if e.status in (http.HTTPStatus.UNAUTHORIZED, http.HTTPStatus.FORBIDDEN):
+                if worst_skipped_auth_status != http.HTTPStatus.FORBIDDEN:
+                    worst_skipped_auth_status = e.status
+                continue  # no access to this repo
+            if e.status == ocm.retrieve.error_code_indicating_not_found(
                 image_reference=image_reference,
             ):
-                continue  # no versions found or no access to this repo
+                continue  # no versions found
 
             raise
 
@@ -607,6 +600,11 @@ async def component_versions(
                 version_filter_overwrite=version_filter,
             ),
         )
+
+    if not included_versions and worst_skipped_auth_status is not None:
+        if worst_skipped_auth_status == http.HTTPStatus.FORBIDDEN:
+            raise aiohttp.web.HTTPForbidden()
+        raise aiohttp.web.HTTPUnauthorized()
 
     return included_versions
 
