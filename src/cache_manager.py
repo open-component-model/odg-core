@@ -259,7 +259,14 @@ async def iter_sbom_artefacts(
                     max_versions=component.max_versions_limit,
                     ocm_repo=component.ocm_repo,
                 )
-            except Exception:
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code < 500:
+                    raise
+                logger.warning(f'failed to retrieve versions for {component.component_name=}, skip')
+                if skipped_components is not None:
+                    skipped_components.append(component.component_name)
+                continue
+            except requests.exceptions.ConnectionError, requests.exceptions.Timeout:
                 logger.warning(f'failed to retrieve versions for {component.component_name=}, skip')
                 if skipped_components is not None:
                     skipped_components.append(component.component_name)
