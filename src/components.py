@@ -569,7 +569,7 @@ async def component_versions(
     ocm_repository_cfgs = lookups.resolve_ocm_repository_cfgs(ocm_repo)
 
     included_versions = set()
-    skipped_auth_error: aiohttp.ClientResponseError | None = None
+    skipped_due_to_missing_credentials = False
 
     for ocm_repository_cfg in ocm_repository_cfgs:
         if not ocm_repository_cfg.component_matches(component_name):
@@ -584,7 +584,7 @@ async def component_versions(
         except aiohttp.ClientResponseError as e:
             image_reference = ocm_repository_cfg.ocm_repository.component_oci_ref(component_name)
             if e.status in (http.HTTPStatus.UNAUTHORIZED, http.HTTPStatus.FORBIDDEN):
-                skipped_auth_error = e
+                skipped_due_to_missing_credentials = True
                 continue  # no access to this repo
             if e.status == ocm.retrieve.error_code_indicating_not_found(
                 image_reference=image_reference,
@@ -600,11 +600,10 @@ async def component_versions(
             ),
         )
 
-    if not included_versions and skipped_auth_error is not None:
-        if skipped_auth_error.status == http.HTTPStatus.FORBIDDEN:
-            raise aiohttp.web.HTTPForbidden()
-        if skipped_auth_error.status == http.HTTPStatus.UNAUTHORIZED:
-            raise aiohttp.web.HTTPUnauthorized()
+    if not included_versions and skipped_due_to_missing_credentials:
+        raise aiohttp.web.HTTPNotFound(
+            reason=f'Component {component_name!r} not found (upstream access denied)',
+        )
 
     return included_versions
 
