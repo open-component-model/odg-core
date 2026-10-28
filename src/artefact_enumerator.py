@@ -507,19 +507,16 @@ def _process_inactive_compliance_snapshots(
     if not deletable_compliance_snapshots:
         return
 
+    snapshot_count = len(deletable_compliance_snapshots)
     try:
         delivery_service_client.delete_metadata(data=deletable_compliance_snapshots)
     except odg_client.TRANSIENT_EXCEPTIONS as e:
-        snapshot_count = len(deletable_compliance_snapshots)
         logger.warning(
             f'failed to delete {snapshot_count=} inactive compliance snapshots, '
             f'will retry next scheduled run: {e}',
         )
         return
-    logger.info(
-        f'deleted {len(deletable_compliance_snapshots)} inactive compliance snapshots in '
-        f'delivery-db ({artefact=})',
-    )
+    logger.info(f'deleted {snapshot_count} inactive compliance snapshots in delivery-db')
 
 
 def enumerate_artefacts(
@@ -625,7 +622,10 @@ def enumerate_artefacts(
             all_uncommitted_backlog_items.append(uncommitted_backlog_item)
 
     logger.info(f'updating {len(updated_compliance_snapshots)} compliance snapshots in delivery-db')
-    delivery_service_client.update_metadata(data=updated_compliance_snapshots)
+    try:
+        delivery_service_client.update_metadata(data=updated_compliance_snapshots)
+    except odg_client.TRANSIENT_EXCEPTIONS as e:
+        logger.warning(f'failed to update compliance snapshots, will retry next scheduled run: {e}')
 
     for uncommitted_backlog_item in all_uncommitted_backlog_items:
         service = uncommitted_backlog_item.service

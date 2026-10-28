@@ -246,7 +246,7 @@ async def iter_sbom_artefacts(
     sbom_generator_cfg: odg.extensions_cfg.SBOMGeneratorConfig,
     delivery_service_client: odg_client.DeliveryServiceClient,
     component_descriptor_lookup: ocm.ComponentDescriptorLookup,
-    skipped_components: list[str] | None = None,
+    skipped_components: list[str],
 ) -> collections.abc.AsyncGenerator[odg.model.ComponentArtefactId, None]:
     for component in artefact_enumerator_cfg.components:
         if resolved_version := component.resolved_version:
@@ -263,8 +263,7 @@ async def iter_sbom_artefacts(
                 logger.warning(
                     f'failed to retrieve versions for {component.component_name=}, skip: {e}',
                 )
-                if skipped_components is not None:
-                    skipped_components.append(component.component_name)
+                skipped_components.append(component.component_name)
                 continue
 
         ocm_repository_lookup = lookups.extended_ocm_repository_lookup(component.ocm_repo)
