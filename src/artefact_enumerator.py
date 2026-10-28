@@ -345,12 +345,11 @@ def _process_compliance_snapshot_of_artefact(
                     type=odg.model.Datatype.ARTEFACT_SCAN_INFO,
                 ),
             )
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code < 500:
-                raise
-            logger.warning(f'failed to query scan info for {artefact=}, skip issue replicator')
-            scan_count = None
-        except requests.exceptions.ConnectionError, requests.exceptions.Timeout:
+        except (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.HTTPError,
+            requests.exceptions.Timeout,
+        ):
             logger.warning(f'failed to query scan info for {artefact=}, skip issue replicator')
             scan_count = None
 
@@ -516,15 +515,11 @@ def _process_inactive_compliance_snapshots(
 
     try:
         delivery_service_client.delete_metadata(data=deletable_compliance_snapshots)
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code < 500:
-            raise
-        n = len(deletable_compliance_snapshots)
-        logger.warning(
-            f'failed to delete {n} inactive compliance snapshots, will retry next scheduled run',
-        )
-        return
-    except requests.exceptions.ConnectionError, requests.exceptions.Timeout:
+    except (
+        requests.exceptions.ConnectionError,
+        requests.exceptions.HTTPError,
+        requests.exceptions.Timeout,
+    ):
         n = len(deletable_compliance_snapshots)
         logger.warning(
             f'failed to delete {n} inactive compliance snapshots, will retry next scheduled run',
