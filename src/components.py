@@ -583,13 +583,13 @@ async def component_versions(
             )
         except aiohttp.ClientResponseError as e:
             image_reference = ocm_repository_cfg.ocm_repository.component_oci_ref(component_name)
-            if e.status in (http.HTTPStatus.UNAUTHORIZED, http.HTTPStatus.FORBIDDEN):
-                skipped_due_to_missing_credentials = True
-                continue  # no access to this repo
             if e.status == ocm.retrieve.error_code_indicating_not_found(
                 image_reference=image_reference,
             ):
                 continue  # no versions found
+            if e.status in (http.HTTPStatus.UNAUTHORIZED, http.HTTPStatus.FORBIDDEN):
+                skipped_due_to_missing_credentials = True
+                continue  # no access to this repo
 
             raise
 
