@@ -569,6 +569,7 @@ async def component_versions(
     ocm_repository_cfgs = lookups.resolve_ocm_repository_cfgs(ocm_repo)
 
     included_versions = set()
+    skipped_due_to_missing_credentials = False
 
     for ocm_repository_cfg in ocm_repository_cfgs:
         if not ocm_repository_cfg.component_matches(component_name):
@@ -586,6 +587,9 @@ async def component_versions(
                 image_reference=image_reference,
             ):
                 continue  # no versions found
+            if e.status in (http.HTTPStatus.UNAUTHORIZED, http.HTTPStatus.FORBIDDEN):
+                skipped_due_to_missing_credentials = True
+                continue  # no access to this repo
 
             raise
 
@@ -594,6 +598,11 @@ async def component_versions(
                 versions=versions,
                 version_filter_overwrite=version_filter,
             ),
+        )
+
+    if not included_versions and skipped_due_to_missing_credentials:
+        raise aiohttp.web.HTTPNotFound(
+            reason=f'Component {component_name!r} not found (upstream access denied)',
         )
 
     return included_versions
