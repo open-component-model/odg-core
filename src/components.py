@@ -569,7 +569,7 @@ async def component_versions(
     ocm_repository_cfgs = lookups.resolve_ocm_repository_cfgs(ocm_repo)
 
     included_versions = set()
-    worst_skipped_auth_status: int | None = None
+    skipped_auth_error: aiohttp.ClientResponseError | None = None
 
     for ocm_repository_cfg in ocm_repository_cfgs:
         if not ocm_repository_cfg.component_matches(component_name):
@@ -584,8 +584,8 @@ async def component_versions(
         except aiohttp.ClientResponseError as e:
             image_reference = ocm_repository_cfg.ocm_repository.component_oci_ref(component_name)
             if e.status in (http.HTTPStatus.UNAUTHORIZED, http.HTTPStatus.FORBIDDEN):
-                if worst_skipped_auth_status != http.HTTPStatus.FORBIDDEN:
-                    worst_skipped_auth_status = e.status
+                if skipped_auth_error is None:
+                    skipped_auth_error = e
                 continue  # no access to this repo
             if e.status == ocm.retrieve.error_code_indicating_not_found(
                 image_reference=image_reference,
@@ -601,10 +601,11 @@ async def component_versions(
             ),
         )
 
-    if not included_versions and worst_skipped_auth_status is not None:
-        if worst_skipped_auth_status == http.HTTPStatus.FORBIDDEN:
+    if not included_versions and skipped_auth_error is not None:
+        if skipped_auth_error.status == http.HTTPStatus.FORBIDDEN:
             raise aiohttp.web.HTTPForbidden()
-        raise aiohttp.web.HTTPUnauthorized()
+        if skipped_auth_error.status == http.HTTPStatus.UNAUTHORIZED:
+            raise aiohttp.web.HTTPUnauthorized()
 
     return included_versions
 
