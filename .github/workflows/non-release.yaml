@@ -13,6 +13,11 @@ jobs:
       id-token: write
     with:
       mode: snapshot
+      # Condition: is this a PR or a non-default-branch push?
+      # - pull_request_target event → '0'
+      # - push to a non-default branch → '0'
+      # - anything else (e.g. push to main, workflow_dispatch) → '${epoch}'
+      version-prerelease: ${{ (github.event_name == 'pull_request_target' || (github.event_name == 'push' && github.ref_name != github.event.repository.default_branch)) && '0' || '${epoch}' }}
 
   component-descriptor:
     uses: gardener/cc-utils/.github/workflows/post-build.yaml@v1
