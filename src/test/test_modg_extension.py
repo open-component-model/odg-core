@@ -113,6 +113,65 @@ def test_extensions(extension_definitions):
         'foo': 'bar.default-domain.com',
     }
 
+    assert (
+        odgu.template_and_resolve_jsonpath(
+            value='${flag}',
+            jsonpaths={},
+            substitution_context={'flag': True},
+            value_type=odgm.ValueType.PYTHON_STRING_TEMPLATE,
+        )
+        is True
+    )
+
+    assert (
+        odgu.template_and_resolve_jsonpath(
+            value='${flag}',
+            jsonpaths={},
+            substitution_context={'flag': False},
+            value_type=odgm.ValueType.PYTHON_STRING_TEMPLATE,
+        )
+        is False
+    )
+
+    # strings that look like booleans in the source context are also cast (any case),
+    # so chart values with a schema-typed boolean field (e.g. perses-app.enabled)
+    # do not fail helm template with "got string, want boolean"
+    for true_casing, false_casing in (
+        ('True', 'False'),
+        ('true', 'false'),
+        ('TRUE', 'FALSE'),
+        ('tRuE', 'fAlSe'),
+    ):
+        assert (
+            odgu.template_and_resolve_jsonpath(
+                value='${flag}',
+                jsonpaths={},
+                substitution_context={'flag': true_casing},
+                value_type=odgm.ValueType.PYTHON_STRING_TEMPLATE,
+            )
+            is True
+        ), true_casing
+        assert (
+            odgu.template_and_resolve_jsonpath(
+                value='${flag}',
+                jsonpaths={},
+                substitution_context={'flag': false_casing},
+                value_type=odgm.ValueType.PYTHON_STRING_TEMPLATE,
+            )
+            is False
+        ), false_casing
+
+    # non-boolean strings pass through untouched
+    assert (
+        odgu.template_and_resolve_jsonpath(
+            value='${host}',
+            jsonpaths={},
+            substitution_context={'host': 'my-domain.com'},
+            value_type=odgm.ValueType.PYTHON_STRING_TEMPLATE,
+        )
+        == 'my-domain.com'
+    )
+
     missing = set(
         odgc.iter_missing_dependencies(
             requested=(sb,),

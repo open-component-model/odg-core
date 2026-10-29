@@ -135,6 +135,13 @@ def template_and_resolve_jsonpath(
             return value
 
         elif value_type is odgm.ValueType.PYTHON_STRING_TEMPLATE:
+            # Helm boolean fields (e.g. chart `condition:` on Chart.yaml) require a proper YAML
+            # bool. String.Template of a boolean context value yields 'True'/'False', and YAML/JSON
+            # sources give 'true'/'false'; cast all case variants back so helm schema validation
+            # and chart conditions see a real bool, not a string.
+            normalized = templated.lower()
+            if normalized in ('true', 'false'):
+                return normalized == 'true'
             return templated
 
         elif value_type is odgm.ValueType.JSONPATH:
