@@ -26,6 +26,7 @@ jobs:
       id-token: write
     with:
       mode: release
+      version-prerelease: ''
 
   release-to-github-and-bump:
     uses: gardener/cc-utils/.github/workflows/release.yaml@v1
