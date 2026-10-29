@@ -113,53 +113,41 @@ def test_extensions(extension_definitions):
         'foo': 'bar.default-domain.com',
     }
 
-    assert (
-        odgu.template_and_resolve_jsonpath(
-            value='${flag}',
-            jsonpaths={},
-            substitution_context={'flag': True},
-            value_type=odgm.ValueType.PYTHON_STRING_TEMPLATE,
-        )
-        is True
-    )
-
-    assert (
-        odgu.template_and_resolve_jsonpath(
-            value='${flag}',
-            jsonpaths={},
-            substitution_context={'flag': False},
-            value_type=odgm.ValueType.PYTHON_STRING_TEMPLATE,
-        )
-        is False
-    )
-
-    # strings that look like booleans in the source context are also cast (any case),
-    # so chart values with a schema-typed boolean field (e.g. perses-app.enabled)
-    # do not fail helm template with "got string, want boolean"
-    for true_casing, false_casing in (
-        ('True', 'False'),
-        ('true', 'false'),
-        ('TRUE', 'FALSE'),
-        ('tRuE', 'fAlSe'),
+    # value_type=boolean yields real bools regardless of source representation,
+    # so helm chart conditions and boolean-typed schema fields validate.
+    for src, expected in (
+        (True, True),
+        (False, False),
+        ('True', True),
+        ('False', False),
+        ('true', True),
+        ('false', False),
+        ('1', True),
+        ('0', False),
+        ('yes', True),
+        ('no', False),
+        ('on', True),
+        ('off', False),
+        ('', False),
     ):
         assert (
             odgu.template_and_resolve_jsonpath(
                 value='${flag}',
                 jsonpaths={},
-                substitution_context={'flag': true_casing},
-                value_type=odgm.ValueType.PYTHON_STRING_TEMPLATE,
+                substitution_context={'flag': src},
+                value_type=odgm.ValueType.BOOLEAN,
             )
-            is True
-        ), true_casing
-        assert (
-            odgu.template_and_resolve_jsonpath(
-                value='${flag}',
-                jsonpaths={},
-                substitution_context={'flag': false_casing},
-                value_type=odgm.ValueType.PYTHON_STRING_TEMPLATE,
-            )
-            is False
-        ), false_casing
+            is expected
+        ), (src, expected)
+
+    # unparseable values raise so misconfigurations are loud, not silently truthy/falsy
+    with pytest.raises(ValueError):
+        odgu.template_and_resolve_jsonpath(
+            value='${flag}',
+            jsonpaths={},
+            substitution_context={'flag': 'maybe'},
+            value_type=odgm.ValueType.BOOLEAN,
+        )
 
     # non-boolean strings pass through untouched
     assert (

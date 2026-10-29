@@ -18,6 +18,7 @@ class ValueType(enum.StrEnum):
     JSONPATH = 'jsonpath'
     LITERAL = 'literal'
     PYTHON_STRING_TEMPLATE = 'python-string-template'
+    BOOLEAN = 'boolean'  # cast to real bool; use for helm fields typed 'type: boolean'
 
 
 @dataclasses.dataclass
