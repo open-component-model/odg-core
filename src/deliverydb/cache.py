@@ -4,7 +4,8 @@ import datetime
 import logging
 import traceback
 
-import sqlalchemy.exc
+import sqlalchemy
+import sqlalchemy.dialects.postgresql
 import sqlalchemy.orm.session
 
 import deliverydb.model as dm
@@ -16,58 +17,41 @@ import util
 logger = logging.getLogger(__name__)
 
 
-def update_cache_entry(
-    db_session: sqlalchemy.orm.session.Session,
-    cache_entry: dm.DBCache,
-) -> bool:
-    if not (existing_cache_entry := db_session.get(dm.DBCache, cache_entry.id)):
-        # cache entry does not exist yet, hence we cannot _update_ it
-        return False
-
-    try:
-        existing_cache_entry.revision = existing_cache_entry.revision + 1
-        existing_cache_entry.last_update = datetime.datetime.now(datetime.timezone.utc)
-        existing_cache_entry.delete_after = cache_entry.delete_after
-        existing_cache_entry.keep_until = cache_entry.keep_until
-        existing_cache_entry.costs = cache_entry.costs
-        existing_cache_entry.size = cache_entry.size
-        existing_cache_entry.value = cache_entry.value
-
-        db_session.commit()
-        return True
-    except Exception:
-        stacktrace = traceback.format_exc()
-        logger.error(stacktrace)
-
-        db_session.rollback()
-
-    return False
-
-
 def add_or_update_cache_entry(
     db_session: sqlalchemy.orm.session.Session,
     cache_entry: dm.DBCache,
 ) -> bool:
+    now = datetime.datetime.now(datetime.timezone.utc)
+    stmt = (
+        sqlalchemy.dialects.postgresql.insert(dm.DBCache)
+        .values(
+            id=cache_entry.id,
+            descriptor=cache_entry.descriptor,
+            delete_after=cache_entry.delete_after,
+            keep_until=cache_entry.keep_until,
+            costs=cache_entry.costs,
+            size=cache_entry.size,
+            value=cache_entry.value,
+            revision=0,
+            read_count=0,
+        )
+        .on_conflict_do_update(
+            index_elements=[dm.DBCache.id],
+            set_={
+                'revision': dm.DBCache.revision + 1,
+                'last_update': now,
+                'delete_after': cache_entry.delete_after,
+                'keep_until': cache_entry.keep_until,
+                'costs': cache_entry.costs,
+                'size': cache_entry.size,
+                'value': cache_entry.value,
+            },
+        )
+    )
     try:
-        db_session.add(cache_entry)
+        db_session.execute(stmt)
         db_session.commit()
         return True
-
-    except sqlalchemy.exc.IntegrityError:
-        db_session.rollback()
-
-        # try to update cache entry instead because it may have already existed and hence raised a
-        # duplicated key error (this is the expected case if a cache entry got stale or it is
-        # calculated multiple times concurrently)
-        if update_cache_entry(
-            db_session=db_session,
-            cache_entry=cache_entry,
-        ):
-            return True
-
-        stacktrace = traceback.format_exc()
-        logger.error(stacktrace)
-
     except Exception:
         stacktrace = traceback.format_exc()
         logger.error(stacktrace)
@@ -86,8 +70,6 @@ def find_cached_value(
 
     now = datetime.datetime.now(datetime.timezone.utc)
 
-    # explicitly cast timezone to UTC to also support sqlite usage since it drops the timezone
-    # information and always casts to UTC internally
     if cache_entry.delete_after and now > cache_entry.delete_after.astimezone(datetime.timezone.utc):
         # cache entry is already stale -> don't used it
         # TODO: return stale entry already to client and calculate new value in the background and
@@ -97,8 +79,15 @@ def find_cached_value(
     value = cache_entry.value
 
     try:
-        cache_entry.last_read = now
-        cache_entry.read_count = cache_entry.read_count + 1
+        stmt = (
+            sqlalchemy.update(dm.DBCache)
+            .where(dm.DBCache.id == id)
+            .values(
+                last_read=now,
+                read_count=dm.DBCache.read_count + 1,
+            )
+        )
+        db_session.execute(stmt)
         db_session.commit()
     except Exception:
         stacktrace = traceback.format_exc()
