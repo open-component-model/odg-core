@@ -4,8 +4,12 @@ import io
 import logging
 import os
 import tarfile
+import tempfile
+import time
 
+import botocore.exceptions
 import dacite
+import requests.exceptions
 
 import oci.client
 import oci.client_async
@@ -24,6 +28,59 @@ import util
 
 
 logger = logging.getLogger(__name__)
+
+
+def _fetch_blob_with_retries(
+    fetch: collections.abc.Callable[[], collections.abc.Iterator[bytes]],
+    name: str,
+    size: int,
+    chunk_size: int = 65536,
+    remaining_retries: int = 3,
+) -> collections.abc.Generator[bytes, None, None]:
+    tmp = tempfile.NamedTemporaryFile(delete=False)
+
+    logger.info(f'downloading blob {name} ({size / 1024 / 1024:.1f} MiB)')
+    t0 = time.monotonic()
+
+    try:
+        try:
+            for chunk in fetch():
+                tmp.write(chunk)
+        except (
+            botocore.exceptions.BotoCoreError,
+            requests.exceptions.ChunkedEncodingError,
+            requests.exceptions.ConnectionError,
+        ):
+            if remaining_retries == 0:
+                raise
+
+            logger.warning(
+                f'download of {name} failed ({remaining_retries=}), retrying...',
+                exc_info=True,
+            )
+            yield from _fetch_blob_with_retries(
+                fetch=fetch,
+                name=name,
+                size=size,
+                chunk_size=chunk_size,
+                remaining_retries=remaining_retries - 1,
+            )
+            return
+        finally:
+            tmp.close()
+
+        download_s = time.monotonic() - t0
+        actual_size = os.path.getsize(tmp.name)
+        logger.info(
+            f'downloaded blob {name} ({actual_size / 1024 / 1024:.1f} MiB in {download_s:.1f}s)',
+        )
+
+        with open(tmp.name, 'rb') as f:
+            while chunk := f.read(chunk_size):
+                yield chunk
+    finally:
+        if os.path.exists(tmp.name):
+            os.unlink(tmp.name)
 
 
 @dataclasses.dataclass
@@ -65,18 +122,24 @@ def _iter_blob_descriptors_for_manifest(
         logger.debug('skipping config blob')
 
     for blob_ref in blob_refs:
-        content = oci_client.blob(
+        name = f'{blob_ref.digest}.tar'
+
+        fetch = lambda digest=blob_ref.digest: oci_client.blob(
             image_reference=image_reference,
-            digest=blob_ref.digest,
+            digest=digest,
             stream=True,
         ).iter_content(chunk_size=chunk_size)
 
         yield BlobDescriptor(
-            content=content,
+            content=_fetch_blob_with_retries(
+                fetch=fetch,
+                name=name,
+                size=blob_ref.size,
+            ),
             size=blob_ref.size,
             digest=blob_ref.digest,
             media_type=blob_ref.mediaType,
-            name=f'{blob_ref.digest}.tar',
+            name=name,
         )
 
 
@@ -97,11 +160,16 @@ def _iter_blob_descriptors_for_local_blob(
         digest = access.localReference.lower()
         size = access.size
 
-    blob = oci_client.blob(
-        image_reference=image_reference,
-        digest=digest,
-        stream=True,
-    )
+    if not size:
+        blob = oci_client.blob(
+            image_reference=image_reference,
+            digest=digest,
+            stream=True,
+        )
+
+        if 'Content-Length' in blob.headers:
+            size = int(blob.headers.get('Content-Length'))
+        blob.close()  # we need a fresh connection to ensure we can retry it
 
     if not size:
         manifest = oci_client.manifest(
@@ -127,8 +195,18 @@ def _iter_blob_descriptors_for_local_blob(
         else:
             raise ValueError('`size` must not be empty to stream local blob')
 
+    fetch = lambda: oci_client.blob(
+        image_reference=image_reference,
+        digest=digest,
+        stream=True,
+    ).iter_content(chunk_size=4096)
+
     yield BlobDescriptor(
-        content=blob.iter_content(chunk_size=4096),
+        content=_fetch_blob_with_retries(
+            fetch=fetch,
+            name=access.referenceName,
+            size=size,
+        ),
         size=size,
         digest=digest,
         media_type=access.mediaType,
@@ -143,19 +221,24 @@ def _iter_blob_descriptors_for_oci_blob(
 ) -> collections.abc.Generator[BlobDescriptor, None, None]:
     digest = access.digest.lower()
     size = access.size
+    name = f'{digest}.tar'
 
-    blob = oci_client.blob(
+    fetch = lambda: oci_client.blob(
         image_reference=image_reference,
         digest=digest,
         stream=True,
-    )
+    ).iter_content(chunk_size=4096)
 
     yield BlobDescriptor(
-        content=blob.iter_content(chunk_size=4096),
+        content=_fetch_blob_with_retries(
+            fetch=fetch,
+            name=name,
+            size=size,
+        ),
         size=size,
         digest=digest,
         media_type=access.mediaType,
-        name=f'{digest}.tar',
+        name=name,
     )
 
 
@@ -225,13 +308,27 @@ def _iter_blob_descriptors_for_s3(
     blob = s3_client.get_object(Bucket=bucket, Key=key)
 
     size = blob['ContentLength']
-    body = blob['Body']
+    name = f's3://{bucket}/{key}'
+    initial_body = blob['Body']
+
+    def fetch() -> collections.abc.Iterator[bytes]:
+        nonlocal initial_body
+        if initial_body is not None:
+            body = initial_body
+            initial_body = None
+        else:
+            body = s3_client.get_object(Bucket=bucket, Key=key)['Body']
+        return body.iter_chunks(chunk_size=chunk_size)
 
     yield BlobDescriptor(
-        content=body.iter_chunks(chunk_size=chunk_size),
+        content=_fetch_blob_with_retries(
+            fetch=fetch,
+            name=name,
+            size=size,
+        ),
         size=size,
         media_type=s3_access.mediaType,
-        name=f's3://{bucket}/{key}',
+        name=name,
     )
 
 
