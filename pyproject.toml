@@ -19,6 +19,7 @@ dependencies = [
     "boto3==1.43.123",
     "brotli==1.2.1",
     "cachetools==7.2.8",
+    "cryptography==50.0.2",
     "cyclonedx-python-lib==11.12.0",
     "dacite==1.9.2",
     "dataclasses-json==0.6.7",

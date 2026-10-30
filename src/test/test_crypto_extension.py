@@ -107,7 +107,6 @@ def cbom() -> dict:
                 'bom-ref': '6ca0151091803ee4',
                 'type': 'cryptographic-asset',
                 'name': 'ECDSA',
-                'description': 'Curve: P-384',
                 'evidence': {
                     'occurrences': [
                         {
@@ -117,9 +116,17 @@ def cbom() -> dict:
                 },
                 'cryptoProperties': {
                     'assetType': 'related-crypto-material',
+                    # current cbomkit-theia only reports the key itself (here: P-384, taken from
+                    # "Amazon Root CA 4"), no curve or size
                     'relatedCryptoMaterialProperties': {
                         'type': 'public-key',
                         'algorithmRef': 'f8394d4343ecaefa',
+                        'value': (
+                            'MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAE0quKN0+jUw3+wYp7S6h7RktjsGL2LRvbCHEh0gDo'
+                            'Y72aJ/vwOW5d6j2lyYGqo1sgmEVdFtv96BBt45zg471fhGLzcGQzoMskL3C6iKEqoHX4ga5i'
+                            'BsSB2zluKbAe+i5c'
+                        ),
+                        'format': 'PEM',
                     },
                 },
             },

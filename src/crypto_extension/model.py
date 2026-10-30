@@ -1,3 +1,4 @@
+import base64
 import collections.abc
 import datetime
 import enum
@@ -5,11 +6,35 @@ import math
 import os
 import re
 
+import cryptography.hazmat.primitives.asymmetric.ec
+import cryptography.hazmat.primitives.asymmetric.rsa
+import cryptography.hazmat.primitives.asymmetric.types
+import cryptography.hazmat.primitives.serialization
 import cyclonedx.schema
+import structlog
 
 import odg.model
 
+
+logger = structlog.get_logger(__name__)
+
 own_dir = os.path.dirname(__file__)
+
+# maps SEC curve names (as used by `cryptography`) to NIST names (as used in the standards)
+NIST_CURVE_NAMES = {
+    'secp224r1': 'P-224',
+    'secp256r1': 'P-256',
+    'secp384r1': 'P-384',
+    'secp521r1': 'P-521',
+    'sect233k1': 'K-233',
+    'sect233r1': 'B-233',
+    'sect283k1': 'K-283',
+    'sect283r1': 'B-283',
+    'sect409k1': 'K-409',
+    'sect409r1': 'B-409',
+    'sect571k1': 'K-571',
+    'sect571r1': 'B-571',
+}
 
 
 class SupportedSchemaVersions(enum.Enum):
@@ -234,6 +259,28 @@ def deserialise_certificate(
     )
 
 
+def load_public_key(
+    value: str | None,
+) -> cryptography.hazmat.primitives.asymmetric.types.PublicKeyTypes | None:
+    """
+    Loads a public key which is either PEM encoded or a base64 encoded DER `SubjectPublicKeyInfo`
+    (as reported by cbomkit-theia despite declaring the format as `PEM`).
+    """
+    if not value:
+        return None
+
+    try:
+        if value.startswith('-----BEGIN'):
+            return cryptography.hazmat.primitives.serialization.load_pem_public_key(value.encode())
+
+        return cryptography.hazmat.primitives.serialization.load_der_public_key(
+            base64.b64decode(value, validate=True),
+        )
+    except ValueError as e:  # also raised for invalid base64 (binascii.Error)
+        logger.warning('failed to load public key, falling back to "unknown"', error=str(e))
+        return None
+
+
 def deserialise_related_crypto_material(
     related_crypto_material_properties: dict,
     crypto_assets_raw: collections.abc.Sequence[dict],
@@ -247,12 +294,24 @@ def deserialise_related_crypto_material(
     curve = determine_curve(
         description=description,
     )
+    size = related_crypto_material_properties.get('size')
+
+    # cbomkit-theia only reports the encoded public key, curve and size must be derived from it
+    if public_key := load_public_key(related_crypto_material_properties.get('value')):
+        if isinstance(
+            public_key,
+            cryptography.hazmat.primitives.asymmetric.ec.EllipticCurvePublicKey,
+        ):
+            curve = NIST_CURVE_NAMES.get(public_key.curve.name, public_key.curve.name)
+            size = public_key.key_size
+        elif isinstance(public_key, cryptography.hazmat.primitives.asymmetric.rsa.RSAPublicKey):
+            size = public_key.key_size
 
     return odg.model.RelatedCryptoMaterialProperties(
         type=related_crypto_material_properties.get('type'),
         algorithm_ref=algorithm_ref,
         curve=curve,
-        size=related_crypto_material_properties.get('size'),
+        size=size,
     )
 
 
