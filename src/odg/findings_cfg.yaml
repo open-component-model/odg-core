@@ -101,6 +101,18 @@
       selector:
         sub_types:
           - .*
+    - id: no-linting-required
+      display_name: No SAST scans required
+      value: 0
+      rescoring: manual
+    - id: manual-linting
+      display_name: Manual SAST scans done
+      value: 0
+      rescoring: manual
+    - id: other
+      display_name: Other
+      value: 0
+      rescoring: manual
 
 - type: finding/diki
   filter:
@@ -258,6 +270,10 @@
       selector:
         status:
           - moreThanOnePatchlevelBehind
+    - id: one-or-more-patchlevel-behind
+      display_name: One or more Patchlevel behind
+      value: 2
+      rescoring: manual
     - id: eol
       display_name: Branch no longer supported
       value: 8
