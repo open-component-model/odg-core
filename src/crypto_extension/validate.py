@@ -697,13 +697,38 @@ def validate_related_crypto_material(
     return
 
 
+def iter_certificate_key_algorithm_keys(
+    crypto_assets: collections.abc.Sequence[odg.model.CryptoAsset],
+) -> collections.abc.Generator[str, None, None]:
+    """
+    Yields the keys of those algorithms which describe the type of a certificate's public key
+    (e.g. `ECDSA` for `id-ecPublicKey`, `RSA` for `rsaEncryption`). They carry neither a hash
+    function nor key length/curve by themselves, as these are properties of the public key. Hence,
+    they are validated in the context of the certificate (see `validate_certificate()`).
+    """
+    for certificate in crypto_assets:
+        if certificate.asset_type is not odg.model.CryptoAssetTypes.CERTIFICATE:
+            continue
+
+        public_key = find_crypto_asset_by_key(
+            data_key=certificate.properties.subject_public_key_ref,
+            crypto_assets=crypto_assets,
+        )
+        yield public_key.properties.algorithm_ref
+
+
 def validate_against_standard(
     crypto_assets: collections.abc.Sequence[odg.model.CryptoAsset],
     standard: cc.Standard,
     crypto_finding_cfg: odg.findings.Finding,
 ) -> collections.abc.Generator[odg.model.CryptoFinding, None, None]:
+    certificate_key_algorithm_keys = set(iter_certificate_key_algorithm_keys(crypto_assets))
+
     for crypto_asset in crypto_assets:
         if crypto_asset.asset_type is odg.model.CryptoAssetTypes.ALGORITHM:
+            if crypto_asset.key in certificate_key_algorithm_keys:
+                continue
+
             if finding := validate_algorithm(
                 algorithm_asset=crypto_asset,
                 standard=standard,

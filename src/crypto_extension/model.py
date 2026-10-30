@@ -1,6 +1,8 @@
+import base64
 import collections.abc
 import datetime
 import enum
+import logging
 import math
 import os
 import re
@@ -10,7 +12,27 @@ import cyclonedx.schema
 import odg.model
 
 
+logger = logging.getLogger(__name__)
+
 own_dir = os.path.dirname(__file__)
+
+EC_PUBLIC_KEY_OID = '1.2.840.10045.2.1'
+RSA_ENCRYPTION_OID = '1.2.840.113549.1.1.1'
+# maps named curve OIDs (SEC 2) to their NIST name (as used in the standards) and size in bits
+NIST_CURVES_BY_OID = {
+    '1.2.840.10045.3.1.7': ('P-256', 256),
+    '1.3.132.0.16': ('K-283', 283),
+    '1.3.132.0.17': ('B-283', 283),
+    '1.3.132.0.26': ('K-233', 233),
+    '1.3.132.0.27': ('B-233', 233),
+    '1.3.132.0.33': ('P-224', 224),
+    '1.3.132.0.34': ('P-384', 384),
+    '1.3.132.0.35': ('P-521', 521),
+    '1.3.132.0.36': ('K-409', 409),
+    '1.3.132.0.37': ('B-409', 409),
+    '1.3.132.0.38': ('K-571', 571),
+    '1.3.132.0.39': ('B-571', 571),
+}
 
 
 class SupportedSchemaVersions(enum.Enum):
@@ -229,6 +251,88 @@ def deserialise_certificate(
     )
 
 
+def read_der_element(
+    data: bytes,
+    offset: int = 0,
+) -> tuple[int, bytes, int]:
+    """
+    Reads the DER element at `offset` and returns its tag, its content and the offset of the next
+    element.
+    """
+    tag = data[offset]
+    length = data[offset + 1]
+    offset += 2
+
+    if length & 0x80:  # long form, lower bits hold the number of length bytes
+        length_bytes = length & 0x7F
+        length = int.from_bytes(data[offset : offset + length_bytes])
+        offset += length_bytes
+
+    if offset + length > len(data):
+        raise ValueError('DER element exceeds data')
+
+    return tag, data[offset : offset + length], offset + length
+
+
+def decode_der_oid(
+    content: bytes,
+) -> str:
+    first, *rest = content
+    arcs = [first // 40, first % 40] if first < 80 else [2, first - 80]
+
+    arc = 0
+    for byte in rest:
+        arc = (arc << 7) | (byte & 0x7F)
+        if not byte & 0x80:
+            arcs.append(arc)
+            arc = 0
+
+    return '.'.join(str(arc) for arc in arcs)
+
+
+def public_key_curve_and_size(
+    value: str | None,
+) -> tuple[str | None, int | None]:
+    """
+    Determines curve and size of a public key which is either PEM encoded or a base64 encoded DER
+    `SubjectPublicKeyInfo` (as reported by cbomkit-theia despite declaring the format as `PEM`).
+    The structure is parsed directly instead of loading the key, so that curves unsupported by
+    crypto libraries (e.g. the binary curves allowed by FIPS) are recognised as well. Returns
+    `None` for values which cannot be determined.
+    """
+    if not value:
+        return None, None
+
+    if value.startswith('-----BEGIN'):
+        value = ''.join(line for line in value.splitlines() if not line.startswith('-----'))
+
+    try:
+        _, spki, _ = read_der_element(base64.b64decode(value, validate=True))
+        _, algorithm_identifier, public_key_offset = read_der_element(spki)
+        _, algorithm_oid, parameters_offset = read_der_element(algorithm_identifier)
+        algorithm_oid = decode_der_oid(algorithm_oid)
+
+        if algorithm_oid == EC_PUBLIC_KEY_OID:
+            parameters_tag, parameters, _ = read_der_element(algorithm_identifier, parameters_offset)
+            if parameters_tag != 0x06:  # explicit curve parameters instead of a named curve
+                return None, None
+            curve_oid = decode_der_oid(parameters)
+            # report unmapped curves by their OID rather than as "unknown"
+            return NIST_CURVES_BY_OID.get(curve_oid, (curve_oid, None))
+
+        if algorithm_oid == RSA_ENCRYPTION_OID:
+            _, public_key, _ = read_der_element(spki, public_key_offset)
+            # skip the BIT STRING's unused-bits byte to get to `RSAPublicKey ::= SEQUENCE {n, e}`
+            _, rsa_public_key, _ = read_der_element(public_key[1:])
+            _, modulus, _ = read_der_element(rsa_public_key)
+            return None, int.from_bytes(modulus).bit_length()
+
+    except (IndexError, ValueError) as e:  # ValueError also covers invalid base64
+        logger.warning(f'failed to parse public key, falling back to "unknown": {e=}')
+
+    return None, None
+
+
 def deserialise_related_crypto_material(
     related_crypto_material_properties: dict,
     crypto_assets_raw: collections.abc.Sequence[dict],
@@ -242,12 +346,18 @@ def deserialise_related_crypto_material(
     curve = determine_curve(
         description=description,
     )
+    size = related_crypto_material_properties.get('size')
+
+    # cbomkit-theia only reports the encoded public key, curve and size must be derived from it
+    key_curve, key_size = public_key_curve_and_size(related_crypto_material_properties.get('value'))
+    curve = key_curve or curve
+    size = key_size or size
 
     return odg.model.RelatedCryptoMaterialProperties(
         type=related_crypto_material_properties.get('type'),
         algorithm_ref=algorithm_ref,
         curve=curve,
-        size=related_crypto_material_properties.get('size'),
+        size=size,
     )
 
 
