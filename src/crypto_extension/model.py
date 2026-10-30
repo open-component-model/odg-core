@@ -129,13 +129,15 @@ def bom_ref_to_data_key(
 
 def guess_certificate_kind(
     subject_name: str | None,
+    issuer_name: str | None,
 ) -> odg.model.CertificateKind:
     """
     This function is intended to heuristically determine the "kind" of a certificate, like root-ca,
-    intermediate-ca or end-user certificate. It checks the subject name for "well-known" phrases
-    indicating one of the above certificate kinds. If no matching phrase is identified, it will be
-    interpreted as end-user certificate, which will usually have the strictest rules regarding
-    validity whereas the requirements for the used algorithm are usually less strict.
+    intermediate-ca or end-user certificate. Self-signed certificates (subject equals issuer) are
+    root CAs. Otherwise, it checks the subject name for "well-known" phrases indicating one of the
+    above certificate kinds. If no matching phrase is identified, it will be interpreted as end-user
+    certificate, which will usually have the strictest rules regarding validity whereas the
+    requirements for the used algorithm are usually less strict.
     """
     root_ca_phrases = ('root',)
     intermediate_ca_phrases = (
@@ -146,6 +148,9 @@ def guess_certificate_kind(
 
     if not subject_name:
         return odg.model.CertificateKind.END_USER
+
+    if subject_name == issuer_name:
+        return odg.model.CertificateKind.ROOT_CA
 
     subject_name = subject_name.lower().replace(' ', '')
 
@@ -207,6 +212,7 @@ def deserialise_certificate(
 
     kind = guess_certificate_kind(
         subject_name=certificate_properties.get('subjectName'),
+        issuer_name=certificate_properties.get('issuerName'),
     )
 
     if (not_valid_before_raw := certificate_properties.get('notValidBefore')) and (
