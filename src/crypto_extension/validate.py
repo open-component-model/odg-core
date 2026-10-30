@@ -8,6 +8,7 @@ import typing
 import structlog
 
 import crypto_extension.config as cc
+import crypto_extension.model
 import odg.findings
 import odg.model
 
@@ -457,11 +458,19 @@ def validate_certificate(
     and `validity_years` are actually allowed for the detected certificate kind. If either one of
     the used algorithms is not valid or the certificate properties are not sufficient for the
     detected certificate kind, a finding with the rating `not-compliant` will be created.
+    Trust anchors are only validated if the `standard` explicitly defines rules for them.
     """
     if certificate_asset.asset_type is not odg.model.CryptoAssetTypes.CERTIFICATE:
         raise ValueError(certificate_asset.asset_type)
 
     certificate_properties: odg.model.CertificateProperties = certificate_asset.properties
+
+    if certificate_properties.kind is odg.model.CertificateKind.TRUST_ANCHOR and not any(
+        certificate_property.kind is odg.model.CertificateKind.TRUST_ANCHOR
+        for certificate_definition in standard.public_key_infrastructure.certificates
+        for certificate_property in certificate_definition.properties
+    ):
+        return
 
     signature_algorithm = find_crypto_asset_by_key(
         data_key=certificate_properties.signature_algorithm_ref,
@@ -807,6 +816,14 @@ def validate_against_standard(
     for crypto_asset in crypto_assets:
         if crypto_asset.asset_type is odg.model.CryptoAssetTypes.ALGORITHM:
             if crypto_asset.key in certificate_key_algorithm_keys:
+                continue
+
+            if crypto_asset.locations and all(
+                crypto_extension.model.is_trust_store_location(location)
+                for location in crypto_asset.locations
+            ):
+                # algorithms only found in trust stores stem from trust anchors, which are validated
+                # in the context of the respective certificate (see `validate_certificate()`)
                 continue
 
             if finding := validate_algorithm(

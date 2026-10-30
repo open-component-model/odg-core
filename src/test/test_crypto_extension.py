@@ -76,7 +76,7 @@ def cbom() -> dict:
                 'evidence': {
                     'occurrences': [
                         {
-                            'location': '/etc/ssl/cert.pem',
+                            'location': '/opt/app/tls.crt',
                         },
                     ],
                 },
@@ -94,7 +94,7 @@ def cbom() -> dict:
                 'evidence': {
                     'occurrences': [
                         {
-                            'location': '/etc/ssl/cert.pem',
+                            'location': '/opt/app/tls.crt',
                         },
                     ],
                 },
@@ -113,7 +113,7 @@ def cbom() -> dict:
                 'evidence': {
                     'occurrences': [
                         {
-                            'location': '/etc/ssl/cert.pem',
+                            'location': '/opt/app/tls.crt',
                         },
                     ],
                 },
@@ -139,7 +139,7 @@ def cbom() -> dict:
                 'evidence': {
                     'occurrences': [
                         {
-                            'location': '/etc/ssl/cert.pem',
+                            'location': '/opt/app/tls.crt',
                         },
                     ],
                 },
@@ -449,3 +449,82 @@ def test_go_fips140_module_validation(
     stdlib.go_fips140_modules.append('v1.26.0')
 
     assert severity_by_path(fips_v1_26_certified)['/in-process'] == 'compliant'
+
+
+@pytest.mark.parametrize(
+    'location',
+    [
+        'etc/ssl/certs/ca-certificates.crt',
+        '/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem',
+        '/usr/lib/jvm/java-21/lib/security/cacerts',
+    ],
+)
+def test_trust_anchors_are_not_validated_without_rules(
+    cbom: dict,
+    crypto_mapping: odg.extensions_cfg.CryptoMapping,
+    crypto_finding_cfg: odg.findings.Finding,
+    location: str,
+):
+    for component in cbom['components']:
+        if evidence := component.get('evidence'):
+            evidence['occurrences'] = [{'location': location}]
+
+    crypto_assets = crypto_extension.model.iter_crypto_assets(
+        cbom=cbom,
+        crypto_libraries=crypto_mapping.libraries,
+        included_asset_types=crypto_mapping.included_asset_types,
+    )
+    certificate = next(
+        crypto_asset
+        for crypto_asset in crypto_assets
+        if crypto_asset.asset_type is odg.model.CryptoAssetTypes.CERTIFICATE
+    )
+    assert certificate.properties.kind is odg.model.CertificateKind.TRUST_ANCHOR
+
+    findings = crypto_extension.validate.iter_findings_for_standards(
+        crypto_assets=crypto_assets,
+        standards=crypto_mapping.standards,
+        crypto_finding_cfg=crypto_finding_cfg,
+    )
+
+    # neither the trust anchor nor its algorithms are rated, only the library remains
+    assert {finding.asset.asset_type for finding in findings} == {
+        odg.model.CryptoAssetTypes.LIBRARY,
+    }
+
+
+def test_trust_anchors_are_validated_with_rules(
+    cbom: dict,
+    crypto_mapping: odg.extensions_cfg.CryptoMapping,
+    crypto_finding_cfg: odg.findings.Finding,
+):
+    for component in cbom['components']:
+        if evidence := component.get('evidence'):
+            evidence['occurrences'] = [{'location': 'etc/ssl/cert.pem'}]
+
+    crypto_assets = crypto_extension.model.iter_crypto_assets(
+        cbom=cbom,
+        crypto_libraries=[],
+        included_asset_types=None,
+    )
+    ncs = copy.deepcopy(
+        next(standard for standard in crypto_mapping.standards if standard.name == 'NCS'),
+    )
+    ncs.public_key_infrastructure.certificates[0].properties.append(
+        crypto_extension.config.CertificateProperties(
+            kind=odg.model.CertificateKind.TRUST_ANCHOR,
+            curves=None,
+            key_length=None,
+            validity_years=crypto_extension.config.MinMaxEnumProperties(max=5),
+        ),
+    )
+
+    findings = crypto_extension.validate.iter_findings_for_standards(
+        crypto_assets=crypto_assets,
+        standards=[ncs],
+        crypto_finding_cfg=crypto_finding_cfg,
+    )
+
+    assert [finding.asset.asset_type for finding in findings] == [
+        odg.model.CryptoAssetTypes.CERTIFICATE,
+    ]
