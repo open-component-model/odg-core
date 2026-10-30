@@ -299,6 +299,14 @@
       selector:
         resolutions:
           - false_positive
+    - id: pattern-edited
+      display_name: Pattern Edited
+      value: 0
+      allowed_processing_time: ~
+      rescoring: manual
+      selector:
+        resolutions:
+          - pattern_edited
     - id: revoked
       display_name: Revoked
       value: 0
