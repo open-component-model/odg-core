@@ -37,6 +37,13 @@
       value: 0
       allowed_processing_time: ~
       rescoring: manual
+    - id: scanner-limitation
+      display_name: Scanner-Limitation
+      value: 16
+      allowed_processing_time: 0
+      selector:
+        malware_names:
+          - Heuristics.Limits.Exceeded.*
     - id: BLOCKER
       display_name: BLOCKER
       value: 16
@@ -101,6 +108,22 @@
       selector:
         sub_types:
           - .*
+    - id: no-linting-required
+      display_name: No SAST scans required
+      value: 0
+      rescoring: manual
+    - id: manual-linting
+      display_name: Manual SAST scans done
+      value: 0
+      rescoring: manual
+    - id: other
+      display_name: Other
+      value: 0
+      rescoring: manual
+    - id: missing-linting
+      display_name: Missing SAST scan
+      value: 16
+      rescoring: manual
 
 - type: finding/diki
   filter:
@@ -258,6 +281,10 @@
       selector:
         status:
           - moreThanOnePatchlevelBehind
+    - id: one-or-more-patchlevel-behind
+      display_name: One or more Patchlevel behind
+      value: 2
+      rescoring: manual
     - id: eol
       display_name: Branch no longer supported
       value: 8
@@ -283,6 +310,14 @@
       selector:
         resolutions:
           - false_positive
+    - id: pattern-edited
+      display_name: Pattern Edited
+      value: 0
+      allowed_processing_time: ~
+      rescoring: manual
+      selector:
+        resolutions:
+          - pattern_edited
     - id: revoked
       display_name: Revoked
       value: 0
@@ -315,3 +350,8 @@
       selector:
         resolutions:
           - null
+    - id: secret-found
+      display_name: Secret Found
+      value: 2
+      allowed_processing_time: 0
+      rescoring: manual
