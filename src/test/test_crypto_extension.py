@@ -459,38 +459,71 @@ def test_go_fips140_module_validation(
         '/usr/lib/jvm/java-21/lib/security/cacerts',
     ],
 )
-def test_trust_anchors_are_not_validated_without_rules(
+def test_trust_anchors_are_validated_by_public_key_only(
     cbom: dict,
     crypto_mapping: odg.extensions_cfg.CryptoMapping,
     crypto_finding_cfg: odg.findings.Finding,
     location: str,
 ):
+    """
+    The fixture certificate is valid for 25 years (NCS root CA maximum: 20) and has a P-384 key
+    (allowed for NCS root CAs). Its self-signature is changed to SHA-256 (not allowed in NCS).
+    """
     for component in cbom['components']:
         if evidence := component.get('evidence'):
             evidence['occurrences'] = [{'location': location}]
+        if component['name'] == 'ECDSA-SHA384':
+            component['name'] = 'ECDSA-SHA256'
 
-    crypto_assets = crypto_extension.model.iter_crypto_assets(
-        cbom=cbom,
-        crypto_libraries=crypto_mapping.libraries,
-        included_asset_types=crypto_mapping.included_asset_types,
+    p384_public_key = next(
+        component['cryptoProperties']['relatedCryptoMaterialProperties']['value']
+        for component in cbom['components']
+        if 'relatedCryptoMaterialProperties' in component.get('cryptoProperties', {})
     )
-    certificate = next(
-        crypto_asset
-        for crypto_asset in crypto_assets
-        if crypto_asset.asset_type is odg.model.CryptoAssetTypes.CERTIFICATE
-    )
-    assert certificate.properties.kind is odg.model.CertificateKind.TRUST_ANCHOR
-
-    findings = crypto_extension.validate.iter_findings_for_standards(
-        crypto_assets=crypto_assets,
-        standards=crypto_mapping.standards,
-        crypto_finding_cfg=crypto_finding_cfg,
+    p256_public_key = (
+        'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEB9/oo+1sUmR1msJwmaZ4hSQXc06pEr0lbR7uRKGWFPOc1kIykO9p'
+        'zAB6nCdl9BFjPEW06QEJYwjbO7zT0H37xA=='
     )
 
-    # neither the trust anchor nor its algorithms are rated, only the library remains
-    assert {finding.asset.asset_type for finding in findings} == {
-        odg.model.CryptoAssetTypes.LIBRARY,
-    }
+    def iter_findings(public_key: str) -> list[odg.model.CryptoFinding]:
+        for component in cbom['components']:
+            crypto_properties = component.get('cryptoProperties', {})
+            if related_crypto_material := crypto_properties.get('relatedCryptoMaterialProperties'):
+                related_crypto_material['value'] = public_key
+
+        crypto_assets = crypto_extension.model.iter_crypto_assets(
+            cbom=cbom,
+            crypto_libraries=[],
+            included_asset_types=None,
+        )
+        certificate = next(
+            crypto_asset
+            for crypto_asset in crypto_assets
+            if crypto_asset.asset_type is odg.model.CryptoAssetTypes.CERTIFICATE
+        )
+        assert certificate.properties.kind is odg.model.CertificateKind.TRUST_ANCHOR
+
+        return list(
+            crypto_extension.validate.iter_findings_for_standards(
+                crypto_assets=crypto_assets,
+                standards=crypto_mapping.standards,
+                crypto_finding_cfg=crypto_finding_cfg,
+            ),
+        )
+
+    # neither the self-signature nor the validity are rated, and the algorithms (only found in the
+    # trust store) are not rated standalone
+    assert iter_findings(public_key=p384_public_key) == []
+
+    # P-256 is not allowed for NCS root CAs
+    findings = iter_findings(public_key=p256_public_key)
+    assert [(finding.standard, finding.asset.asset_type) for finding in findings] == [
+        ('NCS', odg.model.CryptoAssetTypes.CERTIFICATE),
+    ]
+    reasoning, _, unmet_requirements = findings[0].summary.partition('\n')
+    assert reasoning == crypto_extension.validate.TRUST_ANCHOR_REASONING.replace('\n', ' ')
+    assert 'validity' not in unmet_requirements
+    assert 'hash' not in unmet_requirements
 
 
 def test_trust_anchors_are_validated_with_rules(
