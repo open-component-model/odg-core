@@ -339,3 +339,8 @@
       selector:
         resolutions:
           - null
+    - id: secret-found
+      display_name: Secret Found
+      value: 2
+      allowed_processing_time: 0
+      rescoring: manual
