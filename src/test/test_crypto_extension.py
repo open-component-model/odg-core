@@ -230,9 +230,15 @@ def test_crypto_validation(
         ),
     )
 
-    assert len([finding for finding in findings if finding.standard == 'FIPS']) == 2
-
-    assert len([finding for finding in findings if finding.standard == 'NCS']) == 3
+    # the certificate's key algorithm (ECDSA) is validated as part of the certificate only, as it
+    # carries neither hash function nor curve by itself
+    assert sorted(
+        (finding.standard, finding.asset.asset_type, finding.asset.names[0]) for finding in findings
+    ) == [
+        ('FIPS', odg.model.CryptoAssetTypes.LIBRARY, 'golang.org/x/crypto'),
+        ('NCS', odg.model.CryptoAssetTypes.CERTIFICATE, 'arbitrary-certificate-name'),
+        ('NCS', odg.model.CryptoAssetTypes.LIBRARY, 'golang.org/x/crypto'),
+    ]
 
 
 @pytest.mark.parametrize(
