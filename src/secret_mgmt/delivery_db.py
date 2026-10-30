@@ -6,7 +6,7 @@ from sqlalchemy.engine import URL
 @dataclasses.dataclass(kw_only=True)
 class DeliveryDB:
     username: str = 'postgres'
-    password: str
+    password: str = dataclasses.field(repr=False)
     hostname: str | None = None
     port: int = 5432
     database: str | None = None

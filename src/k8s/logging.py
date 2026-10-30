@@ -1,7 +1,6 @@
 import http
 import json
 import logging
-import textwrap
 import threading
 import time
 import traceback
@@ -281,16 +280,44 @@ def init_logging_thread(
     thread.start()
 
 
-class JSONFormatter(logging.Formatter):
-    def formatMessage(self, record) -> str:
-        # Check if json module was already cleared during interpreter shutdown
-        if json is None:
-            record.message = '"json module already unloaded during interpreter shutdown"'
-        else:
-            record.message = json.dumps(record.message)
-        if (size := len(record.message.encode('utf-8'))) > 10000:
-            record.message = f'"Request entity body is too large: {size} bytes"'
-        return super().formatMessage(record)
+class LogCollectionFormatter(logging.Formatter):
+    """
+    Format a stdlib LogRecord as the JSON object the odg-ui LogTab expects:
+    `{"timestamp", "name", "logLevel", "thread", "message"}`.
+
+    Independent of the stdlib/structlog stdout format, so extensions can use
+    structured pod logging (odg.logging_cfg) while LogCollection CRs keep the
+    legacy frontend contract unchanged.
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        record.message = record.getMessage()
+        timestamp = f'{self.formatTime(record, datefmt="%Y-%m-%dT%H:%M:%S")}.{record.msecs:03.0f}Z'
+
+        if record.exc_info:
+            record.message = f'{record.message}\n{self.formatException(record.exc_info)}'
+        if record.stack_info:
+            record.message = f'{record.message}\n{self.formatStack(record.stack_info)}'
+
+        message = record.message
+
+        if (size := len(message.encode('utf-8'))) > 10000:
+            message = f'Request entity body is too large: {size} bytes'
+
+        # keep keys identical to the legacy format the odg-ui LogTab expects;
+        # trailing comma is part of the fragments contract (see read_logs_and_remove)
+        return (
+            json.dumps(
+                {
+                    'timestamp': timestamp,
+                    'name': record.name,
+                    'logLevel': record.levelname,
+                    'thread': record.threadName,
+                    'message': message,
+                },
+            )
+            + ','
+        )
 
 
 def configure_kubernetes_logging():
@@ -306,17 +333,7 @@ def configure_kubernetes_logging():
         file_handler.setLevel(level)
         logging.root.addHandler(hdlr=file_handler)
 
-    log_formatter = JSONFormatter(
-        fmt=textwrap.dedent("""\
-        {
-            "timestamp": "%(asctime)s.%(msecs)dZ",
-            "name": "%(name)s",
-            "logLevel": "%(levelname)s",
-            "thread": "%(threadName)s",
-            "message": %(message)s
-        },"""),
-        datefmt='%Y-%m-%dT%H:%M:%S',
-    )
+    log_formatter = LogCollectionFormatter()
 
     for h in logging.root.handlers:
         if isinstance(h, logging.FileHandler):

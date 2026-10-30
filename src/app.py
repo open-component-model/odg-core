@@ -6,10 +6,7 @@ import logging
 import os
 
 import aiohttp.web
-import aiohttp.web_log
 import aiohttp_swagger3
-
-import ci.log
 
 import artefacts
 import blobstore.blob
@@ -29,6 +26,7 @@ import middleware.db_session
 import middleware.errors
 import middleware.prometheus
 import middleware.route_feature_check as rfc
+import odg.logging_cfg
 import osinfo
 import paths
 import rescore.artefacts
@@ -36,7 +34,6 @@ import service_extensions
 import special_component
 import sprints
 
-ci.log.configure_default_logging(print_thread_id=True)
 logger = logging.getLogger(__name__)
 
 own_dir = os.path.abspath(os.path.dirname(__file__))
@@ -411,6 +408,8 @@ async def initialise_app():
 async def run_app():
     parsed_arguments = parse_args()
 
+    odg.logging_cfg.configure_logging(service_name='delivery-service')
+
     port = parsed_arguments.port
 
     app = await initialise_app()
@@ -420,26 +419,17 @@ async def run_app():
 
     else:
         host = '127.0.0.1'
-        print('running in development mode')
-        print()
-        print(f'listening at {host}:{port}')
-        print()
+        logger.info(f'running in development mode, listening at http://{host}:{port}')
 
-    def _format_r(request: aiohttp.web.BaseRequest, *args, **kwargs) -> str:
-        if request is None:
-            return '-'
-
-        if request.path.startswith('/auth'):
-            # use `path` instead of `path_qs` to _not_ log query parameters
-            path = request.path
-        else:
-            path = request.path_qs
-
-        return f'{request.method} {path} HTTP/{request.version.major}.{request.version.minor}'
-
-    aiohttp.web_log.AccessLogger._format_r = _format_r
-
-    runner = aiohttp.web.AppRunner(app)
+    runner = aiohttp.web.AppRunner(
+        app=app,
+        access_log_class=odg.logging_cfg.aiohttp_access_logger_class(
+            # do not log query parameters of auth endpoints (may contain secrets)
+            masked_query_path_prefixes=('/auth',),
+            # suppress successful probe requests to keep log volume low
+            quiet_path_prefixes=('/healthz', '/ready'),
+        ),
+    )
     await runner.setup()
     await aiohttp.web.TCPSite(
         runner=runner,

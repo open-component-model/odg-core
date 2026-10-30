@@ -7,7 +7,6 @@ import os
 import subprocess
 import tarfile
 
-import ci.log
 import cnudie.purge
 import oci.auth
 import oci.client
@@ -23,6 +22,7 @@ import k8s.logging
 import k8s.util
 import lookups
 import odg.extensions_cfg
+import odg.logging_cfg
 import odg.util
 import odg_client
 import paths
@@ -31,8 +31,8 @@ import secret_mgmt.oci_registry
 
 
 logger = logging.getLogger(__name__)
-ci.log.configure_default_logging()
 k8s.logging.configure_kubernetes_logging()
+odg.logging_cfg.configure_logging(service_name='delivery-db-backup')
 
 
 BACKUP_BLOB_MEDIA_TYPE = 'application/data+tar'

@@ -1,6 +1,8 @@
 import functools
 
+import k8s.logging
 import odg.extensions_cfg
+import odg.logging_cfg
 import odg.findings
 import odg.model
 import odg.util
@@ -10,6 +12,9 @@ import trivy_extension.scanner
 
 
 def main():
+    k8s.logging.configure_kubernetes_logging()
+    odg.logging_cfg.configure_logging(service_name='trivy')
+
     parsed_arguments = odg.util.parse_args()
     vulnerability_cfg = odg.findings.Finding.from_file(
         path=parsed_arguments.findings_cfg_path or paths.findings_cfg_path(),

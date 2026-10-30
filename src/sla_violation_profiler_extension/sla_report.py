@@ -15,7 +15,6 @@ import logging
 import os
 import tempfile
 
-import ci.log
 import dacite
 import git
 import github.pullrequest
@@ -27,14 +26,17 @@ import version as version_util
 
 import lookups
 import odg.extensions_cfg
+import k8s.logging
 import odg.findings
+import odg.logging_cfg
 import odg.model
 import odg.util
 import odg_client
 import paths
 import util
 
-ci.log.configure_default_logging()
+k8s.logging.configure_kubernetes_logging()
+odg.logging_cfg.configure_logging(service_name='sla-report')
 logger = logging.getLogger(__name__)
 
 own_dir = os.path.abspath(os.path.dirname(__file__))

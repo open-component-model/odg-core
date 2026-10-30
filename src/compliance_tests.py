@@ -4,14 +4,11 @@ import zipfile
 
 import aiohttp.web
 
-import ci.log
-
 import consts
 import features
 import util
 
 
-ci.log.configure_default_logging()
 logger = logging.getLogger(__name__)
 
 

@@ -43,6 +43,7 @@ dependencies = [
     "scipy==1.18.1",
     "numpy==2.5.4",
     "orjson==3.13.0",
+    "structlog==26.1.0",
 ]
 
 [tool.uv.workspace]

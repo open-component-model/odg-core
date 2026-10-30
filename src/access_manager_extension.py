@@ -19,8 +19,6 @@ import sqlalchemy as sa
 import sqlalchemy.ext.asyncio as sqlasync
 import sqlalchemy.orm
 
-import ci.log
-
 import ctx_util
 import deliverydb
 import deliverydb.model as dm
@@ -28,14 +26,27 @@ import k8s.logging
 import k8s.util
 import lookups
 import odg.extensions_cfg
+import odg.logging_cfg
 import odg.util
 import secret_mgmt.oauth_cfg
 import util
 
 
 logger = logging.getLogger(__name__)
-ci.log.configure_default_logging()
-k8s.logging.configure_kubernetes_logging()
+
+
+def configure_logging(json_logs: bool = True):
+    """
+    Attach FileHandlers for the LogCollection CRD pipeline (legacy frontend
+    format) first; structlog config then takes over stdout without removing
+    them. Pod logs use the structured (JSON) format; the CRD content keeps
+    the legacy fields the odg-ui expects.
+    """
+    k8s.logging.configure_kubernetes_logging()
+    odg.logging_cfg.configure_logging(
+        json_logs=json_logs,
+        service_name='access-manager',
+    )
 
 
 github_host = str
@@ -368,6 +379,8 @@ async def main():
         ),
     )
     namespace = parsed_arguments.k8s_namespace
+
+    configure_logging()
 
     secret_factory = ctx_util.secret_factory()
     kubernetes_api = k8s.util.kubernetes_api(kubeconfig_path=parsed_arguments.kubeconfig)

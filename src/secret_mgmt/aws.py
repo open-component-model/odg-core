@@ -9,7 +9,7 @@ import secret_mgmt
 @dataclasses.dataclass
 class AWS:
     access_key_id: str
-    secret_access_key: str
+    secret_access_key: str = dataclasses.field(repr=False)
     region: str
 
     @functools.cached_property

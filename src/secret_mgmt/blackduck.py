@@ -5,4 +5,4 @@ import dataclasses
 class BlackDuck:
     api_url: str
     group_id: str
-    token: str
+    token: str = dataclasses.field(repr=False)

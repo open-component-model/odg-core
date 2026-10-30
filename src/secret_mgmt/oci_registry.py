@@ -12,7 +12,7 @@ import secret_mgmt
 @dataclasses.dataclass
 class OciRegistry:
     username: str
-    password: str
+    password: str = dataclasses.field(repr=False)
     image_reference_prefixes: list[str] = dataclasses.field(default_factory=list)
     privileges: oci.auth.Privileges = oci.auth.Privileges.READONLY
 

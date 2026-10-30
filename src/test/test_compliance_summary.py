@@ -1,7 +1,6 @@
 import datetime
 import logging
 
-import ci.log
 import pytest
 
 import compliance_summary as cs
@@ -66,7 +65,7 @@ def _artefact_scan_info(artefact: odg.model.ComponentArtefactId) -> odg.model.Ar
 
 
 # surpress warnings due to unknown os-id
-ci.log.configure_default_logging(stdout_level=logging.ERROR)
+logging.getLogger().setLevel(logging.ERROR)
 
 
 @pytest.fixture
