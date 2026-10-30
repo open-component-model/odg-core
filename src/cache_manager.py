@@ -241,13 +241,17 @@ async def prefill_function_caches(
                 )
 
 
-async def iter_sbom_artefacts(
+async def cleanup_sboms(
     artefact_enumerator_cfg: odg.extensions_cfg.ArtefactEnumeratorConfig,
     sbom_generator_cfg: odg.extensions_cfg.SBOMGeneratorConfig,
     delivery_service_client: odg_client.DeliveryServiceClient,
     component_descriptor_lookup: ocm.ComponentDescriptorLookup,
-    skipped_components: list[str],
-) -> collections.abc.AsyncGenerator[odg.model.ComponentArtefactId, None]:
+    db_session: sqlasync.session.AsyncSession,
+    retention_period_seconds: int,
+):
+    artefact_keys = set()
+    skipped_components = []
+
     for component in artefact_enumerator_cfg.components:
         if resolved_version := component.resolved_version:
             # if an explicit version is specified, use it without any further implict lookup
@@ -295,28 +299,7 @@ async def iter_sbom_artefacts(
                     access_type=artefact_node.artefact.access.type,
                     artefact_type=component_artefact_id.artefact.artefact_type,
                 ):
-                    yield component_artefact_id
-
-
-async def cleanup_sboms(
-    artefact_enumerator_cfg: odg.extensions_cfg.ArtefactEnumeratorConfig,
-    sbom_generator_cfg: odg.extensions_cfg.SBOMGeneratorConfig,
-    delivery_service_client: odg_client.DeliveryServiceClient,
-    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
-    db_session: sqlasync.session.AsyncSession,
-    retention_period_seconds: int,
-):
-    artefact_keys = set()
-    skipped_components = []
-
-    async for artefact in iter_sbom_artefacts(
-        artefact_enumerator_cfg=artefact_enumerator_cfg,
-        sbom_generator_cfg=sbom_generator_cfg,
-        delivery_service_client=delivery_service_client,
-        component_descriptor_lookup=component_descriptor_lookup,
-        skipped_components=skipped_components,
-    ):
-        artefact_keys.add(artefact.key)
+                    artefact_keys.add(component_artefact_id.key)
 
     if skipped_components:
         logger.warning(

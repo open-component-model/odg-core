@@ -337,6 +337,7 @@ def _process_compliance_snapshot_of_artefact(
 
     if extensions_cfg.issue_replicator and extensions_cfg.issue_replicator.enabled:
         # if the number of executed scans has changed, trigger an issue update
+        scan_count = None
         try:
             scan_count = len(
                 delivery_service_client.query_metadata(
@@ -345,18 +346,20 @@ def _process_compliance_snapshot_of_artefact(
                 ),
             )
         except odg_client.EXTERNAL_DEPENDENCY_EXCEPTIONS as e:
-            logger.warning(f'failed to query scan info for {artefact=}, skip issue replicator: {e}')
-        else:
-            compliance_snapshot, uncommitted_backlog_item = _create_backlog_item(
-                artefact=artefact,
-                compliance_snapshot=compliance_snapshot,
-                service=odg.extensions_cfg.Services.ISSUE_REPLICATOR,
-                interval_seconds=extensions_cfg.issue_replicator.interval,
-                now=now,
-                status=scan_count,
+            logger.warning(
+                f'failed to query scan info for {artefact=}, skipping scan-count optimisation: {e}',
             )
-            if uncommitted_backlog_item:
-                uncommitted_backlog_items.append(uncommitted_backlog_item)
+
+        compliance_snapshot, uncommitted_backlog_item = _create_backlog_item(
+            artefact=artefact,
+            compliance_snapshot=compliance_snapshot,
+            service=odg.extensions_cfg.Services.ISSUE_REPLICATOR,
+            interval_seconds=extensions_cfg.issue_replicator.interval,
+            now=now,
+            status=scan_count,
+        )
+        if uncommitted_backlog_item:
+            uncommitted_backlog_items.append(uncommitted_backlog_item)
 
     if extensions_cfg.responsibles and extensions_cfg.responsibles.enabled:
         compliance_snapshot, uncommitted_backlog_item = _create_backlog_item(
