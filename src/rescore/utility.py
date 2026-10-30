@@ -1,3 +1,4 @@
+import collections
 import collections.abc
 import copy
 import datetime
@@ -17,19 +18,80 @@ import sprints.model as sm
 import util
 
 
+def _finding_group_key(
+    finding: odg.model.ArtefactMetadata,
+) -> tuple:
+    finding_type = finding.meta.type
+
+    if finding.meta.type == odg.model.Datatype.VULNERABILITY_FINDING:
+        return (
+            finding_type,
+            finding.data.cve,
+            finding.data.package_name,
+        )
+
+    elif finding.meta.type == odg.model.Datatype.LICENSE_FINDING:
+        return (
+            finding_type,
+            finding.data.license.name,
+            finding.data.package_name,
+        )
+
+    elif finding.meta.type == odg.model.Datatype.IP_FINDING:
+        return (
+            finding_type,
+            finding.data.package_name,
+            tuple(sorted(finding.data.labels)),
+        )
+
+    return (
+        finding_type,
+        finding.data.key,
+    )
+
+
+def _rescoring_group_key(
+    rescoring: odg.model.ArtefactMetadata,
+) -> tuple:
+    rescoring_type = rescoring.data.referenced_type
+
+    if rescoring_type == odg.model.Datatype.VULNERABILITY_FINDING:
+        return (
+            rescoring_type,
+            rescoring.data.finding.cve,
+            rescoring.data.finding.package_name,
+        )
+
+    elif rescoring_type == odg.model.Datatype.LICENSE_FINDING:
+        return (
+            rescoring_type,
+            rescoring.data.finding.license.name,
+            rescoring.data.finding.package_name,
+        )
+
+    elif rescoring_type == odg.model.Datatype.IP_FINDING:
+        return (
+            rescoring_type,
+            rescoring.data.finding.package_name,
+            tuple(sorted(rescoring.data.finding.labels)),
+        )
+
+    return (
+        rescoring_type,
+        rescoring.data.finding.key,
+    )
+
+
 def _iter_rescorings_for_finding(
     finding: odg.model.ArtefactMetadata,
-    rescorings: collections.abc.Iterable[odg.model.ArtefactMetadata],
+    grouped_rescorings: dict[tuple, list[odg.model.ArtefactMetadata]],
 ) -> collections.abc.Generator[odg.model.ArtefactMetadata, None, None]:
     normalised_finding_extra_identity = odg.model.normalise_artefact_extra_id(
         artefact_extra_id=finding.artefact.artefact.artefact_extra_id,
         omit_version=True,
     )
 
-    for rescoring in rescorings:
-        if rescoring.data.referenced_type != finding.meta.type:
-            continue
-
+    for rescoring in grouped_rescorings.get(_finding_group_key(finding), []):
         if (
             rescoring.artefact.component_name
             and rescoring.artefact.component_name != finding.artefact.component_name
@@ -69,44 +131,20 @@ def _iter_rescorings_for_finding(
         ):
             continue
 
-        if finding.meta.type == odg.model.Datatype.VULNERABILITY_FINDING:
-            if (
-                rescoring.data.finding.cve != finding.data.cve
-                or rescoring.data.finding.package_name != finding.data.package_name
-            ):
-                continue
-
-        elif finding.meta.type == odg.model.Datatype.LICENSE_FINDING:
-            if (
-                rescoring.data.finding.license.name != finding.data.license.name
-                or rescoring.data.finding.package_name != finding.data.package_name
-            ):
-                continue
-
-        elif finding.meta.type == odg.model.Datatype.IP_FINDING:
-            if rescoring.data.finding.package_name != finding.data.package_name or sorted(
-                rescoring.data.finding.labels,
-            ) != sorted(finding.data.labels):
-                continue
-
-        else:
-            if rescoring.data.finding.key != finding.data.key:
-                continue
-
         yield rescoring
 
 
 def rescorings_for_finding_by_specificity(
     finding: odg.model.ArtefactMetadata,
-    rescorings: collections.abc.Iterable[odg.model.ArtefactMetadata],
+    grouped_rescorings: dict[tuple, list[odg.model.ArtefactMetadata]],
 ) -> tuple[odg.model.ArtefactMetadata]:
     """
-    Returns all rescorings of `rescorings` which match the given `finding`. If multiple
+    Returns all rescorings of `grouped_rescorings` which match the given `finding`. If multiple
     rescorings match the finding, they are ordered based on their creation date.
     """
     rescorings_for_finding = _iter_rescorings_for_finding(
         finding=finding,
-        rescorings=rescorings,
+        grouped_rescorings=grouped_rescorings,
     )
 
     return tuple(
@@ -116,6 +154,17 @@ def rescorings_for_finding_by_specificity(
             reverse=True,
         ),
     )
+
+
+def group_rescorings(
+    rescorings: collections.abc.Iterable[odg.model.ArtefactMetadata],
+) -> dict[tuple, list[odg.model.ArtefactMetadata]]:
+    grouped_rescorings: dict[tuple, list[odg.model.ArtefactMetadata]] = collections.defaultdict(list)
+
+    for rescoring in rescorings:
+        grouped_rescorings[_rescoring_group_key(rescoring)].append(rescoring)
+
+    return grouped_rescorings
 
 
 def _scoped_artefact_id(

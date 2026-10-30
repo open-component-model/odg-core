@@ -71,6 +71,8 @@ def _iter_findings_for_artefact(
             ],
         )
 
+    grouped_rescorings = rescore.utility.group_rescorings(rescorings)
+
     for finding in findings:
         if finding.meta.type == odg.model.Datatype.ARTEFACT_SCAN_INFO:
             if finding.meta.datasource == finding_source:
@@ -80,7 +82,7 @@ def _iter_findings_for_artefact(
         filtered_rescorings = list(
             rescore.utility.rescorings_for_finding_by_specificity(
                 finding=finding,
-                rescorings=rescorings,
+                grouped_rescorings=grouped_rescorings,
             ),
         )
 
