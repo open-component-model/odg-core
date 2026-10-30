@@ -1,5 +1,8 @@
+import copy
+
 import pytest
 
+import crypto_extension.config
 import crypto_extension.model
 import crypto_extension.validate
 import odg.extensions_cfg
@@ -226,3 +229,99 @@ def test_crypto_validation(
     assert len([finding for finding in findings if finding.standard == 'FIPS']) == 2
 
     assert len([finding for finding in findings if finding.standard == 'NCS']) == 3
+
+
+def go_binary_components(
+    path: str,
+    crypto_settings: list[str],
+) -> list[dict]:
+    """
+    Mirrors the syft output for a Go binary: crypto settings are only recorded on the component of
+    the main module, not on the `stdlib` component containing the Go Cryptographic Module.
+    """
+    location_property = {'name': 'syft:location:0:path', 'value': path}
+
+    return [
+        {
+            'type': 'library',
+            'name': 'stdlib',
+            'version': 'go1.27.1',
+            'purl': 'pkg:golang/stdlib@1.27.1',
+            'properties': [location_property],
+        },
+        {
+            'type': 'library',
+            'name': 'example.org/main',
+            'version': 'UNKNOWN',
+            'purl': 'pkg:golang/example.org/main',
+            'properties': [
+                location_property,
+                *(
+                    {'name': f'syft:metadata:goCryptoSettings:{idx}', 'value': crypto_setting}
+                    for idx, crypto_setting in enumerate(crypto_settings)
+                ),
+            ],
+        },
+    ]
+
+
+def test_go_fips140_module_validation(
+    crypto_mapping: odg.extensions_cfg.CryptoMapping,
+    crypto_finding_cfg: odg.findings.Finding,
+):
+    crypto_settings_by_path = {
+        '/certified': ['GODEBUG=fips140=on', 'GOFIPS140=v1.0.0-c2097c7c'],
+        '/certified-mode-off': ['GODEBUG=fips140=off', 'GOFIPS140=v1.0.0-c2097c7c'],
+        '/godebug-only': ['GODEBUG=fips140=on'],
+        '/in-process': ['GODEBUG=fips140=on', 'GOFIPS140=v1.26.0'],
+        '/latest': ['GODEBUG=fips140=on', 'GOFIPS140=latest'],
+        '/plain': [],
+    }
+    cbom = {
+        'specVersion': '1.6',
+        'components': [
+            component
+            for path, crypto_settings in crypto_settings_by_path.items()
+            for component in go_binary_components(path, crypto_settings)
+        ],
+    }
+    fips = next(standard for standard in crypto_mapping.standards if standard.name == 'FIPS')
+
+    def severity_by_path(
+        standard: crypto_extension.config.Standard,
+    ) -> dict[str, str]:
+        crypto_assets = crypto_extension.model.iter_crypto_assets(
+            cbom=cbom,
+            crypto_libraries=crypto_mapping.libraries,
+            included_asset_types=None,
+        )
+        findings = crypto_extension.validate.iter_findings_for_standards(
+            crypto_assets=crypto_assets,
+            standards=[standard],
+            crypto_finding_cfg=crypto_finding_cfg,
+        )
+        return {
+            location: finding.severity
+            for finding in findings
+            for location in finding.asset.locations
+        }
+
+    assert severity_by_path(fips) == {
+        '/certified': 'compliant',
+        '/certified-mode-off': 'not-standard-compliant',
+        '/godebug-only': 'not-standard-compliant',
+        '/in-process': 'not-standard-compliant',
+        '/latest': 'not-standard-compliant',
+        '/plain': 'not-standard-compliant',
+    }
+
+    # newly certified module versions are accepted once added to the standard
+    fips_v1_26_certified = copy.deepcopy(fips)
+    stdlib = next(
+        library
+        for library in fips_v1_26_certified.libraries.validated_crypto_libraries
+        if library.name == 'stdlib'
+    )
+    stdlib.go_fips140_modules.append('v1.26.0')
+
+    assert severity_by_path(fips_v1_26_certified)['/in-process'] == 'compliant'

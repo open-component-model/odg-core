@@ -850,12 +850,20 @@ class CertificateProperties:
 
 @dataclasses.dataclass
 class LibraryProperties:
+    """
+    :param list[str] crypto_settings:
+        Sorted build settings affecting the library's cryptography, e.g. `GOFIPS140=v1.0.0-c2097c7c`
+        and `GODEBUG=fips140=on` for the Go standard library (which contains the Go Cryptographic
+        Module).
+    """
+
     name: str
     version: str | None
+    crypto_settings: list[str] = dataclasses.field(default_factory=list)
 
     @property
     def key(self) -> str:
-        return _as_key(self.name, self.version)
+        return _as_key(self.name, self.version, *self.crypto_settings)
 
 
 @dataclasses.dataclass

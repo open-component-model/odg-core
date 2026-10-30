@@ -592,6 +592,72 @@ def validate_certificate(
     )
 
 
+# `GOFIPS140` is recorded with a source hash suffix for some module versions (e.g.
+# `v1.0.0-c2097c7c`), and as `latest` if the non-frozen (hence never validated) module is used
+GO_FIPS140_MODULE_REGEX = re.compile(r'^(?P<version>v\d+\.\d+\.\d+)(?:-[0-9a-f]+)?$')
+GO_FIPS140_MODES = ['on', 'only']
+
+
+def rate_go_fips140_module(
+    crypto_settings: collections.abc.Iterable[str],
+    validated_module_versions: list[str],
+    standard: cc.Standard,
+) -> tuple[FindingRatings, str]:
+    """
+    Rates a Go binary based on its crypto build settings. It is compliant if it links one of the
+    `validated_module_versions` of the Go Cryptographic Module (`GOFIPS140`) and enables FIPS 140-3
+    mode by default (`GODEBUG=fips140=on|only`), see https://go.dev/doc/security/fips140.
+    """
+    module_version = None
+    fips140_mode = None
+
+    for crypto_setting in crypto_settings:
+        name, _, value = crypto_setting.partition('=')
+
+        if name == 'GOFIPS140':
+            if match := GO_FIPS140_MODULE_REGEX.fullmatch(value):
+                module_version = match.group('version')
+            else:
+                module_version = value
+
+        elif name == 'GODEBUG':
+            godebug_name, _, godebug_value = value.partition('=')
+            if godebug_name == 'fips140':
+                fips140_mode = godebug_value
+
+    unmet_requirements = list(
+        iter_unmet_requirements(
+            [
+                Requirement(
+                    name='Go Cryptographic Module (GOFIPS140)',
+                    required_value=validated_module_versions,
+                    actual_value=module_version,
+                ),
+                Requirement(
+                    name='FIPS 140-3 mode (GODEBUG=fips140)',
+                    required_value=GO_FIPS140_MODES,
+                    actual_value=fips140_mode,
+                ),
+            ],
+        ),
+    )
+
+    if unmet_requirements:
+        summary = (
+            f'The Go binary does not use a {standard.name} validated Go Cryptographic Module in '
+            'FIPS 140-3 mode (build it with `GOFIPS140=certified`):\n'
+        )
+        summary += '\n'.join(str(requirement) for requirement in unmet_requirements)
+        return FindingRatings.NOT_COMPLIANT, summary
+
+    summary = (
+        f'The Go binary uses the {standard.name} validated Go Cryptographic Module '
+        f'"{module_version}" and enables FIPS 140-3 mode by default. Note that the mode can still '
+        'be disabled at runtime via the `GODEBUG` environment variable.'
+    )
+    return FindingRatings.COMPLIANT, summary
+
+
 def validate_library(
     library_asset: odg.model.CryptoAsset,
     standard: cc.Standard,
@@ -602,17 +668,28 @@ def validate_library(
     validated libraries defined in the `standard`. If the libary matches one of the validated
     libraries (`name` or `name` and `version` matches), a finding with the rating `maybe-compliant`
     will be created. Otherwise, a finding with the rating `not-compliant` will be created.
+    Validated libraries specifying `go_fips140_modules` are rated according to
+    `rate_go_fips140_module()` instead.
     """
     if library_asset.asset_type is not odg.model.CryptoAssetTypes.LIBRARY:
         raise ValueError(library_asset.asset_type)
 
     library_properties: odg.model.LibraryProperties = library_asset.properties
+    go_fips140_rating = None
     provides_validated_variant = False
     may_be_validated_variant = False
 
     for validated_crypto_library in standard.libraries.validated_crypto_libraries:
         if validated_crypto_library.name != library_properties.name:
             continue
+
+        if validated_crypto_library.go_fips140_modules is not None:
+            go_fips140_rating = rate_go_fips140_module(
+                crypto_settings=library_properties.crypto_settings,
+                validated_module_versions=validated_crypto_library.go_fips140_modules,
+                standard=standard,
+            )
+            break
 
         provides_validated_variant = True
 
@@ -622,7 +699,10 @@ def validate_library(
         may_be_validated_variant = True
         break
 
-    if may_be_validated_variant:
+    if go_fips140_rating:
+        finding_rating, summary = go_fips140_rating
+
+    elif may_be_validated_variant:
         finding_rating = FindingRatings.MAYBE_COMPLIANT
 
         summary = textwrap.dedent(f'''\

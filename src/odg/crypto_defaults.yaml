@@ -57,6 +57,7 @@ libraries:
   - rsa
   - software.sslmate.com/src/go-pkcs12
   - ssl_client
+  - stdlib # Go standard library, contains the Go Cryptographic Module
 
 standards:
   - name: FIPS
@@ -96,6 +97,12 @@ standards:
         - name: openssl-libs
           versions:
             *validated_openssl_versions
+        - name: stdlib
+          versions: []
+          # Go Cryptographic Module versions holding a CMVP certificate, see
+          # https://go.dev/doc/security/fips140#module-versions-validations-and-compatibility
+          go_fips140_modules:
+            - v1.0.0 # CMVP certificate #5247
 
     primitives:
       symmetric_algorithms:
