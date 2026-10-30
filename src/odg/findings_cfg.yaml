@@ -120,6 +120,10 @@
       display_name: Other
       value: 0
       rescoring: manual
+    - id: missing-linting
+      display_name: Missing SAST scan
+      value: 16
+      rescoring: manual
 
 - type: finding/diki
   filter:
