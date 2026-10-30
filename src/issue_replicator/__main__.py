@@ -4,6 +4,7 @@ import dataclasses
 import enum
 import functools
 import logging
+import time
 
 import cachetools
 import ci.log
@@ -576,10 +577,15 @@ def replicate_issue(
         ),
     )
 
+    # cache clear is necessary to prevent creating duplicated issues
+    github_util.all_issues.cache_clear()
+    last_cache_clear = time.monotonic()
+
     for finding_cfg in finding_cfgs:
-        # cache clear is necessary to prevent creating duplicated issues and to force
-        # re-authentication
-        github_util.all_issues.cache_clear()
+        if time.monotonic() - last_cache_clear > 60 * 25:
+            # cache clear is necessary to force re-authentication
+            github_util.all_issues.cache_clear()
+            last_cache_clear = time.monotonic()
 
         replicate_issue_for_finding_type(
             artefact=artefact,
