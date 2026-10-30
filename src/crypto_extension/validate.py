@@ -7,6 +7,7 @@ import textwrap
 import typing
 
 import crypto_extension.config as cc
+import crypto_extension.model
 import odg.findings
 import odg.model
 
@@ -440,6 +441,17 @@ def validate_algorithm(
         logger.warning(f'missing validation for {algorithm_properties.primitive=}')
 
 
+TRUST_ANCHOR_REASONING = (
+    'This certificate is a trust anchor, i.e. it is located in a system trust store and trusted by '
+    'the software rather than used or issued by it. According to RFC 5280 (section 6.1), only its '
+    'name and public key are used for certificate path validation, the public key verifying the '
+    'next certificate in the path. Hence, only the public key is validated against the root CA '
+    'requirements, whereas the self-signature (never verified) and the validity (a concern of the '
+    'CA operator) are not. To resolve this finding, remove the root CA from the trust store of the '
+    'image if it is not required, or assess the finding if it is.'
+)
+
+
 def validate_certificate(
     certificate_asset: odg.model.CryptoAsset,
     standard: cc.Standard,
@@ -457,22 +469,46 @@ def validate_certificate(
     and `validity_years` are actually allowed for the detected certificate kind. If either one of
     the used algorithms is not valid or the certificate properties are not sufficient for the
     detected certificate kind, a finding with the rating `not-compliant` will be created.
+
+    Trust anchors (certificates in a system trust store) are validated with the rules a `standard`
+    defines for `kind: trust-anchor`. Without such rules, only their public key is validated against
+    the root CA rules: According to RFC 5280 (section 6.1), path validation solely uses the trust
+    anchor's name and public key, which verifies the next certificate in the path. Its self-signature
+    is never verified and its validity is not part of the trust anchor information, both are
+    concerns of the CA operator (see `TRUST_ANCHOR_REASONING`).
     """
     if certificate_asset.asset_type is not odg.model.CryptoAssetTypes.CERTIFICATE:
         raise ValueError(certificate_asset.asset_type)
 
     certificate_properties: odg.model.CertificateProperties = certificate_asset.properties
 
-    signature_algorithm = find_crypto_asset_by_key(
-        data_key=certificate_properties.signature_algorithm_ref,
-        crypto_assets=crypto_assets,
+    relying_party_validation = (
+        certificate_properties.kind is odg.model.CertificateKind.TRUST_ANCHOR
+        and not any(
+            certificate_property.kind is odg.model.CertificateKind.TRUST_ANCHOR
+            for certificate_definition in standard.public_key_infrastructure.certificates
+            for certificate_property in certificate_definition.properties
+        )
     )
-    signature_algorithm_finding = validate_signature_algorithm(
-        algorithm_name=signature_algorithm.properties.name,
-        algorithm_asset=signature_algorithm,
-        standard=standard,
-        crypto_finding_cfg=crypto_finding_cfg,
+    certificate_kind = (
+        odg.model.CertificateKind.ROOT_CA
+        if relying_party_validation
+        else certificate_properties.kind
     )
+
+    if relying_party_validation:
+        signature_algorithm_finding = None
+    else:
+        signature_algorithm = find_crypto_asset_by_key(
+            data_key=certificate_properties.signature_algorithm_ref,
+            crypto_assets=crypto_assets,
+        )
+        signature_algorithm_finding = validate_signature_algorithm(
+            algorithm_name=signature_algorithm.properties.name,
+            algorithm_asset=signature_algorithm,
+            standard=standard,
+            crypto_finding_cfg=crypto_finding_cfg,
+        )
 
     public_key = find_crypto_asset_by_key(
         data_key=certificate_properties.subject_public_key_ref,
@@ -522,7 +558,7 @@ def validate_certificate(
                             required_value=certificate_property.key_length,
                             actual_value=key_length,
                         )
-                    if certificate_property.validity_years:
+                    if certificate_property.validity_years and not relying_party_validation:
                         yield Requirement(
                             name='Required validity (years)',
                             required_value=certificate_property.validity_years,
@@ -541,7 +577,7 @@ def validate_certificate(
         return certificate_kind_matches, best_unmet_requirements
 
     certificate_kind_matches, best_unmet_requirements = check_unmet_requirements(
-        certificate_kind=certificate_properties.kind,
+        certificate_kind=certificate_kind,
         key_length=key_length,
         curve=public_key.properties.curve,
         validity_years=certificate_properties.validity_years,
@@ -551,10 +587,7 @@ def validate_certificate(
     summary = ''
 
     if not certificate_kind_matches:
-        summary += (
-            f'Certificates of kind "{certificate_properties.kind}" '
-            f'are not allowed in {standard.name}.'
-        )
+        summary += f'Certificates of kind "{certificate_kind}" are not allowed in {standard.name}.'
 
     if best_unmet_requirements:
         if summary:
@@ -575,6 +608,9 @@ def validate_certificate(
     if not summary:
         # all requirements are fulfilled, no need to create a finding
         return
+
+    if relying_party_validation:
+        summary = f'{TRUST_ANCHOR_REASONING}\n{summary}'
 
     if not (
         categorisation := odg.findings.categorise_finding(
@@ -704,6 +740,14 @@ def validate_against_standard(
 ) -> collections.abc.Generator[odg.model.CryptoFinding, None, None]:
     for crypto_asset in crypto_assets:
         if crypto_asset.asset_type is odg.model.CryptoAssetTypes.ALGORITHM:
+            if crypto_asset.locations and all(
+                crypto_extension.model.is_trust_store_location(location)
+                for location in crypto_asset.locations
+            ):
+                # algorithms only found in trust stores stem from trust anchors, which are validated
+                # in the context of the respective certificate (see `validate_certificate()`)
+                continue
+
             if finding := validate_algorithm(
                 algorithm_asset=crypto_asset,
                 standard=standard,
