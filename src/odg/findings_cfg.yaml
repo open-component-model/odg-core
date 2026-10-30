@@ -37,6 +37,13 @@
       value: 0
       allowed_processing_time: ~
       rescoring: manual
+    - id: scanner-limitation
+      display_name: Scanner-Limitation
+      value: 16
+      allowed_processing_time: 0
+      selector:
+        malware_names:
+          - Heuristics.Limits.Exceeded.*
     - id: BLOCKER
       display_name: BLOCKER
       value: 16
