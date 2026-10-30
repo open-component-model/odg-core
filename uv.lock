@@ -1125,11 +1125,11 @@ wheels = [
 
 [[package]]
 name = "jsonpath-ng"
-version = "1.12.0"
+version = "1.13.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/be/0f/3c18dfaad07f4a6fd6d38a1905a019aad5b835e2453ccec903e037b37970/jsonpath_ng-1.12.0.tar.gz", hash = "sha256:3a00d5ec335559d63f683b7b5295fef2a8afe61717f2fef8128c418790124579", size = 103683, upload-time = "2026-10-20T22:16:25.212Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4a/a4/4db8bd69f41fd56bdc0a709137c10a410e5cc148b3760ea206a510128ae6/jsonpath_ng-1.13.0.tar.gz", hash = "sha256:da54eff64eef303b90a8491f50c607e6beb2eb4a6e66828edab948766d40c531", size = 116355, upload-time = "2026-10-23T11:50:31.346Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/88/ff/7b4345bd4a737e29a820f6c5a4a5139c43af5cda68d497fdc00c8489b195/jsonpath_ng-1.12.0-py3-none-any.whl", hash = "sha256:6fc33404ab2a9b77895e9acde23f80998c61567c8e9c182301e73a78f158e585", size = 80563, upload-time = "2026-10-20T22:16:23.391Z" },
+    { url = "https://files.pythonhosted.org/packages/5c/03/30db4cd2e778aee7feb29b14ff9c831735e5e1939600dff2bacba38107b1/jsonpath_ng-1.13.0-py3-none-any.whl", hash = "sha256:f58e7f88cdd2eb04a402c0d542e7d6db71909e521f4c23c62f4d2ee73266361e", size = 83987, upload-time = "2026-10-23T11:50:30.012Z" },
 ]
 
 [[package]]
@@ -1630,7 +1630,7 @@ requires-dist = [
     { name = "github3-py", specifier = "==4.0.1" },
     { name = "greenlet", specifier = "==3.5.6" },
     { name = "htmllistparse", specifier = "==0.6.1" },
-    { name = "jsonpath-ng", specifier = "==1.12.0" },
+    { name = "jsonpath-ng", specifier = "==1.13.0" },
     { name = "jsonschema", specifier = "==4.26.0" },
     { name = "kubernetes", specifier = "==36.0.3" },
     { name = "mako", specifier = "==1.4.3" },
