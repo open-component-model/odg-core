@@ -57,10 +57,6 @@ What the script does:
 3. Truncates the cache table and rewrites internal component names to their public OSS equivalents
 4. Stops Postgres cleanly, `docker commit`s the container as `odg-test-db:latest`.
 
-```bash
-test/scripts/create_db_image.sh --db data/delivery-db-backup/2026-10-26 --tag odg-test-db:2026-10-26
-```
-
 ## Run the tests
 
 ```bash
