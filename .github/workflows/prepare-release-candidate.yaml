@@ -1,0 +1,63 @@
+name: Prepare Release Candidate
+on:
+  workflow_dispatch:
+    inputs:
+      commit-sha:
+        type: string
+        required: false
+        description: |
+          Optional commit SHA to create the release branch from (defaults to HEAD)
+
+jobs:
+  prepare-release-candidate:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - uses: gardener/cc-utils/.github/actions/trusted-checkout@v1
+        with:
+          token-server: ${{ vars.FEDERATED_GITHUB_ACCESS_TOKEN_SERVER }}
+          github-auth-token-permissions: |
+            contents: write
+            workflows: write
+          init-git-identity: true
+          remove-trusted-label: false
+          fetch-depth: 0
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - name: Create release branch and bump default branch
+        shell: bash
+        env:
+          COMMIT_SHA: ${{ inputs.commit-sha }}
+        run: |
+          default_branch="$(git remote show origin | awk '/HEAD branch/ {print $NF}')"
+          git checkout "$default_branch"
+
+          # Derive major.minor from VERSION on the default branch
+          raw_version="$(cat VERSION)"
+          version="${raw_version%%.*}.$(echo "${raw_version}" | cut -d. -f2)"
+
+          major="${version%%.*}"
+          minor="${version##*.}"
+          next_minor=$((minor + 1))
+
+          # Create release branch from the specified commit or HEAD
+          if [[ -n "$COMMIT_SHA" ]]; then
+            git checkout -b "release-${version}" "$COMMIT_SHA"
+          else
+            git checkout -b "release-${version}"
+          fi
+
+          rc_version="${version}.0-rc.0"
+          echo "$rc_version" | uv run .ci/write-version
+          git commit --all -m "prepare release candidate: ${rc_version}"
+          release_candidate_commit="$(git rev-parse HEAD)"
+
+          # Bump default branch to next dev version
+          git checkout "$default_branch"
+          next_dev_version="${major}.${next_minor}.0-dev"
+          echo "$next_dev_version" | uv run .ci/write-version
+          git commit --all -m "next version: ${next_dev_version}"
+          git push --atomic origin \
+            "${release_candidate_commit}:refs/heads/release-${version}" \
+            "HEAD:refs/heads/${default_branch}"
