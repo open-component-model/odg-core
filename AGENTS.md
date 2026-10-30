@@ -83,6 +83,7 @@ specific capability (scanning, reporting, replication, etc.); extensions share c
 - Prefer `is` over `==` when comparing enum values, but only when the left-hand side is already an enum instance — use `==` when comparing raw strings (e.g. from DB columns) against enum values
 - Be conscise, specific and value dense
 - Sort members alphabetically where it is suitable (e.g. enum members, static lists, etc.)
+- Pin dependency to the exact version (`==`)
 
 ## After you finished
 

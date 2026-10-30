@@ -1,4 +1,4 @@
-.PHONY: help setup lint lint-staged format format-staged test build-clients build-core build-docker build-docker-local build-helm-local .check-build-prereqs run-db run clean
+.PHONY: help setup lint lint-staged format format-staged test build-clients build-core build-docker build-docker-local build-docker-debug-local build-helm-local .check-build-prereqs run-db run clean
 
 # Configuration variables with defaults
 DB_PASSWORD ?= MyPassword
@@ -21,6 +21,7 @@ help:
 	@echo "  build-core     - Build odg-core-libs package"
 	@echo "  build-docker   - Build Docker image"
 	@echo "  build-docker-local - Build Docker image for current architecture only"
+	@echo "  build-docker-debug-local - Build debug Docker image for current architecture only"
 	@echo "  build-helm-local  - Package Helm charts into dist/ for local use"
 	@echo "  run-db         - Run a PostgreSQL database instance"
 	@echo "  run            - Run the development server"
@@ -132,10 +133,20 @@ format-staged:
 # Testing
 test:
 	@echo "Running tests..."
-	@if PYTHONPATH="$(CURDIR):$$PYTHONPATH" uv run pytest "$(CURDIR)"; then \
+	@if uv run pytest src/test/; then \
 		echo "Unittest executions succeeded"; \
 	else \
 		echo "Errors were found whilst executing unittests (see above)"; \
+		exit 1; \
+	fi
+
+# Performance testing
+test-perf:
+	@echo "Running performance tests..."
+	@if uv run pytest test/perf/ -c test/perf/pytest.ini; then \
+		echo "Performance test executions succeeded"; \
+	else \
+		echo "Errors were found whilst executing performance tests (see above)"; \
 		exit 1; \
 	fi
 
@@ -193,6 +204,17 @@ build-docker-local: .check-build-prereqs
 		-f Dockerfile \
 		.
 	@echo "Docker image built: odg-core:$(ODG_CORE_LIBS_VERSION)"
+
+# Build debug Docker image for current architecture only (local development)
+build-docker-debug-local: build-docker-local
+	@echo "Building debug Docker image (local arch)..."
+	@docker-buildx build \
+		--build-arg ODG_CORE_LIBS_VERSION=$(ODG_CORE_LIBS_VERSION) \
+		--load \
+		-t odg-core:$(ODG_CORE_LIBS_VERSION)-debug \
+		-f Dockerfile.debug \
+		.
+	@echo "Docker image built: odg-core:$(ODG_CORE_LIBS_VERSION)-debug"
 
 # Package Helm charts for local use
 build-helm-local: .check-build-prereqs
