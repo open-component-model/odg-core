@@ -41,11 +41,11 @@ def categorisation_to_summary_categorisation(
 
 def rescored_severity_if_any(
     finding: odg.model.ArtefactMetadata,
-    rescorings: collections.abc.Iterable[odg.model.ArtefactMetadata],
+    grouped_rescorings: dict[tuple, list[odg.model.ArtefactMetadata]],
 ) -> str | None:
     rescorings_for_finding = rescore.utility.rescorings_for_finding_by_specificity(
         finding=finding,
-        rescorings=rescorings,
+        grouped_rescorings=grouped_rescorings,
     )
 
     if not rescorings_for_finding:
@@ -98,19 +98,19 @@ class ComponentComplianceSummary:
 
 async def severity_for_finding(
     finding: odg.model.ArtefactMetadata,
-    rescorings: collections.abc.Iterable[odg.model.ArtefactMetadata] = tuple(),
+    grouped_rescorings: dict[tuple, list[odg.model.ArtefactMetadata]],
 ) -> ComplianceEntryCategorisation | str | None:
     """
     Severity for known `ArtefactMetadata`.
     """
-    if rescorings:
+    if grouped_rescorings:
         loop = asyncio.get_running_loop()
         rescored_severity = await loop.run_in_executor(
             None,
             functools.partial(
                 rescored_severity_if_any,
                 finding=finding,
-                rescorings=rescorings,
+                grouped_rescorings=grouped_rescorings,
             ),
         )
         if rescored_severity:
@@ -130,10 +130,12 @@ async def calculate_summary_entry(
     """
     most_severe_categorisation = None
 
+    grouped_rescorings = rescore.utility.group_rescorings(rescorings)
+
     for finding in findings:
         severity_name = await severity_for_finding(
             finding=finding,
-            rescorings=rescorings,
+            grouped_rescorings=grouped_rescorings,
         )
 
         categorisation = finding_cfg.categorisation_by_id(severity_name)
