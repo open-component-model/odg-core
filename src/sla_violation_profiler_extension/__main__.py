@@ -22,13 +22,13 @@ logger = logging.getLogger(__name__)
 
 def filter_rescorings_before_release_date(
     finding: odg.model.ArtefactMetadata,
-    rescorings: list[odg.model.ArtefactMetadata],
+    grouped_rescorings: dict[tuple, list[odg.model.ArtefactMetadata]],
     release_date: datetime.datetime,
 ) -> list[odg.model.ArtefactMetadata]:
     filtered_rescorings = []
     for rescoring in rescore.utility.rescorings_for_finding_by_specificity(
         finding=finding,
-        rescorings=rescorings,
+        grouped_rescorings=grouped_rescorings,
     ):
         rescoring_creation_date = util.normalise_date(rescoring.meta.creation_date)
         if rescoring_creation_date < release_date:
@@ -179,6 +179,9 @@ def iter_version_sla_violations(
 ) -> collections.abc.Generator[odg.model.SlaViolation, None, None]:
     release_date = util.normalise_date(release_date)
     findings = _deduplicate_findings(findings)
+
+    grouped_rescorings = rescore.utility.group_rescorings(rescorings)
+
     for finding in findings:
         if util.normalise_date(finding.meta.creation_date) > release_date:
             continue
@@ -191,7 +194,7 @@ def iter_version_sla_violations(
 
         sorted_rescorings = filter_rescorings_before_release_date(
             finding=finding,
-            rescorings=rescorings,
+            grouped_rescorings=grouped_rescorings,
             release_date=release_date,
         )
         violations = iter_policy_violations(
