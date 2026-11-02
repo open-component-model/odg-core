@@ -1,5 +1,6 @@
 import collections.abc
 import dataclasses
+import hashlib
 import io
 import logging
 import os
@@ -34,6 +35,7 @@ def _fetch_blob_with_retries(
     fetch: collections.abc.Callable[[], collections.abc.Iterator[bytes]],
     name: str,
     size: int,
+    digest: str | None = None,
     chunk_size: int = 65536,
     remaining_retries: int = 3,
 ) -> collections.abc.Generator[bytes, None, None]:
@@ -44,8 +46,10 @@ def _fetch_blob_with_retries(
 
     try:
         try:
+            hasher = hashlib.sha256()
             for chunk in fetch():
                 tmp.write(chunk)
+                hasher.update(chunk)
         except (
             botocore.exceptions.BotoCoreError,
             requests.exceptions.ChunkedEncodingError,
@@ -64,6 +68,7 @@ def _fetch_blob_with_retries(
                 fetch=fetch,
                 name=name,
                 size=size,
+                digest=digest,
                 chunk_size=chunk_size,
                 remaining_retries=remaining_retries - 1,
             )
@@ -73,9 +78,14 @@ def _fetch_blob_with_retries(
 
         download_s = time.monotonic() - t0
         actual_size = os.path.getsize(tmp.name)
+        actual_digest = f'sha256:{hasher.hexdigest()}'
         logger.info(
-            f'downloaded blob {name} ({actual_size / 1024 / 1024:.1f} MiB in {download_s:.1f}s)',
+            f'downloaded blob {name} ({actual_digest}) ({actual_size / 1024 / 1024:.1f} MiB in '
+            f'{download_s:.1f}s)',
         )
+
+        if digest and actual_digest != digest:
+            raise ValueError(f'digest mismatch for {name}: expected {digest}, got {actual_digest}')
 
         with open(tmp.name, 'rb') as f:
             while chunk := f.read(chunk_size):
@@ -137,6 +147,7 @@ def _iter_blob_descriptors_for_manifest(
                 fetch=fetch,
                 name=name,
                 size=blob_ref.size,
+                digest=blob_ref.digest,
             ),
             size=blob_ref.size,
             digest=blob_ref.digest,
@@ -208,6 +219,7 @@ def _iter_blob_descriptors_for_local_blob(
             fetch=fetch,
             name=access.referenceName,
             size=size,
+            digest=digest,
         ),
         size=size,
         digest=digest,
@@ -236,6 +248,7 @@ def _iter_blob_descriptors_for_oci_blob(
             fetch=fetch,
             name=name,
             size=size,
+            digest=digest,
         ),
         size=size,
         digest=digest,
