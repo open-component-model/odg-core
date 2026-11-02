@@ -251,7 +251,8 @@ run:
 		--port $(SERVER_PORT) \
 		$(CURDIR)/src \
 		-- \
-		--delivery-db-url postgresql+psycopg://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)
+		--delivery-db-url postgresql+psycopg://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME) \
+		$(if $(filter 1 true yes,$(JSON_LOGS)),--json-logs,--no-json-logs)
 
 # Clean build artifacts
 clean:

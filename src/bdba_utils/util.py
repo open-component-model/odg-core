@@ -11,7 +11,6 @@ import textwrap
 
 import dacite
 
-import ci.log
 import ocm.iter
 
 import bdba.model as bm
@@ -24,7 +23,6 @@ import scanner_utils.findings
 
 
 logger = logging.getLogger(__name__)
-ci.log.configure_default_logging(print_thread_id=True)
 
 
 def iter_artefact_metadata(

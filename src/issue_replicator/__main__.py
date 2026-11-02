@@ -7,7 +7,6 @@ import logging
 import time
 
 import cachetools
-import ci.log
 import dacite
 import github.user
 import github3.repos
@@ -21,6 +20,7 @@ import k8s.model
 import k8s.util
 import odg.extensions_cfg
 import odg.findings
+import odg.logging_cfg
 import odg.model
 import odg.util
 import odg_client
@@ -34,8 +34,8 @@ import util
 
 
 logger = logging.getLogger(__name__)
-ci.log.configure_default_logging()
 k8s.logging.configure_kubernetes_logging()
+odg.logging_cfg.configure_logging(service_name='issue-replicator')
 
 
 def _iter_findings_for_artefact(

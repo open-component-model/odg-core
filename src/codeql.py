@@ -6,15 +6,15 @@ import json
 import logging
 import urllib.parse
 
-import ci.log
 import ocm
 
 import github_util
-import k8s.util
 import k8s.logging
+import k8s.util
 import odg.extensions_cfg
 import odg.findings
 import odg.labels
+import odg.logging_cfg
 import odg.model
 import odg.util
 import odg_client
@@ -23,8 +23,8 @@ import secret_mgmt
 
 
 logger = logging.getLogger(__name__)
-ci.log.configure_default_logging()
 k8s.logging.configure_kubernetes_logging()
+odg.logging_cfg.configure_logging(service_name='codeql')
 
 # CodeQL uses different language names than GitHub's /languages endpoint.
 # This mapping expands CodeQL language identifiers to their GitHub equivalents

@@ -25,7 +25,7 @@ class GitHubApp:
     api_url: str
     app_id: int
     mappings: list[GitHubAppMapping]
-    private_key: str
+    private_key: str = dataclasses.field(repr=False)
     tls_verify: bool = True
 
     @property
@@ -91,7 +91,7 @@ class GitHub:
     api_url: str
     http_url: str
     username: str
-    auth_token: str
+    auth_token: str = dataclasses.field(repr=False)
     repo_urls: list[str]
     tls_verify: bool = True
 

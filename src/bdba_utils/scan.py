@@ -4,7 +4,6 @@ import logging
 import botocore.exceptions
 import requests
 
-import ci.log
 import oci.client
 import ocm.iter
 import tarutil
@@ -23,7 +22,6 @@ import secret_mgmt
 
 
 logger = logging.getLogger(__name__)
-ci.log.configure_default_logging(print_thread_id=True)
 
 
 def normalize_display_name(value: str) -> str:
