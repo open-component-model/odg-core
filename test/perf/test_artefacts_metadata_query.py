@@ -5,14 +5,18 @@ Mimics the query shapes used by extensions, using odg_client exactly as extensio
 One request per shape; log what was queried, how many entries came back, and elapsed.
 
 Tests:
-  test_scanner_utils_read    — 1 artefact + type=VULNERABILITY
-                               (scanner_utils reads existing findings before writing)
-  test_issue_replicator_read — N artefacts + type=[ARTEFACT_SCAN_INFO, VULNERABILITY]
-                               (issue_replicator bulk-fetches findings + scan info)
-  test_sla_profiler_read     — components (no artefact) + type=VULNERABILITY
-                               (sla_violation_profiler fetches all findings for a component)
-  test_rescorings_read       — one request per component, type=RESCORING
-                               (rescoring fetch used by issue_replicator + sla_profiler)
+  test_scanner_utils_read       — 1 artefact + type=VULNERABILITY
+                                  (scanner_utils reads existing findings before writing)
+  test_issue_replicator_read    — N artefacts + type=[ARTEFACT_SCAN_INFO, VULNERABILITY]
+                                  (issue_replicator bulk-fetches findings + scan info)
+  test_sla_profiler_read        — components (no artefact) + type=VULNERABILITY
+                                  (sla_violation_profiler fetches all findings for a component)
+  test_rescorings_read          — one request per component, type=RESCORING
+                                  (rescoring fetch used by issue_replicator + sla_profiler)
+  test_responsibles_license_read — components, type=RESPONSIBLES + referenced_type=LICENSE_FINDING
+                                  (issue_replicator reads responsibles for license findings)
+  test_responsibles_malware_read — components, type=RESPONSIBLES + referenced_type=MALWARE_FINDING
+                                  (issue_replicator reads responsibles for malware findings)
 
 Run (from test/perf/):
     uv run pytest test_artefacts_metadata_query.py -v
@@ -29,6 +33,9 @@ from utils.timer import timed
 
 logger = logging.getLogger(__name__)
 
+_LICENSE = odg.model.Datatype.LICENSE_FINDING
+_MALWARE = odg.model.Datatype.MALWARE_FINDING
+_RESPONSIBLES = odg.model.Datatype.RESPONSIBLES
 _VULNERABILITY = odg.model.Datatype.VULNERABILITY_FINDING
 _ARTEFACT_SCAN_INFO = odg.model.Datatype.ARTEFACT_SCAN_INFO
 _RESCORING = odg.model.Datatype.RESCORING
@@ -116,3 +123,69 @@ def test_rescorings_read(odg_stack, odg_client, components, snapshot):
 
     if not any_results:
         pytest.skip('no rescorings in DB backup')
+
+
+def test_responsibles_license_read(odg_stack, odg_client, components, snapshot):
+    """issue_replicator: fetch responsibles for license findings, one request per component"""
+    any_results = False
+    for component in components:
+        entry = [
+            {
+                'component_name': component.component_name,
+                'component_version': component.component_version,
+            },
+        ]
+        version_slug = (component.component_version or 'null').replace('/', '-')
+        snap_name = (
+            'responsibles-license-'
+            + component.component_name.replace('/', '-')
+            + '-'
+            + version_slug
+            + '.json'
+        )
+        with timed('responsibles_license_read', logger) as t:
+            result = odg_client.query_metadata(
+                artefacts=entry,
+                type=_RESPONSIBLES,
+                referenced_type=_LICENSE,
+            )
+            t.info(entries=len(result), component=component.component_name)
+        if result:
+            any_results = True
+            assert result == snapshot(snap_name)
+
+    if not any_results:
+        pytest.skip('no meta/responsibles rows for finding/license in DB backup')
+
+
+def test_responsibles_malware_read(odg_stack, odg_client, components, snapshot):
+    """issue_replicator: fetch responsibles for malware findings, one request per component"""
+    any_results = False
+    for component in components:
+        entry = [
+            {
+                'component_name': component.component_name,
+                'component_version': component.component_version,
+            },
+        ]
+        version_slug = (component.component_version or 'null').replace('/', '-')
+        snap_name = (
+            'responsibles-malware-'
+            + component.component_name.replace('/', '-')
+            + '-'
+            + version_slug
+            + '.json'
+        )
+        with timed('responsibles_malware_read', logger) as t:
+            result = odg_client.query_metadata(
+                artefacts=entry,
+                type=_RESPONSIBLES,
+                referenced_type=_MALWARE,
+            )
+            t.info(entries=len(result), component=component.component_name)
+        if result:
+            any_results = True
+            assert result == snapshot(snap_name)
+
+    if not any_results:
+        pytest.skip('no meta/responsibles rows for finding/malware in DB backup')
