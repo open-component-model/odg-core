@@ -1,7 +1,6 @@
 import http
 import json
 import logging
-import textwrap
 import threading
 import time
 import traceback
@@ -16,6 +15,11 @@ import odg.extensions_cfg
 logger = logging.getLogger(__name__)
 
 supported_log_levels = {logging.INFO, logging.WARNING, logging.ERROR}
+
+# JSON-escaped byte budgets per LogCollection entry; total stays well below the CRD
+# storage limit (see `trim_logs_to_fit_max_storage_size`)
+MAX_MESSAGE_BYTES = 10000
+MAX_TRACEBACK_BYTES = 100000
 
 
 def log_filename_for_level(level: int) -> str:
@@ -281,16 +285,78 @@ def init_logging_thread(
     thread.start()
 
 
-class JSONFormatter(logging.Formatter):
-    def formatMessage(self, record) -> str:
-        # Check if json module was already cleared during interpreter shutdown
-        if json is None:
-            record.message = '"json module already unloaded during interpreter shutdown"'
-        else:
-            record.message = json.dumps(record.message)
-        if (size := len(record.message.encode('utf-8'))) > 10000:
-            record.message = f'"Request entity body is too large: {size} bytes"'
-        return super().formatMessage(record)
+def _json_size(text: str) -> int:
+    # measure JSON-escaped, `str.encode` raises on lone surrogates
+    return len(json.dumps(text).encode('utf-8'))
+
+
+def truncate_head_to_fit(
+    text: str,
+    max_bytes: int,
+    marker: str = '[truncated]\n',
+) -> str:
+    """
+    Drop leading characters until the JSON-escaped `text` fits `max_bytes`. The tail is
+    kept because tracebacks end with the innermost frame and the exception message.
+    """
+    if _json_size(text) <= max_bytes:
+        return text
+
+    budget = max_bytes - _json_size(marker)
+    start = len(text)
+    while start > 0 and (cost := len(json.dumps(text[start - 1])) - 2) <= budget:
+        budget -= cost
+        start -= 1
+
+    return f'{marker}{text[start:]}'
+
+
+class LogCollectionFormatter(logging.Formatter):
+    """
+    Format a stdlib LogRecord as the JSON object the odg-ui LogTab expects:
+    `{"timestamp", "name", "logLevel", "thread", "message"}`.
+
+    Independent of the stdlib/structlog stdout format, so extensions can use
+    structured pod logging (odg.logging_cfg) while LogCollection CRs keep the
+    legacy frontend contract unchanged.
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        record.message = record.getMessage()
+        timestamp = f'{self.formatTime(record, datefmt="%Y-%m-%dT%H:%M:%S")}.{record.msecs:03.0f}Z'
+
+        # cap the plain message before appending tracebacks so a long traceback
+        # does not hide the original error (traceback is appended after)
+        message = record.message
+
+        if (size := _json_size(message)) > MAX_MESSAGE_BYTES:
+            message = f'Request entity body is too large: {size} bytes'
+
+        details = []
+        if record.exc_info:
+            details.append(self.formatException(record.exc_info))
+        if record.stack_info:
+            details.append(self.formatStack(record.stack_info))
+        if details:
+            message = f'{message}\n' + truncate_head_to_fit(
+                text='\n'.join(details),
+                max_bytes=MAX_TRACEBACK_BYTES,
+            )
+
+        # keep keys identical to the legacy format the odg-ui LogTab expects;
+        # trailing comma is part of the fragments contract (see read_logs_and_remove)
+        return (
+            json.dumps(
+                {
+                    'timestamp': timestamp,
+                    'name': record.name,
+                    'logLevel': record.levelname,
+                    'thread': record.threadName,
+                    'message': message,
+                },
+            )
+            + ','
+        )
 
 
 def configure_kubernetes_logging():
@@ -306,17 +372,7 @@ def configure_kubernetes_logging():
         file_handler.setLevel(level)
         logging.root.addHandler(hdlr=file_handler)
 
-    log_formatter = JSONFormatter(
-        fmt=textwrap.dedent("""\
-        {
-            "timestamp": "%(asctime)s.%(msecs)dZ",
-            "name": "%(name)s",
-            "logLevel": "%(levelname)s",
-            "thread": "%(threadName)s",
-            "message": %(message)s
-        },"""),
-        datefmt='%Y-%m-%dT%H:%M:%S',
-    )
+    log_formatter = LogCollectionFormatter()
 
     for h in logging.root.handlers:
         if isinstance(h, logging.FileHandler):

@@ -19,8 +19,6 @@ import sqlalchemy as sa
 import sqlalchemy.ext.asyncio as sqlasync
 import sqlalchemy.orm
 
-import ci.log
-
 import ctx_util
 import deliverydb
 import deliverydb.model as dm
@@ -28,14 +26,16 @@ import k8s.logging
 import k8s.util
 import lookups
 import odg.extensions_cfg
+import odg.logging_cfg
 import odg.util
 import secret_mgmt.oauth_cfg
 import util
 
 
 logger = logging.getLogger(__name__)
-ci.log.configure_default_logging()
+# CRD FileHandlers (legacy odg-ui format) must be attached before structlog takes over stdout
 k8s.logging.configure_kubernetes_logging()
+odg.logging_cfg.configure_logging(service_name='access-manager')
 
 
 github_host = str

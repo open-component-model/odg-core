@@ -2,7 +2,6 @@ import collections.abc
 import datetime
 import logging
 
-import ci.log
 import ocm
 import ocm.iter
 import ocm.retrieve
@@ -10,6 +9,7 @@ import ocm.retrieve
 import k8s.logging
 import lookups
 import odg.extensions_cfg
+import odg.logging_cfg
 import odg.model
 import odg.util
 import odg_client
@@ -18,6 +18,8 @@ import rescore.utility
 import util
 
 logger = logging.getLogger(__name__)
+k8s.logging.configure_kubernetes_logging()
+odg.logging_cfg.configure_logging(service_name='sla-violation-profiler')
 
 
 def filter_rescorings_before_release_date(
@@ -281,8 +283,6 @@ def create_sla_violation(
 
 
 def main():
-    ci.log.configure_default_logging()
-    k8s.logging.configure_kubernetes_logging()
     parsed_arguments = odg.util.parse_args(
         arguments=(
             odg.util.Arguments.EXTENSIONS_CFG_PATH,
