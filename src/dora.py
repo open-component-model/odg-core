@@ -876,6 +876,7 @@ class DoraMetrics(aiohttp.web.View):
 def _cache_key_diff_components(
     component_vector: components.ComponentVector,
     component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,
+    ocm_repository_lookup: ocm.OcmRepositoryLookup,
 ):
     return cachetools.keys.hashkey(
         component_vector.start.name,
