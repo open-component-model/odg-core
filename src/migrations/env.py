@@ -6,6 +6,7 @@ from alembic import context
 import sqlalchemy
 
 from deliverydb.model import Base
+import migrations
 
 
 config = context.config
@@ -22,14 +23,6 @@ ADVISORY_LOCK_KEY = 0x6F64676D6967
 # structlog pipeline; fileConfig would shadow it with a plain root StreamHandler
 if config.config_file_name is not None and not logging.root.handlers:
     fileConfig(config.config_file_name)
-
-
-def _include_object(obj, name, type_, reflected, compare_to) -> bool:
-    # exclude unnamed indexes (SQLAlchemy auto-naming differs between
-    # create_all and alembic runs and would cause endless drop/re-add diffs)
-    if type_ == 'index' and not name:
-        return False
-    return True
 
 
 def _db_url() -> str:
@@ -72,7 +65,7 @@ def run_migrations_offline() -> None:
         url=_db_url(),
         target_metadata=target_metadata,
         literal_binds=True,
-        include_object=_include_object,
+        include_object=migrations.include_object,
     )
 
     with context.begin_transaction():
@@ -112,7 +105,7 @@ def run_migrations_online() -> None:
             context.configure(
                 connection=connection,
                 target_metadata=target_metadata,
-                include_object=_include_object,
+                include_object=migrations.include_object,
             )
 
             with context.begin_transaction():

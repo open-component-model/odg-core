@@ -4,7 +4,7 @@ This tutorial shows you the full workflow of a schema change.
 You will:
 
 1. Start a local, empty Postgres database
-2. Apply the base migration
+2. Apply the head migration
 3. Insert one row with SQL
 4. Add a new column to the model
 5. Generate a new migration
@@ -14,7 +14,7 @@ You will:
 
 Time: about 15 minutes.
 
-All commands run from the repository root, unless told otherwise.
+All shell commands run from `src/`. Run `cd src` once from the repository root.
 
 ---
 
@@ -46,21 +46,18 @@ docker ps --filter name=alembic-tutorial-db
 
 ---
 
-## Step 2: Apply the base migration
+## Step 2: Apply the head migration
 
-Apply the base migration `cc90ad81441c`, which sets up the initial schema.
+Apply the head migration, which sets up the current schema.
 Later examples introduce further migrations on top.
 
 ```bash
-# from the repository root
-cd src
-
 uv run --project .. alembic -c migrations/alembic.ini \
     -x db_url=postgresql+psycopg://postgres:password-123@localhost:55432/postgres \
     upgrade head
 ```
 
-Check the result. The command must print `cc90ad81441c`:
+Check the result. The command must print the newest version in `src/migrations/versions`:
 
 ```bash
 uv run --project .. alembic -c migrations/alembic.ini \
@@ -68,7 +65,7 @@ uv run --project .. alembic -c migrations/alembic.ini \
     current
 ```
 
-The database now has five tables. One of them is `cache`.
+The database now has (at least) five tables. One of them is `cache`.
 
 ---
 
@@ -86,8 +83,9 @@ Connect to the database with DBeaver:
 - User: `postgres`
 - Password: `password-123`
 
-Open a SQL editor and run this statement. It inserts one cache entry. You
-can copy it as-is:
+Open a SQL editor and edit this statement. 
+It inserts one cache entry.
+Before executing, check that the cache table hasn't changed and adapt if necessary.
 
 ```sql
 INSERT INTO cache (
@@ -121,13 +119,13 @@ You see one row. Keep DBeaver open.
 
 ## Step 4: Add the column to the model
 
-The schema is defined in `src/deliverydb/model.py`. The `cache` table is
+The schema is defined in `deliverydb/model.py`. The `cache` table is
 the class `DBCache`.
 
 Add one new column in alphabetical order: the class ends with `costs`,
 `size`, `value`, so add `encoding` between `costs` and `size`.
 
-Open `src/deliverydb/model.py`, find the class `DBCache`, and change this
+Open `deliverydb/model.py`, find the class `DBCache`, and change this
 block:
 
 ```python
@@ -155,18 +153,15 @@ change plan.
 
 ## Step 5: Generate the new migration
 
-Run autogenerate (from the repository root):
+Run autogenerate:
 
 ```bash
-# from the repository root
-cd src
-
 uv run --project .. alembic -c migrations/alembic.ini \
     -x db_url=postgresql+psycopg://postgres:password-123@localhost:55432/postgres \
     revision --autogenerate -m "add encoding to cache"
 ```
 
-This creates a new file in `src/migrations/versions/`. The filename starts
+This creates a new file in `migrations/versions/`. The filename starts
 with a timestamp and ends with `add_encoding_to_cache.py`.
 
 **Note: the database must be up for this step.**
@@ -301,24 +296,17 @@ Note: the data backfill only runs inside `data_upgrade()`. On downgrade,
 `data_downgrade()` is a `pass` and the column with its values disappears
 with `DROP COLUMN` in `schema_downgrade()`.
 
-### Long-running data migrations
-
-Migrations run with a 5-minute `lock_timeout`. Do not put a data backfill
-that might exceed it into the automatic alembic path — a stalled init
-container keeps every replacement pod in `Init` and blocks the rollout. Run
-such backfills manually during a maintenance window instead, against the live
-database, outside of alembic.
+For long-running backfills, see "Long-running migrations" in `README.md`.
 
 ---
 
 ## Clean up
 
-When you are done (paths below are relative to the repository root —
-`cd ..` first if you are still in `src/`):
+When you are done:
 
-1. Delete the migration file you created in `src/migrations/versions/`
+1. Delete the migration file you created in `migrations/versions/`
    (only if you do not want to keep it for a real change).
-2. Remove the `encoding` column from `DBCache` in `src/deliverydb/model.py`.
+2. Remove the `encoding` column from `DBCache` in `deliverydb/model.py`.
 3. Stop the container:
 
    ```bash

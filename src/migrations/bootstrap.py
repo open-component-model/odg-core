@@ -1,9 +1,9 @@
 """
 Entry script for the delivery-service migration job.
 
-Decides between `alembic stamp head` (existing database whose schema was
-previously managed by `create_all`) and `alembic upgrade head` (fresh
-database). Afterwards the schema is always at alembic head.
+Legacy databases (schema previously managed by `create_all`) are stamped at the
+baseline revision, then every database is upgraded to head. Afterwards the
+revision is verified against the checked-out head.
 
 Usage:
     python3 -m migrations.bootstrap
@@ -22,7 +22,6 @@ import deliverydb.model
 import odg.logging_cfg
 
 
-odg.logging_cfg.configure_logging(service_name='delivery-db-migration')
 logger = logging.getLogger('odg.migrations')
 
 
@@ -31,8 +30,6 @@ def _db_url() -> str:
     Simplified variant of the URL resolution in migrations/env.py, sufficient for
     in-cluster runs: read the mounted delivery-db secret.
     """
-    import os
-
     import secret_mgmt
     import secret_mgmt.delivery_db
 
@@ -85,7 +82,10 @@ def _head_revision() -> str:
 
 
 def main() -> int:
-    engine = sqlalchemy.create_engine(_db_url())
+    db_url = _db_url()
+    # env.py prefers DELIVERY_DB_URL; ensure alembic targets the database inspected here
+    os.environ['DELIVERY_DB_URL'] = db_url
+    engine = sqlalchemy.create_engine(db_url)
 
     with engine.connect() as connection:
         existing_tables = set(sqlalchemy.inspect(connection).get_table_names())
@@ -96,16 +96,20 @@ def main() -> int:
     argv = ['-c', migrations.ini_path]
 
     if alembic_managed:
-        logger.info('database is alembic-managed, running upgrade to head')
-        alembic_main(argv=[*argv, 'upgrade', 'head'])
+        logger.info('database is alembic-managed')
     elif model_tables & existing_tables:
+        # legacy schema equals the baseline revision; later revisions must still run
+        base_revision = 'cc90ad81441c'
         logger.info(
-            'schema exists but is not alembic-managed (create_all-era), stamping head',
+            'schema exists but is not alembic-managed (create_all-era), stamping %s',
+            base_revision,
         )
-        alembic_main(argv=[*argv, 'stamp', 'head'])
+        alembic_main(argv=[*argv, 'stamp', base_revision])
     else:
-        logger.info('fresh database, running full upgrade to head')
-        alembic_main(argv=[*argv, 'upgrade', 'head'])
+        logger.info('fresh database')
+
+    logger.info('running upgrade to head')
+    alembic_main(argv=[*argv, 'upgrade', 'head'])
 
     # post-condition: the database must now reflect checked-in head.
     # This catches silent failures, in particular cases where an open pre-existing
@@ -128,4 +132,5 @@ def main() -> int:
 
 
 if __name__ == '__main__':
+    odg.logging_cfg.configure_logging(service_name='delivery-db-migration')
     raise SystemExit(main())
