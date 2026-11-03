@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.14"
 
 [manifest]
@@ -259,16 +259,16 @@ wheels = [
 
 [[package]]
 name = "boto3"
-version = "1.43.119"
+version = "1.43.120"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "botocore" },
     { name = "jmespath" },
     { name = "s3transfer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/02/1b/97f8ec6ce00ae49455797b8af9fde522624ecf80bc73c937596b558b1853/boto3-1.43.119.tar.gz", hash = "sha256:e12c3b1d81713e14bd6947b7412d9d0ea49b320642d795ded1d64d6483ca6f49", size = 112659, upload-time = "2026-10-26T19:25:58.76Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0f/d3/9426f7c627719bd0f8ab3827a91362805b72fc721dcddd61a3daef555d4a/boto3-1.43.120.tar.gz", hash = "sha256:9d85840e721869f8202ab5f6b4ec3e697ac46343116cc8d1d0804ec58f90c503", size = 112687, upload-time = "2026-10-27T19:20:31.944Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3a/d7/6c82dff652082a4bab907b7a5833933a362f12400f14bd7a9935a330145e/boto3-1.43.119-py3-none-any.whl", hash = "sha256:d1718edae48c3241d289c0ece8a515399a7242c406e35328b9685c4d24039186", size = 140045, upload-time = "2026-10-26T19:25:57.128Z" },
+    { url = "https://files.pythonhosted.org/packages/7a/42/04025133386d7881ca2235044c2ed9ffa33c8f80c91453b2114567463b9c/boto3-1.43.120-py3-none-any.whl", hash = "sha256:86978245a7b911549a44df3f805ae4ce94a8154f4ebe4a166631b8a6d7af2697", size = 140041, upload-time = "2026-10-27T19:20:27.812Z" },
 ]
 
 [[package]]
@@ -1578,7 +1578,7 @@ requires-dist = [
     { name = "aiohttp-swagger3", specifier = "==0.10.0" },
     { name = "awesomeversion", specifier = "==25.8.0" },
     { name = "bdba-client", editable = "packages/bdba-client" },
-    { name = "boto3", specifier = "==1.43.119" },
+    { name = "boto3", specifier = "==1.43.120" },
     { name = "brotli", specifier = "==1.2.1" },
     { name = "cachetools", specifier = "==7.2.6" },
     { name = "cyclonedx-python-lib", specifier = "==11.12.0" },
