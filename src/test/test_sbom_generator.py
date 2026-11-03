@@ -143,9 +143,13 @@ def _make_sync_lookup(path):
     return sync_lookup
 
 
-def _make_oci_client_for_sbom(sbom_payload: dict) -> unittest.mock.MagicMock:
+def _make_oci_client_for_sbom(
+    sbom_payload: dict,
+    digest: str,
+) -> unittest.mock.MagicMock:
     layer = unittest.mock.MagicMock()
-    layer.digest = 'sha256:deadbeef'
+    layer.digest = digest
+    layer.size = 0
     manifest = unittest.mock.MagicMock(spec=['layers'])
     manifest.layers = [layer]
 
@@ -350,7 +354,8 @@ def test_generate_sbom_ocm_sbom_found_skips_generation():
     )
 
     layer = unittest.mock.MagicMock()
-    layer.digest = 'sha256:abc'
+    layer.digest = 'sha256:ce0b5d9ed482deb4040649f91c106069848b913c1182179b6614c22dfe4814ab'
+    layer.size = 0
     manifest = unittest.mock.MagicMock(spec=['layers'])
     manifest.layers = [layer]
 
@@ -472,7 +477,10 @@ def test_smoke_ocm_sbom_preferred_over_syft():
         ),
     )
 
-    oci_client = _make_oci_client_for_sbom(sbom_payload)
+    oci_client = _make_oci_client_for_sbom(
+        sbom_payload=sbom_payload,
+        digest='sha256:a393062281b129e4df7b86dc020597370b4829c9ac624790a9681db9ac5bb6a8',
+    )
     delivery_client = _make_delivery_client()
 
     with unittest.mock.patch('sbom_generator.generate_sbom_with_syft') as mock_syft:
@@ -511,7 +519,10 @@ def test_smoke_extra_identity_match_picks_correct_sbom():
         ),
     )
 
-    oci_client = _make_oci_client_for_sbom(sbom_payload)
+    oci_client = _make_oci_client_for_sbom(
+        sbom_payload=sbom_payload,
+        digest='sha256:ce0b5d9ed482deb4040649f91c106069848b913c1182179b6614c22dfe4814ab',
+    )
     delivery_client = _make_delivery_client()
 
     with unittest.mock.patch('sbom_generator.generate_sbom_with_syft') as mock_syft:
