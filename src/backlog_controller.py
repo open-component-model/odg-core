@@ -7,20 +7,19 @@ import dateutil.parser
 import kubernetes.client.rest
 import urllib3.exceptions
 
-import ci.log
-
 import k8s.backlog
 import k8s.logging
 import k8s.model
 import k8s.util
 import odg.extensions_cfg
+import odg.logging_cfg
 import odg.util
 import paths
 
 
 logger = logging.getLogger(__name__)
-ci.log.configure_default_logging()
 k8s.logging.configure_kubernetes_logging()
+odg.logging_cfg.configure_logging(service_name='backlog-controller')
 
 
 def on_backlog_change(
@@ -119,13 +118,12 @@ def on_backlog_change(
 def main():
     parsed_arguments = odg.util.parse_args(
         arguments=(
-            odg.util.Arguments.K8S_CFG_NAME,
             odg.util.Arguments.KUBECONFIG,
             odg.util.Arguments.K8S_NAMESPACE,
             odg.util.Arguments.EXTENSIONS_CFG_PATH,
         ),
     )
-    kubernetes_api = odg.util.kubernetes_api(parsed_arguments)
+    kubernetes_api = k8s.util.kubernetes_api(kubeconfig_path=parsed_arguments.kubeconfig)
     namespace = parsed_arguments.k8s_namespace
 
     k8s.logging.init_logging_thread(

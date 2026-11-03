@@ -7,17 +7,17 @@ import datetime
 import logging
 
 import dacite
-import ci.log
-import cnudie.retrieve
 import ocm
 import ocm.util
 
 import ctx_util
 import github_util
 import k8s.logging
+import k8s.util
 import lookups
 import odg.extensions_cfg
 import odg.findings
+import odg.logging_cfg
 import odg.model
 import odg.util
 import odg_client
@@ -27,8 +27,8 @@ import util
 
 
 logger = logging.getLogger(__name__)
-ci.log.configure_default_logging()
 k8s.logging.configure_kubernetes_logging()
+odg.logging_cfg.configure_logging(service_name='ghas')
 
 
 @dataclasses.dataclass
@@ -292,7 +292,7 @@ def create_ghas_findings(
 
 def build_artefact_from_finding(
     finding: odg.model.GitHubSecretFinding,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_service_client: odg_client.DeliveryServiceClient,
 ) -> odg.model.ComponentArtefactId:
     """
@@ -346,7 +346,7 @@ def build_artefact_from_finding(
 def scan(
     ghas_config: odg.extensions_cfg.GHASConfig,
     ghas_finding_cfg: odg.findings.Finding,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_service_client: odg_client.DeliveryServiceClient,
     secret_factory: secret_mgmt.SecretFactory,
 ):
@@ -456,7 +456,7 @@ def main():
 
     namespace = parsed_arguments.k8s_namespace
     delivery_service_url = parsed_arguments.delivery_service_url
-    kubernetes_api = odg.util.kubernetes_api(parsed_arguments)
+    kubernetes_api = k8s.util.kubernetes_api(kubeconfig_path=parsed_arguments.kubeconfig)
 
     k8s.logging.init_logging_thread(
         service=odg.extensions_cfg.Services.GHAS,

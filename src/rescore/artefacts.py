@@ -329,6 +329,8 @@ async def _iter_rescoring_proposals(
     seen_ids = set()
     loop = asyncio.get_running_loop()
 
+    grouped_rescorings = rescore.utility.group_rescorings(rescorings)
+
     for am in artefact_metadata:
         if am.meta.type == odg.model.Datatype.STRUCTURE_INFO or am.id in seen_ids:
             continue
@@ -345,7 +347,7 @@ async def _iter_rescoring_proposals(
             functools.partial(
                 rescore.utility.rescorings_for_finding_by_specificity,
                 finding=am,
-                rescorings=rescorings,
+                grouped_rescorings=grouped_rescorings,
             ),
         )
         severity = am.data.severity

@@ -106,7 +106,7 @@ def _mock_auth_response(bearer_token: str) -> unittest.mock.Mock:
 
 
 def test_oidc_token_calls_auth_with_bearer_header():
-    client = _make_oidc_client(token='sa-token-123')
+    client = _make_oidc_client(token='changeme')
     mock_response = _mock_auth_response('session-jwt')
 
     with unittest.mock.patch.object(client._session, 'get', return_value=mock_response) as mock_get:
@@ -114,7 +114,7 @@ def test_oidc_token_calls_auth_with_bearer_header():
 
     mock_get.assert_called_once()
     _, kwargs = mock_get.call_args
-    assert kwargs['headers']['Authorization'] == 'Bearer sa-token-123'
+    assert kwargs['headers']['Authorization'] == 'Bearer changeme'
     assert client._bearer_token == 'session-jwt'
 
 
@@ -150,5 +150,5 @@ def test_for_oidc_requires_token_or_lookup():
 def test_oidc_and_github_auth_are_mutually_exclusive():
     # The API enforces this by having separate factory methods — verify
     # the deprecated __init__ still validates the old-style combinations.
-    with pytest.raises(ValueError):
+    with pytest.warns(DeprecationWarning), pytest.raises(ValueError):
         _make_client(auth_token='gh-tok', auth_token_lookup=lambda api_url: 'gh-tok')

@@ -13,10 +13,10 @@ import dateutil.parser
 import semver
 import yaml
 
-import cnudie.retrieve_async
 import oci.model as om
 import ocm
 import ocm.iter
+import ocm.retrieve_async
 import version as versionutil
 
 
@@ -103,7 +103,7 @@ def dict_to_json_factory(data: dict) -> str:
 async def retrieve_component_descriptor(
     component_id: ocm.ComponentIdentity,
     /,
-    component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,
     ocm_repository_lookup: ocm.OcmRepositoryLookup | None = None,
 ) -> ocm.ComponentDescriptor:
     try:

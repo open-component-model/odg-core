@@ -1,5 +1,3 @@
-$id: https://gardener.cloud/schemas/delivery-service/dto/jwt-schema
-$schema: http://json-schema.org/draft/2020-12/schema
 description: Delivery Service JWT schema
 type: object
 required:

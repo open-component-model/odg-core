@@ -5,15 +5,14 @@ import enum
 import functools
 import logging
 
-import ci.log
-import cnudie.retrieve
 import ocm
 
-import k8s.util
 import k8s.logging
+import k8s.util
 import odg.extensions_cfg
 import odg.findings
 import odg.labels
+import odg.logging_cfg
 import odg.model
 import odg.util
 import odg_client
@@ -22,8 +21,8 @@ import rescore.utility
 
 
 logger = logging.getLogger(__name__)
-ci.log.configure_default_logging()
 k8s.logging.configure_kubernetes_logging()
+odg.logging_cfg.configure_logging(service_name='sast')
 
 
 class AnalysisLabel(enum.StrEnum):
@@ -117,7 +116,7 @@ def iter_sast_artefacts_for_sub_type(
 
 def iter_artefact_metadata(
     artefact: odg.model.ComponentArtefactId,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     sast_finding_config: odg.findings.Finding,
     sast_config: odg.extensions_cfg.SASTConfig,
     creation_timestamp: datetime.datetime | None = None,
@@ -199,7 +198,7 @@ def scan(
     artefact: odg.model.ComponentArtefactId,
     extension_cfg: odg.extensions_cfg.OsId,
     sast_finding_config: odg.findings.Finding,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_service_client: odg_client.DeliveryServiceClient,
     **kwargs,
 ):

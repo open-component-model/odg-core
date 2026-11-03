@@ -17,12 +17,11 @@ import sqlalchemy
 import sqlalchemy.ext.asyncio as sqlasync
 import sqlalchemy.sql.elements
 
-import ci.log
-import cnudie.retrieve_async
 import oci.client_async
 import ocm
 import ocm.iter
 import ocm.iter_async
+import ocm.retrieve_async
 
 import compliance_summary
 import components as components_module
@@ -31,9 +30,11 @@ import deliverydb
 import deliverydb.model as dm
 import deliverydb.util as du
 import k8s.logging
+import k8s.util
 import lookups
 import odg.extensions_cfg
 import odg.findings
+import odg.logging_cfg
 import odg.model
 import odg.util
 import odg_client
@@ -41,8 +42,8 @@ import paths
 
 
 logger = logging.getLogger(__name__)
-ci.log.configure_default_logging()
 k8s.logging.configure_kubernetes_logging()
+odg.logging_cfg.configure_logging(service_name='cache-manager')
 
 
 def bytes_to_str(
@@ -133,7 +134,7 @@ async def prune_cache(
 
 async def prefill_compliance_summary_cache(
     component_id: ocm.ComponentIdentity,
-    component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,
     finding_cfgs: collections.abc.Sequence[odg.findings.Finding],
     db_session: sqlasync.session.AsyncSession,
 ):
@@ -152,7 +153,7 @@ async def prefill_compliance_summary_cache(
 
 async def prefill_compliance_summary_caches(
     components: collections.abc.Iterable[odg.extensions_cfg.Component],
-    component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,
     oci_client: oci.client_async.Client,
     finding_cfgs: collections.abc.Sequence[odg.findings.Finding],
     db_session: sqlasync.session.AsyncSession,
@@ -215,7 +216,7 @@ async def prefill_component_versions_caches(
 async def prefill_function_caches(
     function_names: collections.abc.Iterable[odg.extensions_cfg.FunctionNames],
     components: collections.abc.Iterable[odg.extensions_cfg.Component],
-    component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,
     oci_client: oci.client_async.Client,
     finding_cfgs: collections.abc.Sequence[odg.findings.Finding],
     db_session: sqlasync.session.AsyncSession,
@@ -240,22 +241,34 @@ async def prefill_function_caches(
                 )
 
 
-async def iter_sbom_artefacts(
+async def cleanup_sboms(
     artefact_enumerator_cfg: odg.extensions_cfg.ArtefactEnumeratorConfig,
     sbom_generator_cfg: odg.extensions_cfg.SBOMGeneratorConfig,
     delivery_service_client: odg_client.DeliveryServiceClient,
     component_descriptor_lookup: ocm.ComponentDescriptorLookup,
-) -> collections.abc.AsyncGenerator[odg.model.ComponentArtefactId, None]:
+    db_session: sqlasync.session.AsyncSession,
+    retention_period_seconds: int,
+):
+    artefact_keys = set()
+    skipped_components = []
+
     for component in artefact_enumerator_cfg.components:
         if resolved_version := component.resolved_version:
             # if an explicit version is specified, use it without any further implict lookup
             versions = [resolved_version]
         else:
-            versions = delivery_service_client.greatest_component_versions(
-                component_name=component.component_name,
-                max_versions=component.max_versions_limit,
-                ocm_repo=component.ocm_repo,
-            )
+            try:
+                versions = delivery_service_client.greatest_component_versions(
+                    component_name=component.component_name,
+                    max_versions=component.max_versions_limit,
+                    ocm_repo=component.ocm_repo,
+                )
+            except odg_client.EXTERNAL_DEPENDENCY_EXCEPTIONS as e:
+                logger.warning(
+                    f'failed to retrieve versions for {component.component_name=}, skip: {e}',
+                )
+                skipped_components.append(component.component_name)
+                continue
 
         ocm_repository_lookup = lookups.extended_ocm_repository_lookup(component.ocm_repo)
 
@@ -286,26 +299,14 @@ async def iter_sbom_artefacts(
                     access_type=artefact_node.artefact.access.type,
                     artefact_type=component_artefact_id.artefact.artefact_type,
                 ):
-                    yield component_artefact_id
+                    artefact_keys.add(component_artefact_id.key)
 
-
-async def cleanup_sboms(
-    artefact_enumerator_cfg: odg.extensions_cfg.ArtefactEnumeratorConfig,
-    sbom_generator_cfg: odg.extensions_cfg.SBOMGeneratorConfig,
-    delivery_service_client: odg_client.DeliveryServiceClient,
-    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
-    db_session: sqlasync.session.AsyncSession,
-    retention_period_seconds: int,
-):
-    artefact_keys = set()
-
-    async for artefact in iter_sbom_artefacts(
-        artefact_enumerator_cfg=artefact_enumerator_cfg,
-        sbom_generator_cfg=sbom_generator_cfg,
-        delivery_service_client=delivery_service_client,
-        component_descriptor_lookup=component_descriptor_lookup,
-    ):
-        artefact_keys.add(artefact.key)
+    if skipped_components:
+        logger.warning(
+            f'skipping SBOM cleanup: enumeration incomplete due to failed version lookups for '
+            f'{skipped_components=}',
+        )
+        return
 
     db_statement = sqlalchemy.select(dm.ArtefactMetaData).where(
         dm.ArtefactMetaData.type == odg.model.Datatype.ARTEFACT_SCAN_INFO,
@@ -369,7 +370,7 @@ async def main():
     namespace = parsed_arguments.k8s_namespace
 
     secret_factory = ctx_util.secret_factory()
-    kubernetes_api = odg.util.kubernetes_api(parsed_arguments, secret_factory=secret_factory)
+    kubernetes_api = k8s.util.kubernetes_api(kubeconfig_path=parsed_arguments.kubeconfig)
 
     k8s.logging.init_logging_thread(
         service=odg.extensions_cfg.Services.CACHE_MANAGER,

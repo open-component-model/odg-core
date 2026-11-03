@@ -4,8 +4,6 @@ import dataclasses
 import datetime
 import logging
 
-import ci.log
-import cnudie.retrieve
 import ocm
 import ocm.iter
 
@@ -17,6 +15,7 @@ import lookups
 import odg.extensions_cfg
 import odg.filter
 import odg.findings
+import odg.logging_cfg
 import odg.model
 import odg.util
 import odg_client
@@ -24,8 +23,8 @@ import paths
 
 
 logger = logging.getLogger(__name__)
-ci.log.configure_default_logging()
 k8s.logging.configure_kubernetes_logging()
+odg.logging_cfg.configure_logging(service_name='artefact-enumerator')
 
 
 @dataclasses.dataclass
@@ -73,7 +72,7 @@ def create_compliance_snapshot(
 def _iter_ocm_artefacts_for_single_component(
     component: odg.extensions_cfg.Component,
     delivery_service_client: odg_client.DeliveryServiceClient,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
 ) -> collections.abc.Generator[odg.model.ComponentArtefactId, None, None]:
     if resolved_version := component.resolved_version:
         # if an explicit version is specified, use it without any further implict lookup
@@ -113,7 +112,7 @@ def _iter_ocm_artefacts_for_single_component(
 def _iter_ocm_artefacts(
     components: collections.abc.Iterable[odg.extensions_cfg.Component],
     delivery_service_client: odg_client.DeliveryServiceClient,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
 ) -> collections.abc.Generator[odg.model.ComponentArtefactId, None, None]:
     for component in components:
         try:
@@ -172,7 +171,7 @@ def _calculate_backlog_item_priority(
         service=service,
     )
 
-    if not current_state or (status and status != current_state.status):
+    if not current_state or (status is not None and status != current_state.status):
         return k8s.backlog.BacklogPriorities.HIGH
 
     elif now - current_state.timestamp >= datetime.timedelta(
@@ -338,12 +337,18 @@ def _process_compliance_snapshot_of_artefact(
 
     if extensions_cfg.issue_replicator and extensions_cfg.issue_replicator.enabled:
         # if the number of executed scans has changed, trigger an issue update
-        scan_count = len(
-            delivery_service_client.query_metadata(
-                artefacts=(artefact,),
-                type=odg.model.Datatype.ARTEFACT_SCAN_INFO,
-            ),
-        )
+        scan_count = None
+        try:
+            scan_count = len(
+                delivery_service_client.query_metadata(
+                    artefacts=(artefact,),
+                    type=odg.model.Datatype.ARTEFACT_SCAN_INFO,
+                ),
+            )
+        except odg_client.EXTERNAL_DEPENDENCY_EXCEPTIONS as e:
+            logger.warning(
+                f'failed to query scan info for {artefact=}, skipping scan-count optimisation: {e}',
+            )
 
         compliance_snapshot, uncommitted_backlog_item = _create_backlog_item(
             artefact=artefact,
@@ -505,11 +510,16 @@ def _process_inactive_compliance_snapshots(
     if not deletable_compliance_snapshots:
         return
 
-    delivery_service_client.delete_metadata(data=deletable_compliance_snapshots)
-    logger.info(
-        f'deleted {len(deletable_compliance_snapshots)} inactive compliance snapshots in '
-        f'delivery-db ({artefact=})',
-    )
+    snapshot_count = len(deletable_compliance_snapshots)
+    try:
+        delivery_service_client.delete_metadata(data=deletable_compliance_snapshots)
+    except odg_client.EXTERNAL_DEPENDENCY_EXCEPTIONS as e:
+        logger.warning(
+            f'failed to delete {snapshot_count=} inactive compliance snapshots, '
+            f'will retry next scheduled run: {e}',
+        )
+        return
+    logger.info(f'deleted {snapshot_count} inactive compliance snapshots in delivery-db')
 
 
 def enumerate_artefacts(
@@ -518,7 +528,7 @@ def enumerate_artefacts(
     namespace: str,
     kubernetes_api: k8s.util.KubernetesApi,
     delivery_service_client: odg_client.DeliveryServiceClient,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
 ):
     """
     Retrieves first of all the unique artefacts referenced by the configured components and the
@@ -615,7 +625,10 @@ def enumerate_artefacts(
             all_uncommitted_backlog_items.append(uncommitted_backlog_item)
 
     logger.info(f'updating {len(updated_compliance_snapshots)} compliance snapshots in delivery-db')
-    delivery_service_client.update_metadata(data=updated_compliance_snapshots)
+    try:
+        delivery_service_client.update_metadata(data=updated_compliance_snapshots)
+    except odg_client.EXTERNAL_DEPENDENCY_EXCEPTIONS as e:
+        logger.warning(f'failed to update compliance snapshots, will retry next scheduled run: {e}')
 
     for uncommitted_backlog_item in all_uncommitted_backlog_items:
         service = uncommitted_backlog_item.service
@@ -635,7 +648,7 @@ def enumerate_artefacts(
 
 def main():
     parsed_arguments = odg.util.parse_args()
-    kubernetes_api = odg.util.kubernetes_api(parsed_arguments)
+    kubernetes_api = k8s.util.kubernetes_api(kubeconfig_path=parsed_arguments.kubeconfig)
     namespace = parsed_arguments.k8s_namespace
 
     k8s.logging.init_logging_thread(

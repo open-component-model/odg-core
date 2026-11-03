@@ -1,5 +1,8 @@
 {{- $podName := "responsibles" }}
 
+{{- include "odg.rbac" . }}
+---
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -35,6 +38,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      serviceAccountName: {{ .Chart.Name }}
       containers:
         - name: {{ $podName }}
           image: {{ include "image" .Values.global.image }}
@@ -59,8 +63,6 @@ spec:
               mountPath: /secrets/github
             - name: github-app
               mountPath: /secrets/github-app
-            - name: kubernetes
-              mountPath: /secrets/kubernetes
             - name: extensions-cfg
               mountPath: /extensions_cfg
             - name: findings-cfg
@@ -84,10 +86,6 @@ spec:
           secret:
             secretName: secret-factory-github-app
             optional: true
-        - name: kubernetes
-          secret:
-            secretName: secret-factory-kubernetes
-            optional: true # might use incluster config
         - name: extensions-cfg
           configMap:
             name: extensions-cfg

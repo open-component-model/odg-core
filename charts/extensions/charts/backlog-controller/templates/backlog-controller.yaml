@@ -1,5 +1,8 @@
 {{- $podName := "backlog-controller" }}
 
+{{- include "odg.rbac" . }}
+---
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,6 +22,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      serviceAccountName: {{ .Chart.Name }}
       containers:
         - name: {{ $podName }}
           image: {{ include "image" .Values.global.image }}
@@ -37,8 +41,6 @@ spec:
             - name: K8S_TARGET_NAMESPACE
               value: {{ .Values.target_namespace | default .Release.Namespace }}
           volumeMounts:
-            - name: kubernetes
-              mountPath: /secrets/kubernetes
             - name: extensions-cfg
               mountPath: /extensions_cfg
             - name: github
@@ -50,10 +52,6 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
       volumes:
-        - name: kubernetes
-          secret:
-            secretName: secret-factory-kubernetes
-            optional: true # might use incluster config
         - name: extensions-cfg
           configMap:
             name: extensions-cfg

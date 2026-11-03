@@ -20,6 +20,162 @@ _CVE_CATEGORISATION_VALUE = {
 }
 
 
+def _artefact(
+    component_name: str = 'comp',
+) -> odg.model.ComponentArtefactId:
+    return odg.model.ComponentArtefactId(
+        component_name=component_name,
+        component_version='1.0.0',
+        artefact_kind=odg.model.ArtefactKind.RESOURCE,
+        artefact=odg.model.LocalArtefactId(
+            artefact_name='art',
+            artefact_version='1.0.0',
+            artefact_type='ociImage',
+            artefact_extra_id={},
+        ),
+    )
+
+
+def _meta(
+    datatype: str,
+    creation_date: str = '2024-01-01T00:00:00',
+) -> odg.model.Metadata:
+    return odg.model.Metadata(
+        datasource='test',
+        type=datatype,
+        creation_date=creation_date,
+    )
+
+
+def _user() -> odg.model.User:
+    return odg.model.User(username='tester')
+
+
+def _vuln_finding(
+    cve: str = 'CVE-2024-1234',
+    package: str = 'pkg',
+) -> odg.model.ArtefactMetadata:
+    return odg.model.ArtefactMetadata(
+        artefact=_artefact(),
+        meta=_meta(odg.model.Datatype.VULNERABILITY_FINDING),
+        data=odg.model.VulnerabilityFinding(
+            severity='HIGH',
+            package_name=package,
+            package_version='1.0',
+            cve=cve,
+            cvss_score=7.5,
+        ),
+    )
+
+
+def _vuln_rescoring(
+    cve: str = 'CVE-2024-1234',
+    package: str = 'pkg',
+) -> odg.model.ArtefactMetadata:
+    return odg.model.ArtefactMetadata(
+        artefact=_artefact(),
+        meta=_meta(odg.model.Datatype.RESCORING),
+        data=odg.model.CustomRescoring(
+            finding=odg.model.RescoringVulnerabilityFinding(
+                package_name=package,
+                cve=cve,
+            ),
+            referenced_type=odg.model.Datatype.VULNERABILITY_FINDING,
+            severity='NONE',
+            user=_user(),
+        ),
+    )
+
+
+def _license_finding(
+    license_name: str = 'MIT',
+    package: str = 'pkg',
+) -> odg.model.ArtefactMetadata:
+    return odg.model.ArtefactMetadata(
+        artefact=_artefact(),
+        meta=_meta(odg.model.Datatype.LICENSE_FINDING),
+        data=odg.model.LicenseFinding(
+            severity='MEDIUM',
+            base_url='http://bdba',
+            report_url='http://bdba/report',
+            product_id=1,
+            group_id=1,
+            package_name=package,
+            package_version='1.0',
+            license=odg.model.License(
+                name=license_name,
+            ),
+        ),
+    )
+
+
+def _license_rescoring(
+    license_name: str = 'MIT',
+    package: str = 'pkg',
+) -> odg.model.ArtefactMetadata:
+    return odg.model.ArtefactMetadata(
+        artefact=_artefact(),
+        meta=_meta(odg.model.Datatype.RESCORING),
+        data=odg.model.CustomRescoring(
+            finding=odg.model.RescoringLicenseFinding(
+                package_name=package,
+                license=odg.model.License(
+                    name=license_name,
+                ),
+            ),
+            referenced_type=odg.model.Datatype.LICENSE_FINDING,
+            severity='NONE',
+            user=_user(),
+        ),
+    )
+
+
+def _ip_finding(
+    package: str = 'pkg',
+    labels: list[str] = ('label-a',),
+) -> odg.model.ArtefactMetadata:
+    return odg.model.ArtefactMetadata(
+        artefact=_artefact(),
+        meta=_meta(odg.model.Datatype.IP_FINDING),
+        data=odg.model.IPFinding(
+            severity='HIGH',
+            package_name=package,
+            package_version='1.0',
+            license=odg.model.License(
+                name='MIT',
+            ),
+            policy_violation=odg.model.PolicyViolationRef(
+                name='test-policy',
+                id=None,
+                url=None,
+            ),
+            labels=list(labels),
+            host='host',
+            href=None,
+        ),
+    )
+
+
+def _ip_rescoring(
+    package: str = 'pkg',
+    labels: list[str] = ('label-a',),
+) -> odg.model.ArtefactMetadata:
+    return odg.model.ArtefactMetadata(
+        artefact=_artefact(),
+        meta=_meta(odg.model.Datatype.RESCORING),
+        data=odg.model.CustomRescoring(
+            finding=odg.model.RescoringIPFinding(
+                package_name=package,
+                license=None,
+                labels=list(labels),
+            ),
+            referenced_type=odg.model.Datatype.IP_FINDING,
+            severity='NONE',
+            user=_user(),
+        ),
+    )
+
+
 def _make_artefact_node(
     artefact_labels: list[ocm.Label] = (),
     component_labels: list[ocm.Label] = (),
@@ -268,3 +424,221 @@ def test_find_cve_categorisation_new_artefact_beats_legacy_component():
     node = _make_artefact_node(artefact_labels=[artefact_label], component_labels=[component_label])
     result = rescore.utility.find_cve_categorisation(node)
     assert result.authentication_enforced is False
+
+
+# ---------------------------------------------------------------------------
+# _finding_group_key / _rescoring_group_key — keys must match for same finding
+# ---------------------------------------------------------------------------
+
+
+def test_group_key_matches_vulnerability():
+    finding = _vuln_finding()
+    rescoring = _vuln_rescoring()
+    assert rescore.utility._finding_group_key(finding) == rescore.utility._rescoring_group_key(
+        rescoring,
+    )
+
+
+def test_group_key_differs_on_cve():
+    finding = _vuln_finding(cve='CVE-2024-1111')
+    rescoring = _vuln_rescoring(cve='CVE-2024-9999')
+    assert rescore.utility._finding_group_key(finding) != rescore.utility._rescoring_group_key(
+        rescoring,
+    )
+
+
+def test_group_key_differs_on_package_vulnerability():
+    finding = _vuln_finding(package='pkg-a')
+    rescoring = _vuln_rescoring(package='pkg-b')
+    assert rescore.utility._finding_group_key(finding) != rescore.utility._rescoring_group_key(
+        rescoring,
+    )
+
+
+def test_group_key_matches_license():
+    finding = _license_finding()
+    rescoring = _license_rescoring()
+    assert rescore.utility._finding_group_key(finding) == rescore.utility._rescoring_group_key(
+        rescoring,
+    )
+
+
+def test_group_key_differs_on_license_name():
+    finding = _license_finding(license_name='MIT')
+    rescoring = _license_rescoring(license_name='Apache-2.0')
+    assert rescore.utility._finding_group_key(finding) != rescore.utility._rescoring_group_key(
+        rescoring,
+    )
+
+
+def test_group_key_matches_ip():
+    finding = _ip_finding(labels=['b', 'a'])
+    rescoring = _ip_rescoring(labels=['a', 'b'])  # order must not matter
+    assert rescore.utility._finding_group_key(finding) == rescore.utility._rescoring_group_key(
+        rescoring,
+    )
+
+
+def test_group_key_differs_on_ip_labels():
+    finding = _ip_finding(labels=['label-x'])
+    rescoring = _ip_rescoring(labels=['label-y'])
+    assert rescore.utility._finding_group_key(finding) != rescore.utility._rescoring_group_key(
+        rescoring,
+    )
+
+
+# ---------------------------------------------------------------------------
+# group_rescorings
+# ---------------------------------------------------------------------------
+
+
+def test_group_rescorings_empty():
+    assert rescore.utility.group_rescorings([]) == {}
+
+
+def test_group_rescorings_single():
+    rescoring = _vuln_rescoring()
+    grouped = rescore.utility.group_rescorings([rescoring])
+    assert len(grouped) == 1
+    assert grouped[rescore.utility._rescoring_group_key(rescoring)] == [rescoring]
+
+
+def test_group_rescorings_two_same_key():
+    r1 = _vuln_rescoring()
+    r2 = _vuln_rescoring()
+    grouped = rescore.utility.group_rescorings([r1, r2])
+    assert len(grouped) == 1
+    assert set(grouped[rescore.utility._rescoring_group_key(r1)]) == {r1, r2}
+
+
+def test_group_rescorings_different_keys():
+    r_vuln = _vuln_rescoring()
+    r_license = _license_rescoring()
+    grouped = rescore.utility.group_rescorings([r_vuln, r_license])
+    assert len(grouped) == 2
+    assert grouped[rescore.utility._rescoring_group_key(r_vuln)] == [r_vuln]
+    assert grouped[rescore.utility._rescoring_group_key(r_license)] == [r_license]
+
+
+def test_group_rescorings_lookup_miss_returns_empty():
+    grouped = rescore.utility.group_rescorings([_license_rescoring()])
+    vuln_key = rescore.utility._rescoring_group_key(_vuln_rescoring())
+    assert grouped[vuln_key] == []
+
+
+# ---------------------------------------------------------------------------
+# Regression: rescorings_for_finding_by_specificity via group_rescorings
+# ---------------------------------------------------------------------------
+
+
+def test_rescorings_for_finding_matches_same_vuln():
+    finding = _vuln_finding(cve='CVE-2024-1234', package='libfoo')
+    rescoring = _vuln_rescoring(cve='CVE-2024-1234', package='libfoo')
+    result = rescore.utility.rescorings_for_finding_by_specificity(
+        finding=finding,
+        grouped_rescorings=rescore.utility.group_rescorings([rescoring]),
+    )
+    assert rescoring in result
+
+
+def test_rescorings_for_finding_no_match_different_cve():
+    finding = _vuln_finding(cve='CVE-2024-1111')
+    rescoring = _vuln_rescoring(cve='CVE-2024-9999')
+    result = rescore.utility.rescorings_for_finding_by_specificity(
+        finding=finding,
+        grouped_rescorings=rescore.utility.group_rescorings([rescoring]),
+    )
+    assert result == ()
+
+
+def test_rescorings_for_finding_no_match_different_package():
+    finding = _vuln_finding(cve='CVE-2024-1234', package='pkg-a')
+    rescoring = _vuln_rescoring(cve='CVE-2024-1234', package='pkg-b')
+    result = rescore.utility.rescorings_for_finding_by_specificity(
+        finding=finding,
+        grouped_rescorings=rescore.utility.group_rescorings([rescoring]),
+    )
+    assert result == ()
+
+
+def test_rescorings_for_finding_no_match_wrong_type():
+    # a license rescoring must not match a vulnerability finding
+    vuln_finding = _vuln_finding()
+    license_rescoring = _license_rescoring()
+    result = rescore.utility.rescorings_for_finding_by_specificity(
+        finding=vuln_finding,
+        grouped_rescorings=rescore.utility.group_rescorings([license_rescoring]),
+    )
+    assert result == ()
+
+
+def test_rescorings_for_finding_selects_correct_from_mixed_pool():
+    # pool contains one matching and one non-matching rescoring
+    finding = _vuln_finding(cve='CVE-2024-1234', package='pkg')
+    matching = _vuln_rescoring(cve='CVE-2024-1234', package='pkg')
+    decoy = _vuln_rescoring(cve='CVE-2024-9999', package='pkg')
+    result = rescore.utility.rescorings_for_finding_by_specificity(
+        finding=finding,
+        grouped_rescorings=rescore.utility.group_rescorings([matching, decoy]),
+    )
+    assert result == (matching,)
+
+
+def test_rescorings_for_finding_global_rescoring_matches_any_component():
+    # a rescoring with no component set is global and must match any finding
+    finding = _vuln_finding()
+    global_rescoring = odg.model.ArtefactMetadata(
+        artefact=odg.model.ComponentArtefactId(
+            component_name=None,
+            component_version=None,
+            artefact_kind=None,
+            artefact=None,
+        ),
+        meta=_meta(odg.model.Datatype.RESCORING),
+        data=odg.model.CustomRescoring(
+            finding=odg.model.RescoringVulnerabilityFinding(
+                package_name='pkg',
+                cve='CVE-2024-1234',
+            ),
+            referenced_type=odg.model.Datatype.VULNERABILITY_FINDING,
+            severity='NONE',
+            user=_user(),
+        ),
+    )
+    result = rescore.utility.rescorings_for_finding_by_specificity(
+        finding=finding,
+        grouped_rescorings=rescore.utility.group_rescorings([global_rescoring]),
+    )
+    assert global_rescoring in result
+
+
+def test_rescorings_for_finding_component_scoped_no_match_different_component():
+    finding = odg.model.ArtefactMetadata(
+        artefact=_artefact(component_name='comp-a'),
+        meta=_meta(odg.model.Datatype.VULNERABILITY_FINDING),
+        data=odg.model.VulnerabilityFinding(
+            severity='HIGH',
+            package_name='pkg',
+            package_version='1.0',
+            cve='CVE-2024-1234',
+            cvss_score=7.5,
+        ),
+    )
+    rescoring_other_comp = odg.model.ArtefactMetadata(
+        artefact=_artefact(component_name='comp-b'),
+        meta=_meta(odg.model.Datatype.RESCORING),
+        data=odg.model.CustomRescoring(
+            finding=odg.model.RescoringVulnerabilityFinding(
+                package_name='pkg',
+                cve='CVE-2024-1234',
+            ),
+            referenced_type=odg.model.Datatype.VULNERABILITY_FINDING,
+            severity='NONE',
+            user=_user(),
+        ),
+    )
+    result = rescore.utility.rescorings_for_finding_by_specificity(
+        finding=finding,
+        grouped_rescorings=rescore.utility.group_rescorings([rescoring_other_comp]),
+    )
+    assert result == ()

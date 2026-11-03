@@ -1,8 +1,6 @@
 import functools
 import logging
 
-import ci.log
-import cnudie.retrieve
 import oci.client
 import ocm
 
@@ -14,6 +12,7 @@ import k8s.logging
 import k8s.util
 import odg.extensions_cfg
 import odg.findings
+import odg.logging_cfg
 import odg.model
 import odg.util
 import odg_client
@@ -23,8 +22,8 @@ import secret_mgmt.bdba
 
 
 logger = logging.getLogger(__name__)
-ci.log.configure_default_logging()
 k8s.logging.configure_kubernetes_logging()
+odg.logging_cfg.configure_logging(service_name='bdba')
 
 
 def _mark_compliance_summary_cache_for_deletion(
@@ -55,7 +54,7 @@ def scan(
     extension_cfg: odg.extensions_cfg.BDBAConfig,
     vulnerability_cfg: odg.findings.Finding | None,
     license_cfg: odg.findings.Finding | None,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_service_client: odg_client.DeliveryServiceClient,
     oci_client: oci.client.Client,
     secret_factory: secret_mgmt.SecretFactory,

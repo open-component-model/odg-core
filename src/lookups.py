@@ -18,12 +18,11 @@ import github3.repos
 import requests
 import requests.adapters
 
-import cnudie.retrieve
-import cnudie.retrieve_async
-import cnudie.util
 import oci.client
 import oci.client_async
 import ocm
+import ocm.retrieve
+import ocm.retrieve_async
 import version as versionutil
 
 import ctx_util
@@ -350,7 +349,7 @@ def init_ocm_repository_lookup(
         component: ocm.ComponentName,
         /,
     ) -> collections.abc.Iterable[str]:
-        component_name = cnudie.util.to_component_name(component)
+        component_name = ocm.to_component_name(component)
         seen_repositories = set()
 
         for ocm_repository_cfg in resolved_ocm_repository_cfgs:
@@ -369,7 +368,7 @@ def init_ocm_repository_lookup(
 
 def extended_ocm_repository_lookup(
     ocm_repo: ocm.OciOcmRepository | str | None = None,
-    ocm_repository_lookup: cnudie.retrieve.OcmRepositoryLookup = None,
+    ocm_repository_lookup: ocm.OcmRepositoryLookup = None,
 ) -> ocm.OcmRepositoryLookup:
     """
     Creates an extended OCM repository lookup that also includes the specified `ocm_repo`. Useful
@@ -414,8 +413,8 @@ def semver_sanitising_oci_client(
         credentials_lookup=credentials_lookup,
         routes=routes,
         session=session,
-        tag_preprocessing_callback=cnudie.util.sanitise_version,
-        tag_postprocessing_callback=cnudie.util.desanitise_version,
+        tag_preprocessing_callback=versionutil.sanitise_version,
+        tag_postprocessing_callback=versionutil.desanitise_version,
     )
 
 
@@ -442,19 +441,19 @@ def semver_sanitising_oci_client_async(
         credentials_lookup=credentials_lookup,
         routes=routes,
         session=session,
-        tag_preprocessing_callback=cnudie.util.sanitise_version,
-        tag_postprocessing_callback=cnudie.util.desanitise_version,
+        tag_preprocessing_callback=versionutil.sanitise_version,
+        tag_postprocessing_callback=versionutil.desanitise_version,
     )
 
 
 def db_cache_component_descriptor_lookup_async(
     db_url_callback: collections.abc.Callable[[], str | None],
-    ocm_repository_lookup: cnudie.retrieve.OcmRepositoryLookup = None,
+    ocm_repository_lookup: ocm.OcmRepositoryLookup = None,
     encoding_format: dcm.EncodingFormat = dcm.EncodingFormat.PICKLE,
     ttl_seconds: int = 0,
     keep_at_least_seconds: int = 0,
     max_size_octets: int = 0,
-) -> cnudie.retrieve_async.ComponentDescriptorLookupById:
+) -> ocm.retrieve_async.ComponentDescriptorLookupById:
     """
     Used to lookup referenced component descriptors in the database cache. In case of a cache miss,
     the required component descriptor can be added to the cache by using the writeback function.
@@ -531,15 +530,15 @@ def db_cache_component_descriptor_lookup_async(
             await db_session.close()
 
     async def lookup(
-        component_id: cnudie.util.ComponentId,
-        ocm_repository_lookup: cnudie.retrieve.OcmRepositoryLookup = ocm_repository_lookup,
+        component_id: ocm.ComponentId,
+        ocm_repository_lookup: ocm.OcmRepositoryLookup = ocm_repository_lookup,
     ):
         if not (db_url := db_url_callback()):
             return None
 
-        component_id = cnudie.util.to_component_id(component_id)
+        component_id = ocm.to_component_id(component_id)
 
-        ocm_repos = cnudie.retrieve.iter_ocm_repositories(
+        ocm_repos = ocm.retrieve.iter_ocm_repositories(
             component_id,
             ocm_repository_lookup,
         )
@@ -579,18 +578,18 @@ def db_cache_component_descriptor_lookup_async(
 
         # component descriptor not found in lookup
         start = datetime.datetime.now(tz=datetime.timezone.utc)
-        return cnudie.retrieve_async.WriteBack(functools.partial(writeback, start=start))
+        return ocm.retrieve_async.WriteBack(functools.partial(writeback, start=start))
 
     return lookup
 
 
 def init_component_descriptor_lookup(
-    ocm_repository_lookup: cnudie.retrieve.OcmRepositoryLookup = None,
+    ocm_repository_lookup: ocm.OcmRepositoryLookup = None,
     cache_dir: str = None,
     delivery_service_client: odg_client.DeliveryServiceClient = None,
     oci_client: oci.client.Client = None,
     default_absent_ok: bool = False,
-) -> cnudie.retrieve.ComponentDescriptorLookupById:
+) -> ocm.ComponentDescriptorLookup:
     """
     convenience function to create a composite component descriptor lookup consisting of:
     - in-memory cache lookup
@@ -605,14 +604,14 @@ def init_component_descriptor_lookup(
         oci_client = semver_sanitising_oci_client()
 
     lookups = [
-        cnudie.retrieve.in_memory_cache_component_descriptor_lookup(
+        ocm.retrieve.in_memory_cache_component_descriptor_lookup(
             ocm_repository_lookup=ocm_repository_lookup,
         ),
     ]
 
     if cache_dir:
         lookups.append(
-            cnudie.retrieve.file_system_cache_component_descriptor_lookup(
+            ocm.retrieve.file_system_cache_component_descriptor_lookup(
                 ocm_repository_lookup=ocm_repository_lookup,
                 cache_dir=cache_dir,
             ),
@@ -620,20 +619,20 @@ def init_component_descriptor_lookup(
 
     if delivery_service_client:
         lookups.append(
-            cnudie.retrieve.delivery_service_component_descriptor_lookup(
+            ocm.retrieve.delivery_service_component_descriptor_lookup(
                 ocm_repository_lookup=ocm_repository_lookup,
                 delivery_client=delivery_service_client,
             ),
         )
 
     lookups.append(
-        cnudie.retrieve.oci_component_descriptor_lookup(
+        ocm.retrieve.oci_component_descriptor_lookup(
             ocm_repository_lookup=ocm_repository_lookup,
             oci_client=oci_client,
         ),
     )
 
-    return cnudie.retrieve.composite_component_descriptor_lookup(
+    return ocm.retrieve.composite_component_descriptor_lookup(
         lookups=lookups,
         ocm_repository_lookup=ocm_repository_lookup,
         default_absent_ok=default_absent_ok,
@@ -641,13 +640,13 @@ def init_component_descriptor_lookup(
 
 
 def init_component_descriptor_lookup_async(
-    ocm_repository_lookup: cnudie.retrieve.OcmRepositoryLookup = None,
+    ocm_repository_lookup: ocm.OcmRepositoryLookup = None,
     cache_dir: str = None,
     db_url_callback: collections.abc.Callable[[], str | None] = None,
     delivery_service_client: odg_client.DeliveryServiceClient = None,
     oci_client: oci.client_async.Client = None,
     default_absent_ok: bool = False,
-) -> cnudie.retrieve_async.ComponentDescriptorLookupById:
+) -> ocm.retrieve_async.ComponentDescriptorLookupById:
     """
     convenience function to create a composite component descriptor lookup consisting of:
     - in-memory cache lookup
@@ -663,14 +662,14 @@ def init_component_descriptor_lookup_async(
         oci_client = semver_sanitising_oci_client_async()
 
     lookups = [
-        cnudie.retrieve_async.in_memory_cache_component_descriptor_lookup(
+        ocm.retrieve_async.in_memory_cache_component_descriptor_lookup(
             ocm_repository_lookup=ocm_repository_lookup,
         ),
     ]
 
     if cache_dir:
         lookups.append(
-            cnudie.retrieve_async.file_system_cache_component_descriptor_lookup(
+            ocm.retrieve_async.file_system_cache_component_descriptor_lookup(
                 ocm_repository_lookup=ocm_repository_lookup,
                 cache_dir=cache_dir,
             ),
@@ -686,20 +685,20 @@ def init_component_descriptor_lookup_async(
 
     if delivery_service_client:
         lookups.append(
-            cnudie.retrieve_async.delivery_service_component_descriptor_lookup(
+            ocm.retrieve_async.delivery_service_component_descriptor_lookup(
                 ocm_repository_lookup=ocm_repository_lookup,
                 delivery_client=delivery_service_client,
             ),
         )
 
     lookups.append(
-        cnudie.retrieve_async.oci_component_descriptor_lookup(
+        ocm.retrieve_async.oci_component_descriptor_lookup(
             ocm_repository_lookup=ocm_repository_lookup,
             oci_client=oci_client,
         ),
     )
 
-    return cnudie.retrieve_async.composite_component_descriptor_lookup(
+    return ocm.retrieve_async.composite_component_descriptor_lookup(
         lookups=lookups,
         ocm_repository_lookup=ocm_repository_lookup,
         default_absent_ok=default_absent_ok,

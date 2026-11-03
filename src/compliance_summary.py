@@ -8,8 +8,8 @@ import logging
 
 import sqlalchemy.ext.asyncio as sqlasync
 
-import cnudie.retrieve_async
 import ocm
+import ocm.retrieve_async
 
 import deliverydb.cache_async
 import deliverydb.util
@@ -41,11 +41,11 @@ def categorisation_to_summary_categorisation(
 
 def rescored_severity_if_any(
     finding: odg.model.ArtefactMetadata,
-    rescorings: collections.abc.Iterable[odg.model.ArtefactMetadata],
+    grouped_rescorings: dict[tuple, list[odg.model.ArtefactMetadata]],
 ) -> str | None:
     rescorings_for_finding = rescore.utility.rescorings_for_finding_by_specificity(
         finding=finding,
-        rescorings=rescorings,
+        grouped_rescorings=grouped_rescorings,
     )
 
     if not rescorings_for_finding:
@@ -98,19 +98,19 @@ class ComponentComplianceSummary:
 
 async def severity_for_finding(
     finding: odg.model.ArtefactMetadata,
-    rescorings: collections.abc.Iterable[odg.model.ArtefactMetadata] = tuple(),
+    grouped_rescorings: dict[tuple, list[odg.model.ArtefactMetadata]],
 ) -> ComplianceEntryCategorisation | str | None:
     """
     Severity for known `ArtefactMetadata`.
     """
-    if rescorings:
+    if grouped_rescorings:
         loop = asyncio.get_running_loop()
         rescored_severity = await loop.run_in_executor(
             None,
             functools.partial(
                 rescored_severity_if_any,
                 finding=finding,
-                rescorings=rescorings,
+                grouped_rescorings=grouped_rescorings,
             ),
         )
         if rescored_severity:
@@ -130,10 +130,12 @@ async def calculate_summary_entry(
     """
     most_severe_categorisation = None
 
+    grouped_rescorings = rescore.utility.group_rescorings(rescorings)
+
     for finding in findings:
         severity_name = await severity_for_finding(
             finding=finding,
-            rescorings=rescorings,
+            grouped_rescorings=grouped_rescorings,
         )
 
         categorisation = finding_cfg.categorisation_by_id(severity_name)
@@ -262,7 +264,7 @@ async def component_datatype_summaries(
     finding_type: odg.model.Datatype,
     datasource: odg.model.Datasource,
     db_session: sqlasync.session.AsyncSession,
-    component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,
     ocm_repo: ocm.OciOcmRepository | None = None,
     shortcut_cache: bool = False,
 ) -> list[tuple[odg.model.ComponentArtefactId, ComplianceSummaryEntry]]:
@@ -359,7 +361,7 @@ async def component_compliance_summary(
     component: ocm.ComponentIdentity,
     finding_cfgs: collections.abc.Sequence[odg.findings.Finding],
     db_session: sqlasync.session.AsyncSession,
-    component_descriptor_lookup: cnudie.retrieve_async.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,
     ocm_repo: ocm.OciOcmRepository | None = None,
     shortcut_cache: bool = False,
 ) -> ComponentComplianceSummary:

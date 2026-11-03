@@ -9,8 +9,8 @@ import sys
 import time
 import uuid
 
-import cnudie.retrieve
 import oci.client
+import ocm
 
 import consts
 import ctx_util
@@ -37,15 +37,10 @@ wants_to_terminate = False
 
 
 class Arguments:
-    K8S_CFG_NAME = {
-        'name': '--k8s-cfg-name',
-        'help': 'specify kubernetes cluster to interact with extensions (and logs)',
-        'default': os.environ.get('K8S_CFG_NAME'),
-    }
     KUBECONFIG = {
         'name': '--kubeconfig',
-        'help': 'specify kubernetes cluster to interact with extensions (and logs); if both '
-        '`k8s-cfg-name` and `kubeconfig` are set, `k8s-cfg-name` takes precedence',
+        'help': 'specify kubernetes cluster to interact with extensions (and logs); defaults '
+        'to in-cluster service account token if not set',
     }
     K8S_NAMESPACE = {
         'name': '--k8s-namespace',
@@ -72,7 +67,6 @@ class Arguments:
 
 
 scan_extension_arguments = [
-    Arguments.K8S_CFG_NAME,
     Arguments.KUBECONFIG,
     Arguments.K8S_NAMESPACE,
     Arguments.EXTENSIONS_CFG_PATH,
@@ -96,20 +90,6 @@ def parse_args(
     return parser.parse_args()
 
 
-def kubernetes_api(
-    parsed_arguments: argparse.Namespace,
-    secret_factory: secret_mgmt.SecretFactory | None = None,
-) -> k8s.util.KubernetesApi:
-    if not parsed_arguments.k8s_cfg_name:
-        return k8s.util.kubernetes_api(kubeconfig_path=parsed_arguments.kubeconfig)
-
-    if not secret_factory:
-        secret_factory = ctx_util.secret_factory()
-
-    kubernetes_cfg = secret_factory.kubernetes(parsed_arguments.k8s_cfg_name)
-    return k8s.util.kubernetes_api(kubernetes_cfg=kubernetes_cfg)
-
-
 def handle_termination_signal(*args):
     global wants_to_terminate
 
@@ -130,7 +110,7 @@ def process_backlog_items(
         [
             odg.model.ComponentArtefactId,
             object,  # extension_cfg
-            cnudie.retrieve.ComponentDescriptorLookupById,
+            ocm.ComponentDescriptorLookup,
             odg_client.DeliveryServiceClient | None,
             oci.client.Client,
             secret_mgmt.SecretFactory,
@@ -146,7 +126,7 @@ def process_backlog_items(
 
         - `artefact`: odg.model.ComponentArtefactId
         - `extension_cfg`: object
-        - `component_descriptor_lookup`: cnudie.retrieve.ComponentDescriptorLookup
+        - `component_descriptor_lookup`: ocm.retrieve.ComponentDescriptorLookup
         - `delivery_service_client`: odg_client.DeliveryServiceClient
         - `oci_client`: oci.client.Client
         - `secret_factory`: secret_mgmt.SecretFactory
@@ -170,7 +150,7 @@ def process_backlog_items(
     namespace = parsed_arguments.k8s_namespace
 
     if not local_debug_artefact:
-        _kubernetes_api = kubernetes_api(parsed_arguments, secret_factory=secret_factory)
+        _kubernetes_api = k8s.util.kubernetes_api(kubeconfig_path=parsed_arguments.kubeconfig)
 
         k8s.logging.init_logging_thread(
             service=service,

@@ -6,10 +6,7 @@ import logging
 import os
 
 import aiohttp.web
-import aiohttp.web_log
 import aiohttp_swagger3
-
-import ci.log
 
 import artefacts
 import blobstore.blob
@@ -29,6 +26,7 @@ import middleware.db_session
 import middleware.errors
 import middleware.prometheus
 import middleware.route_feature_check as rfc
+import odg.logging_cfg
 import osinfo
 import paths
 import rescore.artefacts
@@ -36,7 +34,6 @@ import service_extensions
 import special_component
 import sprints
 
-ci.log.configure_default_logging(print_thread_id=True)
 logger = logging.getLogger(__name__)
 
 own_dir = os.path.abspath(os.path.dirname(__file__))
@@ -49,17 +46,22 @@ def parse_args():
     parser.add_argument('--port', default=5000, type=int)
     parser.add_argument('--max-workers', default=4, type=int)
     parser.add_argument('--shortcut-auth', action='store_true', default=False)
+    parser.add_argument(
+        '--json-logs',
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            'emit structured JSON logs (default, for log pipelines); '
+            'use --no-json-logs for human-readable console output (local dev)'
+        ),
+    )
     parser.add_argument('--delivery-db-url', default=None)
     parser.add_argument('--cache-dir', default=default_cache_dir)
     parser.add_argument(
-        '--k8s-cfg-name',
-        help='specify kubernetes cluster to interact with extensions (and logs)',
-    )
-    parser.add_argument(
         '--kubeconfig',
         help="""
-            specify kubernetes cluster to interact with extensions (and logs); if both
-            `k8s-cfg-name` and `kubeconfig` are set, `k8s-cfg-name` takes precedence
+            specify kubernetes cluster to interact with extensions (and logs); defaults
+            to in-cluster service account token if not set
         """,
     )
     parser.add_argument(
@@ -337,6 +339,12 @@ def add_routes(
 async def initialise_app():
     parsed_arguments = parse_args()
 
+    # configure here, not in `run_app`: `adev runserver` (make run) only calls this factory
+    odg.logging_cfg.configure_logging(
+        json_logs=parsed_arguments.json_logs,
+        service_name='delivery-service',
+    )
+
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=parsed_arguments.max_workers)
     loop = asyncio.get_running_loop()
     loop.set_default_executor(executor)
@@ -424,26 +432,17 @@ async def run_app():
 
     else:
         host = '127.0.0.1'
-        print('running in development mode')
-        print()
-        print(f'listening at {host}:{port}')
-        print()
+        logger.info(f'running in development mode, listening at http://{host}:{port}')
 
-    def _format_r(request: aiohttp.web.BaseRequest, *args, **kwargs) -> str:
-        if request is None:
-            return '-'
-
-        if request.path.startswith('/auth'):
-            # use `path` instead of `path_qs` to _not_ log query parameters
-            path = request.path
-        else:
-            path = request.path_qs
-
-        return f'{request.method} {path} HTTP/{request.version.major}.{request.version.minor}'
-
-    aiohttp.web_log.AccessLogger._format_r = _format_r
-
-    runner = aiohttp.web.AppRunner(app)
+    runner = aiohttp.web.AppRunner(
+        app=app,
+        access_log_class=odg.logging_cfg.aiohttp_access_logger_class(
+            # do not log query parameters of auth endpoints (may contain secrets)
+            masked_query_path_prefixes=('/auth',),
+            # suppress successful probe + scrape requests to keep log volume low
+            quiet_path_prefixes=('/healthz', '/metrics', '/ready'),
+        ),
+    )
     await runner.setup()
     await aiohttp.web.TCPSite(
         runner=runner,

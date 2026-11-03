@@ -2,14 +2,14 @@ import collections.abc
 import datetime
 import logging
 
-import ci.log
-import cnudie.retrieve
 import ocm
 import ocm.iter
+import ocm.retrieve
 
 import k8s.logging
 import lookups
 import odg.extensions_cfg
+import odg.logging_cfg
 import odg.model
 import odg.util
 import odg_client
@@ -18,17 +18,19 @@ import rescore.utility
 import util
 
 logger = logging.getLogger(__name__)
+k8s.logging.configure_kubernetes_logging()
+odg.logging_cfg.configure_logging(service_name='sla-violation-profiler')
 
 
 def filter_rescorings_before_release_date(
     finding: odg.model.ArtefactMetadata,
-    rescorings: list[odg.model.ArtefactMetadata],
+    grouped_rescorings: dict[tuple, list[odg.model.ArtefactMetadata]],
     release_date: datetime.datetime,
 ) -> list[odg.model.ArtefactMetadata]:
     filtered_rescorings = []
     for rescoring in rescore.utility.rescorings_for_finding_by_specificity(
         finding=finding,
-        rescorings=rescorings,
+        grouped_rescorings=grouped_rescorings,
     ):
         rescoring_creation_date = util.normalise_date(rescoring.meta.creation_date)
         if rescoring_creation_date < release_date:
@@ -179,6 +181,9 @@ def iter_version_sla_violations(
 ) -> collections.abc.Generator[odg.model.SlaViolation, None, None]:
     release_date = util.normalise_date(release_date)
     findings = _deduplicate_findings(findings)
+
+    grouped_rescorings = rescore.utility.group_rescorings(rescorings)
+
     for finding in findings:
         if util.normalise_date(finding.meta.creation_date) > release_date:
             continue
@@ -191,7 +196,7 @@ def iter_version_sla_violations(
 
         sorted_rescorings = filter_rescorings_before_release_date(
             finding=finding,
-            rescorings=rescorings,
+            grouped_rescorings=grouped_rescorings,
             release_date=release_date,
         )
         violations = iter_policy_violations(
@@ -221,7 +226,7 @@ def iter_versions_for_component(
 
 def create_sla_violation(
     root_descriptor: ocm.ComponentDescriptor,
-    ocm_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    ocm_lookup: ocm.ComponentDescriptorLookup,
     delivery_service_client: odg_client.DeliveryServiceClient,
 ) -> odg.model.ArtefactMetadata:
     all_component_identities = []
@@ -278,8 +283,6 @@ def create_sla_violation(
 
 
 def main():
-    ci.log.configure_default_logging()
-    k8s.logging.configure_kubernetes_logging()
     parsed_arguments = odg.util.parse_args(
         arguments=(
             odg.util.Arguments.EXTENSIONS_CFG_PATH,
@@ -308,12 +311,12 @@ def main():
 
     ocm_repository_lookup = lookups.init_ocm_repository_lookup()
 
-    ocm_lookup = cnudie.retrieve.composite_component_descriptor_lookup(
+    ocm_lookup = ocm.retrieve.composite_component_descriptor_lookup(
         lookups=[
-            cnudie.retrieve.in_memory_cache_component_descriptor_lookup(
+            ocm.retrieve.in_memory_cache_component_descriptor_lookup(
                 ocm_repository_lookup=ocm_repository_lookup,
             ),
-            cnudie.retrieve.delivery_service_component_descriptor_lookup(
+            ocm.retrieve.delivery_service_component_descriptor_lookup(
                 ocm_repository_lookup=ocm_repository_lookup,
                 delivery_client=delivery_service_client,
             ),

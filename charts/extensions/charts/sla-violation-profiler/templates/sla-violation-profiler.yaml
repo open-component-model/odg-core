@@ -1,5 +1,7 @@
 {{- $podName := "sla-violation-profiler" }}
 
+{{- include "odg.rbac" . }}
+---
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -23,6 +25,7 @@ spec:
           imagePullSecrets:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          serviceAccountName: {{ .Chart.Name }}
           containers:
           - name: {{ $podName }}
             image: {{ include "image" .Values.global.image }}
@@ -47,8 +50,6 @@ spec:
               mountPath: /secrets/github
             - name: github-app
               mountPath: /secrets/github-app
-            - name: kubernetes
-              mountPath: /secrets/kubernetes
             - name: oci-registry
               mountPath: /secrets/oci-registry
             - name: extensions-cfg
@@ -69,10 +70,6 @@ spec:
               secret:
                 secretName: secret-factory-github-app
                 optional: true
-            - name: kubernetes
-              secret:
-                secretName: secret-factory-kubernetes
-                optional: true 
             - name: oci-registry
               secret:
                 secretName: secret-factory-oci-registry

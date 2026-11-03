@@ -7,21 +7,22 @@ import os
 import subprocess
 import tarfile
 
-import ci.log
 import cnudie.purge
-import cnudie.retrieve
-import cnudie.util
 import oci.auth
 import oci.client
 import ocm
+import ocm.access
 import ocm.iter
+import ocm.retrieve
 import ocm.upload
 import version
 
 import ctx_util
 import k8s.logging
+import k8s.util
 import lookups
 import odg.extensions_cfg
+import odg.logging_cfg
 import odg.util
 import odg_client
 import paths
@@ -30,8 +31,8 @@ import secret_mgmt.oci_registry
 
 
 logger = logging.getLogger(__name__)
-ci.log.configure_default_logging()
 k8s.logging.configure_kubernetes_logging()
+odg.logging_cfg.configure_logging(service_name='delivery-db-backup')
 
 
 BACKUP_BLOB_MEDIA_TYPE = 'application/data+tar'
@@ -158,7 +159,7 @@ def iter_components_to_purge(
     oci_client: oci.client.Client,
     lookup,
 ) -> collections.abc.Generator[ocm.Component, None, None]:
-    oci_ref = cnudie.util.oci_ref(component=component)
+    oci_ref = ocm.access.oci_ref(component=component)
     all_versions = oci_client.tags(oci_ref.ref_without_tag)
 
     sorted_versions = sorted(
@@ -221,12 +222,12 @@ def delete_old_backup_versions(
 
     oci_client = oci.client.Client(
         credentials_lookup=oci_cfg_lookup,
-        tag_preprocessing_callback=cnudie.util.sanitise_version,
-        tag_postprocessing_callback=cnudie.util.desanitise_version,
+        tag_preprocessing_callback=version.sanitise_version,
+        tag_postprocessing_callback=version.desanitise_version,
     )
 
-    lookup = cnudie.retrieve.oci_component_descriptor_lookup(
-        ocm_repository_lookup=cnudie.retrieve.ocm_repository_lookup(ocm_repo),
+    lookup = ocm.retrieve.oci_component_descriptor_lookup(
+        ocm_repository_lookup=ocm.retrieve.ocm_repository_lookup(ocm_repo),
         oci_client=oci_client,
     )
 
@@ -260,7 +261,6 @@ def delete_old_backup_versions(
 def main():
     parsed_arguments = odg.util.parse_args(
         arguments=(
-            odg.util.Arguments.K8S_CFG_NAME,
             odg.util.Arguments.KUBECONFIG,
             odg.util.Arguments.K8S_NAMESPACE,
             odg.util.Arguments.EXTENSIONS_CFG_PATH,
@@ -269,7 +269,7 @@ def main():
     namespace = parsed_arguments.k8s_namespace
 
     secret_factory = ctx_util.secret_factory()
-    kubernetes_api = odg.util.kubernetes_api(parsed_arguments, secret_factory=secret_factory)
+    kubernetes_api = k8s.util.kubernetes_api(kubeconfig_path=parsed_arguments.kubeconfig)
 
     k8s.logging.init_logging_thread(
         service=odg.extensions_cfg.Services.DELIVERY_DB_BACKUP,
@@ -341,7 +341,7 @@ def main():
             additional_args=additional_args,
         )
 
-    target_ref = cnudie.util.oci_artefact_reference(
+    target_ref = ocm.access.oci_artefact_reference(
         component=f'{component_name}:{component_version}',
         ocm_repository=ocm_repo,
     )
@@ -379,7 +379,7 @@ def main():
 
     delete_old_backup_versions(
         backup_retention_count=backup_retention_count,
-        oci_ref=cnudie.util.oci_ref(component),
+        oci_ref=ocm.access.oci_ref(component),
         secret_factory=secret_factory,
         ocm_repo=ocm_repo,
         component=component,

@@ -1,10 +1,13 @@
+import logging
 import time
 
 import jwt as jwt_mod  # avoid overwriting delivery.jwt
 
 import delivery.client
 
-print('WARNING: Deprecation note. Package `delivery` is deprecated. Switch to `odg_client` instead.')
+
+logger = logging.getLogger(__name__)
+logger.warning('Package `delivery` is deprecated. Switch to `odg_client` instead.')
 
 
 def _create_github_jwt(

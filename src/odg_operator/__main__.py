@@ -21,7 +21,6 @@ import kubernetes.watch
 import urllib3
 import yaml
 
-import ci.log
 import oci.client
 import ocm
 import ocm.iter
@@ -30,16 +29,17 @@ import k8s.model
 import k8s.util
 import lookups
 import ocm_util
+import odg.extensions_cfg
+import odg.logging_cfg
+import odg.util
 import odg_operator.odg_model as odgm
 import odg_operator.odg_util as odgu
-import odg.extensions_cfg
-import odg.util
 import paths
 import util
 import version as versionutil
 
 
-ci.log.configure_default_logging()
+odg.logging_cfg.configure_logging(service_name='odg-operator')
 logger = logging.getLogger(__name__)
 
 ODG_CLEAN_UP_FINALISER = 'open-delivery-gear.ocm.software/odg-clean-up'
@@ -122,6 +122,51 @@ def outputs_as_jsonpath(
     return dict(output_lookup)
 
 
+# kinds that must not receive a `metadata.namespace`
+CLUSTER_SCOPED_KINDS = frozenset(
+    (
+        'APIService',
+        'CSIDriver',
+        'CertificateSigningRequest',
+        'ClusterIssuer',
+        'ClusterRole',
+        'ClusterRoleBinding',
+        'CustomResourceDefinition',
+        'GatewayClass',
+        'IngressClass',
+        'MutatingWebhookConfiguration',
+        'Namespace',
+        'Node',
+        'PersistentVolume',
+        'PriorityClass',
+        'RuntimeClass',
+        'StorageClass',
+        'ValidatingAdmissionPolicy',
+        'ValidatingAdmissionPolicyBinding',
+        'ValidatingWebhookConfiguration',
+        'VolumeAttachment',
+        'ClusterSecretStore',
+    ),
+)
+
+
+def _default_namespace(
+    manifest: dict,
+    namespace: str,
+) -> dict:
+    """
+    `helm template` does not inject `--namespace` into namespaced manifests which do not set
+    `.metadata.namespace` (e.g. in subcharts). `helm install` applies such objects into the
+    release namespace, but gardener-resource-manager falls back to `default` which results in an
+    apply error.
+    """
+    if manifest.get('kind') in CLUSTER_SCOPED_KINDS:
+        return manifest
+
+    manifest.setdefault('metadata', {}).setdefault('namespace', namespace)
+    return manifest
+
+
 def _helm_template(
     helm_path: str,
     values: dict,
@@ -154,6 +199,9 @@ def _helm_template(
         if manifest is None:
             # gardener-resource-manager cannot process empty manifests
             continue
+
+        if namespace:
+            manifest = _default_namespace(manifest, namespace)
 
         yield manifest
 
@@ -601,7 +649,8 @@ def reconcile(
                     'namespace': odg_raw['metadata']['namespace'],
                     'uid': odg_raw['metadata']['uid'],
                     'generation': odg_raw['metadata']['generation'],
-                    'context': odg_raw['spec']['context'],
+                    'context': odg_raw['spec']['context']
+                    | odg_raw['spec']['context'].get('schedule_overwrites', {}),
                     'extensions': odg_raw['spec']['extensions'],
                     'annotations': odg_raw['metadata'].get('annotations', {}),
                     'status': odg_raw.get('status', {}),
@@ -877,9 +926,9 @@ if __name__ == '__main__':
     parsed = parser.parse_args()
 
     if parsed.debug:
-        ci.log.configure_default_logging(
-            stdout_level=logging.DEBUG,
-            force=True,
+        odg.logging_cfg.configure_logging(
+            log_level=logging.DEBUG,
+            service_name='odg-operator',
         )
 
     if not (extensions_cfg_path := parsed.extensions_cfg_path):

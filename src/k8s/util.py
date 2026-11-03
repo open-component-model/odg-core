@@ -12,14 +12,12 @@ import kubernetes.config
 import kubernetes.dynamic
 import yaml
 
-import cnudie.retrieve
 import ocm
 import ocm.iter
 
 import k8s.model
 import odg.extensions_cfg
 import odg.model
-import secret_mgmt.kubernetes
 
 
 logger = logging.getLogger(__name__)
@@ -36,15 +34,10 @@ class KubernetesApi:
 
 
 def kubernetes_api(
-    kubernetes_cfg: secret_mgmt.kubernetes.Kubernetes | dict | None = None,
     kubeconfig_path: str | None = None,
     kubernetes_client_cfg: kubernetes.client.Configuration | None = None,
 ) -> KubernetesApi:
-    if kubernetes_cfg:
-        if isinstance(kubernetes_cfg, secret_mgmt.kubernetes.Kubernetes):
-            kubernetes_cfg = kubernetes_cfg.kubeconfig
-        api_client = kubernetes.config.new_client_from_config_dict(kubernetes_cfg)
-    elif kubeconfig_path:
+    if kubeconfig_path:
         kubeconfig = yaml.safe_load(open(kubeconfig_path))
         api_client = kubernetes.config.new_client_from_config_dict(kubeconfig)
     elif kubernetes_client_cfg:
@@ -202,7 +195,7 @@ def scale_replicas(
 
 
 def get_ocm_node(
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     artefact: odg.model.ComponentArtefactId,
     absent_ok: bool = False,
 ) -> ocm.iter.ResourceNode | ocm.iter.SourceNode | None:

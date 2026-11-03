@@ -22,6 +22,15 @@ import odg_client.util
 
 logger = logging.getLogger(__name__)
 
+# Exceptions from external dependencies (network failures, upstream HTTP errors).
+# Catch these at call sites to skip the current operation and continue,
+# rather than exiting the process over issues outside our control.
+EXTERNAL_DEPENDENCY_EXCEPTIONS: tuple[type[Exception], ...] = (
+    requests.exceptions.ConnectionError,
+    requests.exceptions.HTTPError,
+    requests.exceptions.Timeout,
+)
+
 
 class DeliveryServiceRoutes:
     def __init__(self, base_url: str):
@@ -166,7 +175,7 @@ class DeliveryServiceClient:
     def _setup_session(self, max_retries: int | None):
         self._bearer_token = None
         self._session = requests.sessions.Session()
-        self._max_retries = max_retries
+        self._max_retries = max_retries or 0
         self._session.mount('https://', requests.adapters.HTTPAdapter(max_retries=max_retries))
 
     @classmethod
@@ -247,21 +256,19 @@ class DeliveryServiceClient:
         self,
         url: str,
         method: str = 'GET',
-        headers: dict = None,
+        headers: dict | None = None,
         remaining_retries: int | None = None,
         **kwargs,
     ):
         if remaining_retries is None:
-            remaining_retries = self._max_retries or 0
+            remaining_retries = self._max_retries
 
         try:
             self._authenticate()
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
             if remaining_retries == 0:
                 raise
-
-            logger.warning(f'caught ConnectionError, going to retry... ({remaining_retries=}); {e}')
-
+            logger.warning(f'auth {type(e).__name__}, retrying... ({remaining_retries=}); {e}')
             return self.request(
                 url=url,
                 method=method,
@@ -276,11 +283,11 @@ class DeliveryServiceClient:
                 raise
             logger.info('delivery-service authentication feature is inactive')
 
-        headers = headers or {}
+        merged_headers = headers or {}
 
         if self._bearer_token:
-            headers = {
-                **headers,
+            merged_headers = {
+                **merged_headers,
                 'Authorization': f'Bearer {self._bearer_token}',
             }
 
@@ -289,20 +296,9 @@ class DeliveryServiceClient:
         except KeyError:
             timeout = (4, 31)
 
-        try:
-            res = self._session.request(
-                method=method,
-                url=url,
-                headers=headers,
-                timeout=timeout,
-                **kwargs,
-            )
-        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
-            if remaining_retries == 0:
-                raise
-
-            logger.warning(f'caught ConnectionError, going to retry... ({remaining_retries=}); {e}')
-
+        def _retry(log_msg: str):
+            logger.warning(log_msg + f' ({remaining_retries=}), retrying...')
+            time.sleep(min(2 ** (self._max_retries - remaining_retries), 30))
             return self.request(
                 url=url,
                 method=method,
@@ -311,6 +307,24 @@ class DeliveryServiceClient:
                 timeout=timeout,
                 **kwargs,
             )
+
+        try:
+            res = self._session.request(
+                method=method,
+                url=url,
+                headers=merged_headers,
+                timeout=timeout,
+                **kwargs,
+            )
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            if remaining_retries == 0:
+                raise
+            return _retry(f'caught {type(e).__name__}: {e}')
+
+        if res.status_code >= 500:
+            if remaining_retries > 0:
+                return _retry(f'delivery-service returned {res.status_code=}: {res.text}')
+            res.raise_for_status()
 
         return res
 

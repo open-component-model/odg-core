@@ -6,30 +6,28 @@ import logging
 
 import awesomeversion.exceptions
 
-import ci.log
-import oci.client
-import ocm
-
-import cnudie.retrieve
 import eol
 import k8s.logging
 import k8s.util
+import oci.client
+import ocm
 import ocm_util
 import odg.extensions_cfg
 import odg.findings
+import odg.logging_cfg
 import odg.model
 import odg.util
 import odg_client
-import osinfo
 import osid_extension.scan as osidscan
 import osid_extension.util as osidutil
+import osinfo
 import paths
 import secret_mgmt
 
 
 logger = logging.getLogger(__name__)
-ci.log.configure_default_logging()
 k8s.logging.configure_kubernetes_logging()
+odg.logging_cfg.configure_logging(service_name='osid')
 
 
 def determine_os_status(
@@ -198,7 +196,7 @@ def process_artefact(
     artefact: odg.model.ComponentArtefactId,
     extension_cfg: odg.extensions_cfg.OsId,
     osid_finding_config: odg.findings.Finding,
-    component_descriptor_lookup: cnudie.retrieve.ComponentDescriptorLookupById,
+    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
     delivery_service_client: odg_client.DeliveryServiceClient,
     oci_client: oci.client.Client,
     eol_client: eol.EolClient,

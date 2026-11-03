@@ -19,22 +19,23 @@ import sqlalchemy as sa
 import sqlalchemy.ext.asyncio as sqlasync
 import sqlalchemy.orm
 
-import ci.log
-
 import ctx_util
 import deliverydb
 import deliverydb.model as dm
 import k8s.logging
+import k8s.util
 import lookups
 import odg.extensions_cfg
+import odg.logging_cfg
 import odg.util
 import secret_mgmt.oauth_cfg
 import util
 
 
 logger = logging.getLogger(__name__)
-ci.log.configure_default_logging()
+# CRD FileHandlers (legacy odg-ui format) must be attached before structlog takes over stdout
 k8s.logging.configure_kubernetes_logging()
+odg.logging_cfg.configure_logging(service_name='access-manager')
 
 
 github_host = str
@@ -362,7 +363,6 @@ async def update_user_role_bindings(
 async def main():
     parsed_arguments = odg.util.parse_args(
         arguments=(
-            odg.util.Arguments.K8S_CFG_NAME,
             odg.util.Arguments.KUBECONFIG,
             odg.util.Arguments.K8S_NAMESPACE,
         ),
@@ -370,7 +370,7 @@ async def main():
     namespace = parsed_arguments.k8s_namespace
 
     secret_factory = ctx_util.secret_factory()
-    kubernetes_api = odg.util.kubernetes_api(parsed_arguments, secret_factory=secret_factory)
+    kubernetes_api = k8s.util.kubernetes_api(kubeconfig_path=parsed_arguments.kubeconfig)
 
     k8s.logging.init_logging_thread(
         service=odg.extensions_cfg.Services.ACCESS_MANAGER,
