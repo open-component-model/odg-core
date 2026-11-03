@@ -17,7 +17,10 @@ logger = logging.getLogger('odg.migrations')
 # (ascii 'odgmig'). Must only not collide with other pg_advisory_lock users on this db.
 ADVISORY_LOCK_KEY = 0x6F64676D6967
 
-if config.config_file_name is not None:
+# only apply the ini's console handler when nothing configured logging yet (standalone
+# `alembic` CLI). In the bootstrap init-container configure_logging already installed the
+# structlog pipeline; fileConfig would shadow it with a plain root StreamHandler
+if config.config_file_name is not None and not logging.root.handlers:
     fileConfig(config.config_file_name)
 
 
@@ -91,7 +94,8 @@ def run_migrations_online() -> None:
         # begin_transaction() calls connection.get_transaction() via _safe_begin_.*;
         # an already-open transaction would silently swallow commits in some driver
         # combinations (observed: psycopg3 + SQLAlchemy 2 + alembic 1.20).
-        logger.info('acquiring advisory lock key=%s', ADVISORY_LOCK_KEY)
+        # not `key=%s`: the log scrubbing would redact `key=<value>` as a credential
+        logger.info('acquiring advisory lock %s', ADVISORY_LOCK_KEY)
         connection.execute(
             sqlalchemy.text('select pg_advisory_lock(:key)'),
             {'key': ADVISORY_LOCK_KEY},
@@ -121,7 +125,7 @@ def run_migrations_online() -> None:
             # in an open transaction when the connection closes (NullPool -> fresh
             # connection per use, so the close would roll it back otherwise)
             connection.commit()
-            logger.info('released advisory lock key=%s', ADVISORY_LOCK_KEY)
+            logger.info('released advisory lock %s', ADVISORY_LOCK_KEY)
 
 
 if context.is_offline_mode():

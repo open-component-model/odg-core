@@ -19,9 +19,10 @@ import alembic.migration
 
 import migrations
 import deliverydb.model
+import odg.logging_cfg
 
 
-logging.basicConfig(level=logging.INFO, format='%(levelname)-5.5s %(name)s %(message)s')
+odg.logging_cfg.configure_logging(service_name='delivery-db-migration')
 logger = logging.getLogger('odg.migrations')
 
 
