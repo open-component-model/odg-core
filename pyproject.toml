@@ -25,7 +25,6 @@ dependencies = [
     "gardener-cicd-libs==1.2866.0",
     "github3.py==4.0.1",
     "greenlet==3.5.6",
-    "htmllistparse==0.6.1",
     "jsonpath-ng==1.14.0",
     "jsonschema==4.26.0",
     "kubernetes==36.0.3",
@@ -56,7 +55,6 @@ odg-client = { workspace = true }
 [dependency-groups]
 dev = [
     "aiohttp-devtools==1.1.2",
-    "aiosqlite==0.22.1",
     "greenlet==3.5.6",
     "pytest==9.1.1",
     "pytest-asyncio==1.4.1",
