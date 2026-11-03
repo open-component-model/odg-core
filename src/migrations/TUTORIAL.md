@@ -48,11 +48,11 @@ docker ps --filter name=alembic-tutorial-db
 
 ## Step 2: Apply the base migration
 
-Apply only the base migration `cc90ad81441c`. Do not use `head` here — at
-the end of this tutorial, `head` will be your new migration, and you want
-to apply that one later, step by step.
+Apply the base migration `cc90ad81441c`, which sets up the initial schema.
+Later examples introduce further migrations on top.
 
 ```bash
+# from the repository root
 cd src
 
 uv run --project .. alembic -c migrations/alembic.ini \
@@ -155,9 +155,10 @@ change plan.
 
 ## Step 5: Generate the new migration
 
-Run autogenerate:
+Run autogenerate (from the repository root):
 
 ```bash
+# from the repository root
 cd src
 
 uv run --project .. alembic -c migrations/alembic.ini \
@@ -219,11 +220,7 @@ def data_upgrade() -> None:
         'cache',
         sa.column('encoding', sa.String),
     )
-    op.execute(
-        cache_table.update()
-        .where(cache_table.c.encoding.is_(None))
-        .values(encoding='raw')
-    )
+    op.execute(cache_table.update().where(cache_table.c.encoding.is_(None)).values(encoding='raw'))
 ```
 
 Keep `schema_upgrade()` unchanged — autogenerate already put
@@ -304,11 +301,20 @@ Note: the data backfill only runs inside `data_upgrade()`. On downgrade,
 `data_downgrade()` is a `pass` and the column with its values disappears
 with `DROP COLUMN` in `schema_downgrade()`.
 
+### Long-running data migrations
+
+Migrations run with a 5-minute `lock_timeout`. Do not put a data backfill
+that might exceed it into the automatic alembic path — a stalled init
+container keeps every replacement pod in `Init` and blocks the rollout. Run
+such backfills manually during a maintenance window instead, against the live
+database, outside of alembic.
+
 ---
 
 ## Clean up
 
-When you are done:
+When you are done (paths below are relative to the repository root —
+`cd ..` first if you are still in `src/`):
 
 1. Delete the migration file you created in `src/migrations/versions/`
    (only if you do not want to keep it for a real change).

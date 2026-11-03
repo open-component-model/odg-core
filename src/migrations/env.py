@@ -94,6 +94,11 @@ def run_migrations_online() -> None:
         # begin_transaction() calls connection.get_transaction() via _safe_begin_.*;
         # an already-open transaction would silently swallow commits in some driver
         # combinations (observed: psycopg3 + SQLAlchemy 2 + alembic 1.20).
+        # bounded wait on the advisory lock: with a fixed 5-minute lock_timeout the
+        # migration fails fast instead of stalling every replacement pod in `Init`
+        # while another init container (or crashed predecessor) holds the lock
+        connection.execute(sqlalchemy.text("set lock_timeout = '5min'"))
+
         # not `key=%s`: the log scrubbing would redact `key=<value>` as a credential
         logger.info('acquiring advisory lock %s', ADVISORY_LOCK_KEY)
         connection.execute(
