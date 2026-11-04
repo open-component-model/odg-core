@@ -1466,7 +1466,17 @@ class DownloadSBOM(aiohttp.web.View):
                 digest = artefact_metadatum.data['digest']
 
                 db_statement = sa.select(dm.BlobStore).where(dm.BlobStore.digest == digest)
-                blob_metadata = (await db_session.execute(statement=db_statement)).one()[0]
+                blob_metadata_row = (await db_session.execute(statement=db_statement)).one_or_none()
+
+                if not blob_metadata_row:
+                    logger.warning(
+                        'SBoM blob is missing, skipping',
+                        artefact=str(artefact_metadatum.artefact),
+                        digest=digest,
+                    )
+                    continue
+
+                blob_metadata = blob_metadata_row[0]
 
                 component_dir = (
                     f'{artefact_metadatum.artefact.component_name}_'
