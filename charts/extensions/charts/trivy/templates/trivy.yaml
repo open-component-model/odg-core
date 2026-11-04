@@ -66,6 +66,8 @@ spec:
               value: /ocm_repo_mappings/ocm_repo_mappings
             - name: K8S_TARGET_NAMESPACE
               value: {{ .Values.target_namespace | default .Release.Namespace }}
+            - name: ODG_LOG_LEVEL
+              value: {{ .Values.logLevel | default "INFO" | quote }}
             {{- if $cacheEnabled }}
             - name: TRIVY_CACHE_DIR
               value: /cache/trivy

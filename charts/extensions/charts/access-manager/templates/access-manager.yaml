@@ -42,6 +42,8 @@ spec:
                   value: /secrets
                 - name: K8S_TARGET_NAMESPACE
                   value: {{ .Values.target_namespace | default .Release.Namespace }}
+                - name: ODG_LOG_LEVEL
+                  value: {{ .Values.logLevel | default "INFO" | quote }}
               volumeMounts:
                 - name: delivery-db
                   mountPath: /secrets/delivery-db

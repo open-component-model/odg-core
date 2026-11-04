@@ -68,6 +68,12 @@ def parse_args():
         '--k8s-namespace',
         help='specify kubernetes cluster namespace to interact with extensions (and logs)',
     )
+    parser.add_argument(
+        '--log-level',
+        choices=('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'),
+        default=os.environ.get('ODG_LOG_LEVEL', 'INFO').upper(),
+        help='log level; CLI takes precedence over the ODG_LOG_LEVEL env var',
+    )
 
     return parser.parse_args()
 
@@ -341,6 +347,7 @@ async def initialise_app():
 
     # configure here, not in `run_app`: `adev runserver` (make run) only calls this factory
     odg.logging_cfg.configure_logging(
+        log_level=parsed_arguments.log_level,
         json_logs=parsed_arguments.json_logs,
         service_name='delivery-service',
     )
