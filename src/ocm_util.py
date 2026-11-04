@@ -41,7 +41,7 @@ def _fetch_blob_with_retries(
 ) -> collections.abc.Generator[bytes, None, None]:
     tmp = tempfile.NamedTemporaryFile(delete=False)
 
-    logger.info(f'downloading blob {name} ({size / 1024 / 1024:.1f} MiB)')
+    logger.debug(f'downloading blob {name} ({size / 1024 / 1024:.1f} MiB)')
     t0 = time.monotonic()
 
     try:
@@ -79,7 +79,7 @@ def _fetch_blob_with_retries(
         download_s = time.monotonic() - t0
         actual_size = os.path.getsize(tmp.name)
         actual_digest = f'sha256:{hasher.hexdigest()}'
-        logger.info(
+        logger.debug(
             f'downloaded blob {name} ({actual_digest}) ({actual_size / 1024 / 1024:.1f} MiB in '
             f'{download_s:.1f}s)',
         )
