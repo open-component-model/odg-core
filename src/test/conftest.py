@@ -53,7 +53,7 @@ def postgres_container_dsn() -> Generator[str, None, None]:
     SQLAlchemy DSN (`postgresql+psycopg://.../postgres`). One container per test
     session; databases are created per test via `db_dsn`.
     """
-    from testcontainers.postgres import PostgresContainer
+    from testcontainers.community.postgres import PostgresContainer
 
     container = PostgresContainer(
         image=POSTGRES_IMAGE,

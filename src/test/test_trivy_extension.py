@@ -105,24 +105,26 @@ class TestScanFile:
     _KUBECTL_TAR_PATH = os.path.join(_FIXTURE_DIR, 'kubectl.tar')
 
     @pytest.fixture(scope='session')
-    def kubectl_binary(self):
+    @classmethod
+    def kubectl_binary(cls):
         if not _USE_MOCK:
             os.makedirs(_FIXTURE_DIR, exist_ok=True)
-            if not os.path.exists(self._KUBECTL_PATH):
+            if not os.path.exists(cls._KUBECTL_PATH):
                 urllib.request.urlretrieve(
                     'https://dl.k8s.io/release/v1.24.0/bin/linux/amd64/kubectl',
-                    self._KUBECTL_PATH,
+                    cls._KUBECTL_PATH,
                 )
-                os.chmod(self._KUBECTL_PATH, 0o755)
-        return self._KUBECTL_PATH
+                os.chmod(cls._KUBECTL_PATH, 0o755)
+        return cls._KUBECTL_PATH
 
     @pytest.fixture(scope='session')
-    def kubectl_tar(self, kubectl_binary):
+    @classmethod
+    def kubectl_tar(cls, kubectl_binary):
         if not _USE_MOCK:
-            if not os.path.exists(self._KUBECTL_TAR_PATH):
-                with tarfile.open(self._KUBECTL_TAR_PATH, 'w') as tf:
+            if not os.path.exists(cls._KUBECTL_TAR_PATH):
+                with tarfile.open(cls._KUBECTL_TAR_PATH, 'w') as tf:
                     tf.add(kubectl_binary, arcname='kubectl')
-        return self._KUBECTL_TAR_PATH
+        return cls._KUBECTL_TAR_PATH
 
     def test_binary_plain_file_finds_vulnerabilities(self, scanner, kubectl_binary):
         result = scanner.scan_file(kubectl_binary, _blob('application/octet-stream'), is_tar=False)
@@ -208,15 +210,16 @@ class TestScanOciImageArchive:
     _OCI_LAYOUT = os.path.join(_FIXTURE_DIR, 'python-3.9-slim-oci-layout')
 
     @pytest.fixture(scope='session')
-    def oci_layout(self):
+    @classmethod
+    def oci_layout(cls):
         if not _USE_MOCK:
             os.makedirs(_FIXTURE_DIR, exist_ok=True)
-            if not os.path.exists(self._OCI_LAYOUT):
+            if not os.path.exists(cls._OCI_LAYOUT):
                 subprocess.run(
-                    ['oras', 'copy', '--to-oci-layout', self._IMAGE, f'{self._OCI_LAYOUT}:latest'],
+                    ['oras', 'copy', '--to-oci-layout', cls._IMAGE, f'{cls._OCI_LAYOUT}:latest'],
                     check=True,
                 )
-        return self._OCI_LAYOUT
+        return cls._OCI_LAYOUT
 
     def test_finds_vulnerabilities(self, scanner, oci_layout):
         result = scanner.scan_oci_image_archive(

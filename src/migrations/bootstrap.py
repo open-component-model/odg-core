@@ -83,8 +83,6 @@ def _head_revision() -> str:
 
 def main() -> int:
     db_url = _db_url()
-    # env.py prefers DELIVERY_DB_URL; ensure alembic targets the database inspected here
-    os.environ['DELIVERY_DB_URL'] = db_url
     engine = sqlalchemy.create_engine(db_url)
 
     with engine.connect() as connection:
@@ -93,7 +91,9 @@ def main() -> int:
     model_tables = set(deliverydb.model.Base.metadata.tables)
     alembic_managed = 'alembic_version' in existing_tables
 
-    argv = ['-c', migrations.ini_path]
+    # in-process argv (not visible in the process list); `-x db_url` has the highest
+    # precedence in env.py, so alembic targets exactly the database inspected here
+    argv = ['-c', migrations.ini_path, '-x', f'db_url={db_url}']
 
     if alembic_managed:
         logger.info('database is alembic-managed')

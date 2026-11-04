@@ -24,7 +24,8 @@ def bootstrap_db(
     monkeypatch: pytest.MonkeyPatch,
 ) -> Generator[sqlalchemy.Engine, None, None]:
     monkeypatch.setattr(migrations.bootstrap, '_db_url', lambda: _db_dsn)
-    monkeypatch.setenv('DELIVERY_DB_URL', _db_dsn)
+    # bootstrap must not depend on the env var; a wrong value proves the -x arg wins
+    monkeypatch.setenv('DELIVERY_DB_URL', 'postgresql+psycopg://invalid:invalid@invalid:1/invalid')
     engine = sqlalchemy.create_engine(_db_dsn)
     yield engine
     engine.dispose()
@@ -87,8 +88,6 @@ def _run_bootstrap_in_subprocess(dsn: str) -> str:
             sys.executable,
             '-c',
             textwrap.dedent(f"""
-                import os
-                os.environ['DELIVERY_DB_URL'] = {dsn!r}
                 import migrations.bootstrap
                 migrations.bootstrap._db_url = lambda: {dsn!r}
                 assert migrations.bootstrap.main() == 0
