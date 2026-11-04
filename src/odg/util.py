@@ -81,6 +81,7 @@ def parse_args(
     parser = argparse.ArgumentParser()
 
     for argument in arguments:
+        argument = argument.copy()  # Arguments.* are class constants; keep them intact
         parser.add_argument(
             argument.pop('name'),
             **argument,

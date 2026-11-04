@@ -39,6 +39,7 @@ names as most log pipelines (Loki, Fluent Bit, Splunk HEC) recognise them.
 
 import collections.abc
 import logging
+import os
 import re
 import sys
 import threading
@@ -350,7 +351,7 @@ def _install_excepthook(logger_name: str = 'unhandled') -> None:
 
 
 def configure_logging(
-    log_level: int = logging.INFO,
+    log_level: int | str | None = None,
     json_logs: bool = True,
     service_name: str | None = None,
     stream: typing.TextIO | None = None,
@@ -362,12 +363,23 @@ def configure_logging(
     `service_name`, if given, is added to every log entry as `service.name`
     (OTel semantic convention; use the extension/service name, e.g. 'malware').
 
+    `log_level` may be an int (e.g. `logging.DEBUG`) or a level name (e.g.
+    'DEBUG'); unknown names fall back to INFO. If `None` (default), the
+    `ODG_LOG_LEVEL` env var is used (same name/fallback semantics). Pass an
+    explicit value (e.g. a parsed CLI flag) to override the env var.
+
     Also installs a `sys.excepthook`/`threading.excepthook` that routes
     otherwise-silent unhandled exceptions through the structlog pipeline.
 
     Safe to call multiple times: existing stream handlers are removed and the
     record factory is rebuilt each call.
     """
+    if log_level is None:
+        log_level = os.environ.get('ODG_LOG_LEVEL', 'INFO')
+
+    if isinstance(log_level, str):
+        log_level = logging.getLevelNamesMapping().get(log_level.upper(), logging.INFO)
+
     processors = list(_shared_processors)
 
     if service_name:
