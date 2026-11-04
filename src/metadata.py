@@ -1214,10 +1214,14 @@ class ArtefactMetadata(aiohttp.web.View):
             odg.model.ArtefactMetadata.from_dict(_fill_default_values(entry)) for entry in entries
         ]
 
-        # determine all artefact/type combinations to query them at once afterwards
+        # determine all artefact/type/datasource combinations to query them at once afterwards
         artefacts = dict()
         for artefact_metadatum in artefact_metadata:
-            key = (artefact_metadatum.artefact, artefact_metadatum.meta.type)
+            key = (
+                artefact_metadatum.artefact,
+                artefact_metadatum.meta.type,
+                artefact_metadatum.meta.datasource,
+            )
             if key not in artefacts:
                 artefacts[key] = artefact_metadatum
 
@@ -1228,7 +1232,9 @@ class ArtefactMetadata(aiohttp.web.View):
                 yield du.ArtefactMetadataFilters.by_name_and_type(
                     artefact_metadata=dm.ArtefactMetaData(
                         component_name=artefact.artefact.component_name,
+                        component_version=artefact.artefact.component_version,
                         artefact_name=artefact.artefact.artefact.artefact_name,
+                        artefact_version=artefact.artefact.artefact.artefact_version,
                         type=artefact.meta.type,
                         datasource=artefact.meta.datasource,
                     ),
@@ -1305,6 +1311,16 @@ class ArtefactMetadata(aiohttp.web.View):
                 existing_by_group[group_key] = entry
 
         del all_existing_entries  # free up memory
+
+        # Expunge all prefetched ORM objects not needed for the write pass to keep the
+        # identity map small. Only entries in existing_by_id are mutated during the write
+        # loop (UPDATE path); existing_by_group entries are read-only (discovery date reuse)
+        # and need not be tracked. For global-scope components the prefetch can return tens
+        # of thousands of rows; expunging them reduces flush cost from O(prefetch_size) to
+        # O(batch_size).
+        db_session.expunge_all()
+        for entry in existing_by_id.values():
+            db_session.add(entry)
 
         logger.info(
             f'[{correlation_id}] Filtered entries to {len(existing_by_id)=} and '
