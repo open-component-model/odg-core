@@ -1,6 +1,5 @@
-import pytest
-
 import ocm
+import pytest
 
 import responsibles.labels
 

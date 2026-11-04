@@ -3,7 +3,6 @@ import datetime
 
 import kubernetes.client
 
-
 DOMAIN = 'delivery-gear.gardener.cloud'
 LABEL_SERVICE = f'{DOMAIN}/service'
 

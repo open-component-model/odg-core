@@ -16,7 +16,6 @@ import dateutil.parser
 
 import bdba.util as bu
 
-
 logger = logging.getLogger()
 
 

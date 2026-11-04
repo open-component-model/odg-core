@@ -1,9 +1,9 @@
 import unittest.mock
 
 import ocm
-import odg.labels
 
 import ocm_util
+import odg.labels
 
 
 def _make_resource(

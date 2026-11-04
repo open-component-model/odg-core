@@ -1,16 +1,15 @@
 import collections.abc
 import datetime
 import functools
-import logging
 
 import dacite
 import github3.repos
+import structlog
 
 import odg_client
 import sprints.model as sm
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @functools.cache

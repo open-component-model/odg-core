@@ -2,7 +2,6 @@ import collections.abc
 import dataclasses
 import datetime
 import http
-import logging
 import tarfile
 import zlib
 
@@ -20,6 +19,7 @@ import ocm.retrieve
 import ocm.retrieve_async
 import sqlalchemy as sa
 import sqlalchemy.ext.asyncio as sqlasync
+import structlog
 
 import compliance_summary as cs
 import consts
@@ -35,7 +35,7 @@ import responsibles.labels
 import util
 import yp
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @dataclasses.dataclass(frozen=True)

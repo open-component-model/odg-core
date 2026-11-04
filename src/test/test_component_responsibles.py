@@ -1,8 +1,7 @@
 import unittest.mock
 
-import pytest
-
 import github.codeowners
+import pytest
 
 import odg.model
 import responsibles

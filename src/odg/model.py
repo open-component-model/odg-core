@@ -4,19 +4,19 @@ import dataclasses
 import datetime
 import enum
 import hashlib
-import logging
 import textwrap
 import typing
 
 import dacite
 import ocm
 import ocm.iter
+import structlog
 import typing_extensions
 
 import odg.cvss
 import util
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def _as_key(

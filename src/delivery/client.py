@@ -1,23 +1,21 @@
 import collections.abc
 import dataclasses
 import datetime
-import logging
 import time
 import typing
 
 import dacite
+import ocm
 import requests.adapters
 import requests.exceptions
 import requests.sessions
-
-import ocm
+import structlog
 
 import delivery.jwt
 import delivery.model as dm
 import delivery.util
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class DeliveryServiceRoutes:

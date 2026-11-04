@@ -6,7 +6,6 @@ import datetime
 import enum
 import functools
 import http
-import logging
 import statistics
 import typing
 import urllib.parse
@@ -22,6 +21,7 @@ import ocm.iter_async
 import ocm.retrieve_async
 import ocm.util
 import sqlalchemy.ext.asyncio as sqlasync
+import structlog
 import version as versionutil
 
 import caching
@@ -30,7 +30,7 @@ import consts
 import lookups
 import util
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 changes_by_dependencies_cache = dict()
 
 

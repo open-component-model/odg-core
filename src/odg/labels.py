@@ -5,7 +5,6 @@ import inspect
 import sys
 
 import dacite
-
 import ocm
 import ocm.iter
 

@@ -6,11 +6,9 @@ import jsonpath_ng
 import pytest
 import yaml
 
-
 import odg_operator.__main__ as odgc
 import odg_operator.odg_model as odgm
 import odg_operator.odg_util as odgu
-
 
 _own_dir = os.path.abspath(os.path.dirname(__file__))
 test_resources_extension_definitions = os.path.join(

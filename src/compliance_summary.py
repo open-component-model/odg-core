@@ -4,12 +4,11 @@ import collections.abc
 import dataclasses
 import enum
 import functools
-import logging
-
-import sqlalchemy.ext.asyncio as sqlasync
 
 import ocm
 import ocm.retrieve_async
+import sqlalchemy.ext.asyncio as sqlasync
+import structlog
 
 import deliverydb.cache_async
 import deliverydb.util
@@ -18,8 +17,7 @@ import odg.findings
 import odg.model
 import rescore.utility
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class ComplianceEntryCategorisation(enum.StrEnum):

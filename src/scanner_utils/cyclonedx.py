@@ -1,13 +1,14 @@
 import collections.abc
 import dataclasses
-import logging
 import re
+
+import structlog
 
 import odg.cvss
 import odg.findings
 import odg.model
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Preferred source order when multiple CVSS ratings are present.
 _PREFERRED_SOURCES = ('nvd', 'redhat', 'ghsa')

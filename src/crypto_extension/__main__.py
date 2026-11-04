@@ -1,10 +1,10 @@
 import collections.abc
 import datetime
 import functools
-import logging
 
 import oci.client
 import ocm
+import structlog
 
 import crypto_extension.cbom
 import crypto_extension.model
@@ -20,8 +20,7 @@ import odg_client
 import paths
 import secret_mgmt
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging(service_name='crypto')
 

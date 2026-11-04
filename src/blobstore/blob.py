@@ -12,7 +12,6 @@ import deliverydb.model as dm
 import features
 import util
 
-
 logger: logging.Logger = logging.getLogger(name=__name__)
 
 DIGEST_PARAM: str = 'digest'

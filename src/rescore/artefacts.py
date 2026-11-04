@@ -5,12 +5,12 @@ import datetime
 import functools
 import http
 import json
-import logging
 
 import aiohttp.web
 import jsonpath_ng
 import sqlalchemy as sa
 import sqlalchemy.ext.asyncio as sqlasync
+import structlog
 
 import consts
 import deliverydb.model as dm
@@ -29,7 +29,7 @@ import sprints.model as sm
 import sprints.util as su
 import util
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @dataclasses.dataclass

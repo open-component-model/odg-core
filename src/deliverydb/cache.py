@@ -1,19 +1,18 @@
 import collections.abc
 import dataclasses
 import datetime
-import logging
 import traceback
 
 import sqlalchemy.exc
 import sqlalchemy.orm.session
+import structlog
 
 import deliverydb.model as dm
 import deliverydb_cache.model as dcm
 import deliverydb_cache.util as dcu
 import util
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def update_cache_entry(

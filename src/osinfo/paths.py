@@ -1,6 +1,5 @@
 import os
 
-
 own_dir = os.path.abspath(os.path.dirname(__file__))
 
 # Explicit allowlist of supported OS IDs with filesystem configs

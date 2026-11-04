@@ -1,13 +1,12 @@
-import logging
-
 import ocm
+import structlog
 
 import bdba.client
 import bdba.model as bm
 import odg_client
 import scanner_utils.findings
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def upload_version_hints(

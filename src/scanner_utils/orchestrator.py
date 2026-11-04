@@ -1,10 +1,10 @@
 import dataclasses
 import datetime
 import json
-import logging
 
 import oci.client
 import ocm
+import structlog
 
 import k8s.util
 import odg.extensions_cfg
@@ -18,7 +18,7 @@ import scanner_utils.model
 import scanner_utils.scanner
 import secret_mgmt
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def _is_supported_sbom_format(sbom: dict) -> bool:

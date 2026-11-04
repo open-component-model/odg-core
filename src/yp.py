@@ -4,7 +4,6 @@ import dataclasses
 import odg.model
 import util
 
-
 """
 utils for reading user-data from Gardener's Yellow-Pages
 pragmatically hardcoding a lot.

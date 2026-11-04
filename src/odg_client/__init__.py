@@ -9,18 +9,17 @@ import warnings
 
 import dacite
 import jwt as pyjwt
+import ocm
 import requests.adapters
 import requests.exceptions
 import requests.sessions
-
-import ocm
+import structlog
 
 import odg_client.jwt
 import odg_client.model as om
 import odg_client.util
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Exceptions from external dependencies (network failures, upstream HTTP errors).
 # Catch these at call sites to skip the current operation and continue,

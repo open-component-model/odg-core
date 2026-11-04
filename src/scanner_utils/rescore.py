@@ -1,12 +1,13 @@
 import collections.abc
 import dataclasses
-import logging
+
+import structlog
 
 import odg.cvss
 import odg.findings
 import rescore.utility as ru
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @dataclasses.dataclass

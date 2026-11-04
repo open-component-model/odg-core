@@ -5,12 +5,10 @@ import logging
 import sys
 import threading
 
+import aiohttp.web_log
 import pytest
 
-import aiohttp.web_log
-
 import odg.logging_cfg as lc
-
 
 # placeholder credential, avoids secret-scanner findings; repeated to match the 16+
 # chars the Bearer/Basic patterns require

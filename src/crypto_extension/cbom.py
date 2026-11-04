@@ -1,18 +1,17 @@
 import json
-import logging
 import os
 import subprocess
 import tempfile
 
 import oci.client
 import ocm
+import structlog
 
-import syft
 import odg.extensions_cfg
 import secret_mgmt
+import syft
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 own_dir = os.path.abspath(os.path.dirname(__file__))
 

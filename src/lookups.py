@@ -1,28 +1,27 @@
 import abc
 import collections.abc
-import dacite
 import dataclasses
 import datetime
 import enum
 import functools
-import logging
 import re
 import typing
 import urllib.parse
 
 import aiohttp
 import aiohttp.web
+import dacite
 import github3.apps
 import github3.github
 import github3.repos
-import requests
-import requests.adapters
-
 import oci.client
 import oci.client_async
 import ocm
 import ocm.retrieve
 import ocm.retrieve_async
+import requests
+import requests.adapters
+import structlog
 import version as versionutil
 
 import ctx_util
@@ -34,8 +33,7 @@ import secret_mgmt.github
 import secret_mgmt.oci_registry
 import util
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class OcmRepositoryCfgNames(enum.StrEnum):
