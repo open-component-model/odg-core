@@ -565,19 +565,25 @@ async def set_session_and_refresh_token(
     if not (role_bindings := user.role_bindings):
         raise aiohttp.web.HTTPUnauthorized(text='User is not authorised to access this service')
 
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
     refresh_tokens = list(user.refresh_tokens)
 
     if existing_refresh_token_identifier is not None:
-        # check if provided refresh token is valid and if so, remove it from list of persisted tokens
-        # -> user will get a new refresh token
+        # check if provided refresh token is valid (not expired) and if so, remove it from list of
+        # persisted tokens -> user will get a new refresh token
         for refresh_token in refresh_tokens:
+            token_exp = datetime.datetime.fromtimestamp(
+                timestamp=refresh_token['exp'],
+                tz=datetime.timezone.utc,
+            )
+            if token_exp <= now:
+                continue
             if refresh_token['identifier'] == existing_refresh_token_identifier:
                 refresh_tokens.remove(refresh_token)
                 break
         else:
             raise aiohttp.web.HTTPUnauthorized(text='The provided refresh token is not valid')
 
-    now = datetime.datetime.now(tz=datetime.timezone.utc)
     refresh_token_identifier = str(uuid.uuid4())
 
     if use_refresh_token:
