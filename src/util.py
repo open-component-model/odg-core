@@ -4,23 +4,21 @@ import datetime
 import enum
 import functools
 import json
-import logging
 import re
 import urllib.parse
 
 import aiohttp.web
 import dateutil.parser
-import semver
-import yaml
-
 import oci.model as om
 import ocm
 import ocm.iter
 import ocm.retrieve_async
+import semver
+import structlog
 import version as versionutil
+import yaml
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def parse_yaml_file(path: str) -> dict:

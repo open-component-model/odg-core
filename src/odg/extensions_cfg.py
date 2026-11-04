@@ -2,7 +2,6 @@ import collections.abc
 import dataclasses
 import datetime
 import enum
-import logging
 import os
 import re
 import typing
@@ -11,6 +10,7 @@ import cachetools
 import dacite
 import github3.repos
 import ocm
+import structlog
 import yaml
 
 import bdba.model
@@ -24,7 +24,7 @@ import responsibles_extension.strategies as res
 import scanner_utils.model
 import sprints.model as sm
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class Services(enum.StrEnum):

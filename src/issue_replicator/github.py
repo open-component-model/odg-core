@@ -6,7 +6,6 @@ import datetime
 import enum
 import functools
 import hashlib
-import logging
 import re
 import textwrap
 
@@ -20,6 +19,7 @@ import github3.repos
 import ocm
 import ocm.iter
 import ocm.util
+import structlog
 
 import github_util
 import k8s.util
@@ -31,7 +31,7 @@ import rescore.utility
 import sprints.model as sm
 import util
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class IssueComments(enum.StrEnum):

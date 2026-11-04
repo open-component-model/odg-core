@@ -1,12 +1,11 @@
-import logging
 import traceback
 
 import aiohttp.typedefs
 import aiohttp.web
 import aiohttp.web_exceptions
+import structlog
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def errors_middleware() -> aiohttp.typedefs.Middleware:

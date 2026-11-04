@@ -7,10 +7,9 @@ import unittest.mock
 
 import pytest
 
+import malware.clamav as clamav
 import odg.findings
 import odg.model
-
-import malware.clamav as clamav
 
 
 def _make_clamd_server(

@@ -4,11 +4,11 @@ import atexit
 import collections.abc
 import dataclasses
 import datetime
-import logging
 
 import dacite
 import ocm
 import ocm.util
+import structlog
 
 import ctx_util
 import github_util
@@ -25,8 +25,7 @@ import paths
 import secret_mgmt
 import util
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging(service_name='ghas')
 

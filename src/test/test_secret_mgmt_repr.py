@@ -28,7 +28,6 @@ import secret_mgmt.oci_registry
 import secret_mgmt.ppms
 import secret_mgmt.signing_cfg
 
-
 SECRET = 's3cr3t-value-not-matching-any-scrubber'
 
 

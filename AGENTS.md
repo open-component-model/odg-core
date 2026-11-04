@@ -78,7 +78,17 @@ specific capability (scanning, reporting, replication, etc.); extensions share c
 - Set reasonable type hints (avoid `Any` or `object`)
 - Use expressive variable names (`item` over `i`)
 - In logs:
-    - Prefer `{param=}` over `param={param}`
+    - Use structlog loggers and key-value style. Import and create once per module:
+      `logger = structlog.get_logger(__name__)`. Pass values as kwargs, not f-strings, so they
+      become queryable fields in JSON output (OpenSearch/Loki) instead of being baked into
+      `event`:
+        - `logger.info('found items', count=len(items))` → `{"event": "found items", "count": 42}`
+        - not `logger.info(f'found {len(items)} items')` → `{"event": "found 42 items"}`
+      Stdlib `logging.getLogger` raises TypeError on kwargs; do not mix with bare kwargs.
+    - This also applies to `logger.exception(...)` — pass queryable values as kwargs
+      (`logger.exception('scan failed', artefact_name=name)`); use f-string interpolation only
+      for values that make the message more readable (`logger.exception(f'scan {artefact=} failed')`),
+      preferring `{param=}` over `param={param}` when formatting
     - Many classes implement `__str__`
 - Prefer `is` over `==` when comparing enum values, but only when the left-hand side is already an enum instance — use `==` when comparing raw strings (e.g. from DB columns) against enum values
 - Be conscise, specific and value dense

@@ -1,9 +1,9 @@
 import collections.abc
-import logging
 import os
 
+import structlog
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 _own_dir = os.path.abspath(os.path.dirname(__file__))
 

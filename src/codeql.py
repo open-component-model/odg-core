@@ -3,10 +3,10 @@ import collections.abc
 import datetime
 import functools
 import json
-import logging
 import urllib.parse
 
 import ocm
+import structlog
 
 import github_util
 import k8s.logging
@@ -21,8 +21,7 @@ import odg_client
 import paths
 import secret_mgmt
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging(service_name='codeql')
 

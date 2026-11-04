@@ -1,23 +1,22 @@
 import collections.abc
 import datetime
 import functools
-import logging
 import time
 
+import github.retry
 import github3
 import github3.issues
 import github3.repos
 import requests
 import requests.adapters
+import structlog
 import urllib3.util.retry
 
-import github.retry
 import secret_mgmt
 import secret_mgmt.github
 import util
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def is_remaining_quota_too_low(

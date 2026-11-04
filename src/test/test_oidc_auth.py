@@ -12,7 +12,6 @@ import deliverydb.model as dm
 import middleware.auth
 import secret_mgmt.oauth_cfg
 
-
 ISSUER = 'https://example.com/issuer'
 JWKS_URI = 'https://example.com/issuer/jwks'
 AUDIENCE = 'delivery-service'
