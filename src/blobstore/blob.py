@@ -1,18 +1,18 @@
 import datetime
 import enum
 import hashlib
-import logging
 
 import aiohttp.web
 import sqlalchemy as sa
 import sqlalchemy.ext.asyncio as sqlasync
+import structlog
 
 import consts
 import deliverydb.model as dm
 import features
 import util
 
-logger: logging.Logger = logging.getLogger(name=__name__)
+logger = structlog.get_logger(__name__)
 
 DIGEST_PARAM: str = 'digest'
 CHUNK_SIZE: int = 262144  # 256 KiB

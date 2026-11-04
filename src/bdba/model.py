@@ -8,15 +8,15 @@ import dataclasses
 import datetime
 import enum
 import json
-import logging
 import typing
 
 import dacite
 import dateutil.parser
+import structlog
 
 import bdba.util as bu
 
-logger = logging.getLogger()
+logger = structlog.get_logger(__name__)
 
 
 class VersionOverrideScope(enum.IntEnum):
