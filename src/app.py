@@ -73,6 +73,7 @@ def parse_args():
         choices=('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'),
         default=os.environ.get('ODG_LOG_LEVEL', 'INFO').upper(),
         help='log level; CLI takes precedence over the ODG_LOG_LEVEL env var',
+        type=str.upper,
     )
 
     return parser.parse_args()
