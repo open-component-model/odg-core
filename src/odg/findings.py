@@ -793,6 +793,20 @@ class Finding:
 
         raise ValueError(f'did not find categorisation with {id=} for type "{self.type}"')
 
+    def categorisation_by_value(
+        self,
+        value: int,
+        absent_ok: bool = False,
+    ) -> FindingCategorisation | None:
+        for categorisation in self.categorisations:
+            if categorisation.value == value:
+                return categorisation
+
+        if absent_ok:
+            return None
+
+        raise ValueError(f'did not find categorisation with {value=} for type "{self.type}"')
+
     def matches(self, artefact: odg.model.ComponentArtefactId) -> bool:
         if not self.filter:
             return True

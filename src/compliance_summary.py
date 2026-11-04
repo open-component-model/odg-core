@@ -4,7 +4,6 @@ import collections.abc
 import dataclasses
 import enum
 import functools
-
 import ocm
 import ocm.retrieve_async
 import sqlalchemy.ext.asyncio as sqlasync
@@ -16,6 +15,7 @@ import lookups
 import odg.findings
 import odg.model
 import rescore.utility
+import util
 
 logger = structlog.get_logger(__name__)
 
@@ -244,6 +244,57 @@ async def artefact_datatype_summary(
     )
 
 
+def _effective_severity_for_projection(
+    finding: deliverydb.util.FindingProjection,
+    grouped_rescorings: dict[str | None, list[deliverydb.util.RescoringProjection]],
+    normalised_artefact_extra_id: str,
+) -> str | None:
+    """
+    Mirrors rescore.utility.rescorings_for_finding_by_specificity + severity_for_finding
+    but operates on FindingProjection / RescoringProjection — no dacite.
+    grouped_rescorings is keyed by group_key_hash (md5 string or None).
+    """
+    candidates = []
+    for rescoring in grouped_rescorings.get(finding.finding_group_key, []):
+        if rescoring.component_name and rescoring.component_name != finding.component_name:
+            continue
+
+        if (
+            rescoring.component_version
+            and finding.component_version
+            and rescoring.component_version != finding.component_version
+        ):
+            continue
+
+        if rescoring.artefact_name and rescoring.artefact_name != finding.artefact_name:
+            continue
+
+        if (
+            rescoring.artefact_version
+            and finding.artefact_version
+            and rescoring.artefact_version != finding.artefact_version
+        ):
+            continue
+
+        if (
+            rescoring.artefact_extra_id
+            and odg.model.normalise_artefact_extra_id(
+                artefact_extra_id=rescoring.artefact_extra_id,
+                omit_version=True,
+            )
+            != normalised_artefact_extra_id
+        ):
+            continue
+
+        candidates.append(rescoring)
+
+    if not candidates:
+        return finding.severity
+
+    most_recent = max(candidates, key=lambda r: util.normalise_date(r.creation_date))
+    return most_recent.severity
+
+
 # Note: The cache manager expects this function to use the persistent db-cache annotator. If this
 # would be removed in a future change, the cache manager also had to be adjusted to prevent
 # unnecessary load.
@@ -253,6 +304,7 @@ async def artefact_datatype_summary(
         'finding_cfg',
         'component_descriptor_lookup',
         'ocm_repo',
+        'artefact_scan_infos',
     ),
     skip_values=([],),
 )
@@ -265,6 +317,7 @@ async def component_datatype_summaries(
     component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,
     ocm_repo: ocm.OciOcmRepository | None = None,
     shortcut_cache: bool = False,
+    artefact_scan_infos: collections.abc.Sequence[odg.model.ArtefactMetadata] | None = None,
 ) -> list[tuple[odg.model.ComponentArtefactId, ComplianceSummaryEntry]]:
     component = (
         await component_descriptor_lookup(
@@ -273,14 +326,51 @@ async def component_datatype_summaries(
         )
     ).component
 
-    artefact_scan_infos = await deliverydb.util.findings_for_component(
-        component=component,
-        finding_type=odg.model.Datatype.ARTEFACT_SCAN_INFO,
-        datasource=datasource,
-        db_session=db_session,
-    )
+    if artefact_scan_infos is None:
+        artefact_scan_infos = await deliverydb.util.findings_for_component(
+            component=component,
+            finding_type=odg.model.Datatype.ARTEFACT_SCAN_INFO,
+            datasource=datasource,
+            db_session=db_session,
+        )
 
-    rescorings = None  # lazily fetched on first artefact with findings
+    # Fast SQL path: for types supported by severity_summary_for_component, let Postgres do the
+    # findings→rescorings join and MAX aggregation.  Returns {artefact_key: max_value} with no
+    # row-level Python work.  Falls back to the projection path for unsupported types.
+    severity_values = {c.id: c.value for c in finding_cfg.categorisations}
+    try:
+        t_sql = time.monotonic()
+        max_value_by_artefact = await deliverydb.util.severity_summary_for_component(
+            component=component,
+            finding_type=finding_type,
+            datasource=datasource,
+            db_session=db_session,
+            severity_values=severity_values,
+        )
+        logger.info(
+            'component_datatype_summaries(%s): severity_summary (SQL) (%d artefacts) %.2fs',
+            finding_type,
+            len(max_value_by_artefact),
+            time.monotonic() - t_sql,
+        )
+        sql_path = True
+    except NotImplementedError:
+        t_findings = time.monotonic()
+        findings_by_artefact = await deliverydb.util.projected_findings_for_component(
+            component=component,
+            finding_type=finding_type,
+            datasource=datasource,
+            db_session=db_session,
+        )
+        logger.info(
+            'component_datatype_summaries(%s): projected_findings %.2fs',
+            finding_type,
+            time.monotonic() - t_findings,
+        )
+        max_value_by_artefact = None
+        sql_path = False
+
+    grouped_rescorings: collections.defaultdict | None = None
 
     summaries = []
     for ocm_artefact in component.resources + component.sources:
@@ -292,38 +382,100 @@ async def component_datatype_summaries(
         if not finding_cfg.matches(artefact):
             continue
 
-        artefact_has_scan = any(
+        artefact_key = (
+            artefact.artefact_kind,
+            artefact.artefact.artefact_name,
+            artefact.artefact.artefact_version,
+            odg.model.normalise_artefact_extra_id(artefact.artefact.artefact_extra_id),
+        )
+
+        scan_exists = any(
             scan_info.artefact.artefact_kind is artefact.artefact_kind
             and scan_info.artefact.artefact == artefact.artefact
             for scan_info in artefact_scan_infos
         )
 
-        if artefact_has_scan:
-            findings = await deliverydb.util.findings_for_artefact(
-                component=component,
-                artefact=ocm_artefact,
-                finding_type=finding_type,
-                datasource=datasource,
-                db_session=db_session,
+        if not scan_exists:
+            artefact_summary = ComplianceSummaryEntry(
+                type=finding_cfg.type,
+                source=datasource,
+                categorisation=ComplianceEntryCategorisation.UNKNOWN,
+                value=-1,
+                scanStatus=ComplianceScanStatus.NO_DATA,
             )
+        elif sql_path:
+            max_value = max_value_by_artefact.get(artefact_key)
+            if max_value is None:
+                artefact_summary = ComplianceSummaryEntry(
+                    type=finding_cfg.type,
+                    source=datasource,
+                    categorisation=ComplianceEntryCategorisation.CLEAN,
+                    value=0,
+                    scanStatus=ComplianceScanStatus.OK,
+                )
+            else:
+                categorisation = finding_cfg.categorisation_by_value(max_value)
+                artefact_summary = ComplianceSummaryEntry(
+                    type=finding_cfg.type,
+                    source=datasource,
+                    categorisation=categorisation_to_summary_categorisation(categorisation),
+                    value=max_value,
+                    scanStatus=ComplianceScanStatus.OK,
+                )
         else:
-            findings = []
+            findings = findings_by_artefact.get(artefact_key, [])
+            if not findings:
+                artefact_summary = ComplianceSummaryEntry(
+                    type=finding_cfg.type,
+                    source=datasource,
+                    categorisation=ComplianceEntryCategorisation.CLEAN,
+                    value=0,
+                    scanStatus=ComplianceScanStatus.OK,
+                )
+            else:
+                if grouped_rescorings is None:
+                    t_resc = time.monotonic()
+                    projected_rescorings = await deliverydb.util.projected_rescorings_for_component(
+                        component=component,
+                        finding_type=finding_type,
+                        db_session=db_session,
+                    )
+                    logger.info(
+                        'component_datatype_summaries(%s): projected_rescorings (%d rows) %.2fs',
+                        finding_type,
+                        len(projected_rescorings),
+                        time.monotonic() - t_resc,
+                    )
+                    grouped_rescorings = collections.defaultdict(list)
+                    for rescoring in projected_rescorings:
+                        grouped_rescorings[rescoring.group_key_hash].append(rescoring)
 
-        if findings and rescorings is None:
-            rescorings = await deliverydb.util.rescorings_for_component(
-                component=component,
-                finding_type=finding_type,
-                db_session=db_session,
-            )
-
-        artefact_summary = await artefact_datatype_summary(
-            artefact=artefact,
-            finding_cfg=finding_cfg,
-            datasource=datasource,
-            artefact_scan_infos=artefact_scan_infos,
-            findings=findings,
-            rescorings=rescorings or [],
-        )
+                normalised_extra_id = odg.model.normalise_artefact_extra_id(
+                    artefact.artefact.artefact_extra_id,
+                    omit_version=True,
+                )
+                most_severe_categorisation = None
+                for finding in findings:
+                    severity_name = _effective_severity_for_projection(
+                        finding=finding,
+                        grouped_rescorings=grouped_rescorings,
+                        normalised_artefact_extra_id=normalised_extra_id,
+                    )
+                    categorisation = finding_cfg.categorisation_by_id(severity_name)
+                    if (
+                        not most_severe_categorisation
+                        or categorisation.value > most_severe_categorisation.value
+                    ):
+                        most_severe_categorisation = categorisation
+                artefact_summary = ComplianceSummaryEntry(
+                    type=finding_cfg.type,
+                    source=datasource,
+                    categorisation=categorisation_to_summary_categorisation(
+                        most_severe_categorisation,
+                    ),
+                    value=most_severe_categorisation.value,
+                    scanStatus=ComplianceScanStatus.OK,
+                )
 
         summaries.append(
             (
@@ -363,19 +515,51 @@ async def component_compliance_summary(
     ocm_repo: ocm.OciOcmRepository | None = None,
     shortcut_cache: bool = False,
 ) -> ComponentComplianceSummary:
+    t0 = time.monotonic()
+    component_resolved = (
+        await component_descriptor_lookup(
+            component,
+            ocm_repository_lookup=lookups.extended_ocm_repository_lookup(ocm_repo),
+        )
+    ).component
+    logger.info('component_compliance_summary: resolve component %.2fs', time.monotonic() - t0)
+
+    # Fetch artefact_scan_infos once per datasource — shared across all finding_cfgs
+    # that map to the same datasource.
+    t1 = time.monotonic()
+    artefact_scan_infos_by_datasource: dict[
+        odg.model.Datasource,
+        list[odg.model.ArtefactMetadata],
+    ] = {}
+    for finding_cfg in finding_cfgs:
+        datasource = finding_cfg.type.datasource()
+        if datasource not in artefact_scan_infos_by_datasource:
+            artefact_scan_infos_by_datasource[
+                datasource
+            ] = await deliverydb.util.findings_for_component(
+                component=component_resolved,
+                finding_type=odg.model.Datatype.ARTEFACT_SCAN_INFO,
+                datasource=datasource,
+                db_session=db_session,
+            )
+    logger.info('component_compliance_summary: fetch scan_infos %.2fs', time.monotonic() - t1)
+
     component_entries = []
     artefacts_entries_by_artefact = collections.defaultdict(list)
 
+    t3 = time.monotonic()
     for finding_cfg in finding_cfgs:
+        datasource = finding_cfg.type.datasource()
         summary_entries_by_artefact = await component_datatype_summaries(
             component=component,
             finding_cfg=finding_cfg,
             finding_type=finding_cfg.type,
-            datasource=finding_cfg.type.datasource(),
+            datasource=datasource,
             db_session=db_session,
             component_descriptor_lookup=component_descriptor_lookup,
             ocm_repo=ocm_repo,
             shortcut_cache=shortcut_cache,
+            artefact_scan_infos=artefact_scan_infos_by_datasource[datasource],
         )
 
         if not summary_entries_by_artefact:
@@ -386,6 +570,12 @@ async def component_compliance_summary(
 
         for component_artefact_id, summary_entry in summary_entries_by_artefact[1:]:
             artefacts_entries_by_artefact[component_artefact_id].append(summary_entry)
+
+    logger.info(
+        'component_compliance_summary: datatype_summaries loop %.2fs',
+        time.monotonic() - t3,
+    )
+    logger.info('component_compliance_summary: total %.2fs', time.monotonic() - t0)
 
     return ComponentComplianceSummary(
         componentId=component,

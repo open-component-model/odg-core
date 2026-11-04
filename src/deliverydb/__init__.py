@@ -1,6 +1,5 @@
 import orjson
 import sqlalchemy
-import sqlalchemy.dialects.postgresql as sap
 import sqlalchemy.ext.asyncio as sqlasync
 import sqlalchemy.orm.session
 from psycopg.types.json import set_json_dumps, set_json_loads
@@ -10,13 +9,6 @@ import deliverydb.model as dm
 set_json_loads(orjson.loads)
 set_json_dumps(orjson.dumps)
 
-
-def do_raise(self):
-    raise RuntimeError('JSONB is not allowed, use JSON instead')
-
-
-# prevent usage of postgresql exclusive `JSONB`
-sap.JSONB.__init__ = do_raise
 
 # pool configuration for low-priority sessions (small pool, long timeout)
 DB_POOL_LOW_PRIO_SIZE = 2

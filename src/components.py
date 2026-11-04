@@ -1,3 +1,4 @@
+import asyncio
 import collections.abc
 import dataclasses
 import datetime
@@ -23,6 +24,7 @@ import structlog
 
 import compliance_summary as cs
 import consts
+import deliverydb
 import deliverydb.cache_async
 import deliverydb.model as dm
 import deliverydb.util as du
@@ -1287,18 +1289,34 @@ class ComplianceSummary(aiohttp.web.View):
         )
         await response.prepare(self.request)
 
-        await response.write(b'{"complianceSummary":[')
-        first = True
-        try:
-            for component in components:
-                component_summary = await cs.component_compliance_summary(
+        db_url: str = self.request[consts.REQUEST_DB_URL]
+
+        async def _summary_for_component(
+            component: ocm.ComponentIdentity,
+        ) -> cs.ComponentComplianceSummary:
+            # AsyncSession is not safe to share across concurrent coroutines — each needs its own.
+            # Sessions are drawn from the shared engine pool (no extra connections beyond pool_size).
+            session = await deliverydb.sqlalchemy_session_async(db_url=db_url)
+            try:
+                return await cs.component_compliance_summary(
                     component=component,
                     finding_cfgs=finding_cfgs,
-                    db_session=db_session,
+                    db_session=session,
                     component_descriptor_lookup=component_descriptor_lookup,
                     ocm_repo=ocm_repo,
                     shortcut_cache=shortcut_cache,
                 )
+            finally:
+                await session.close()
+
+        summaries = await asyncio.gather(
+            *(_summary_for_component(component) for component in components),
+        )
+
+        await response.write(b'{"complianceSummary":[')
+        try:
+            first = True
+            for component_summary in summaries:
                 if not first:
                     await response.write(b',')
                 first = False
