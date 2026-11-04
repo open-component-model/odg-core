@@ -9,7 +9,6 @@ import cyclonedx.schema
 
 import odg.model
 
-
 own_dir = os.path.dirname(__file__)
 
 

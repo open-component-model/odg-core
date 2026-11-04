@@ -6,12 +6,11 @@
 import collections.abc
 import dataclasses
 import datetime
-import logging
 import textwrap
 
 import dacite
-
 import ocm.iter
+import structlog
 
 import bdba.model as bm
 import odg.cvss
@@ -21,8 +20,7 @@ import odg_client
 import rescore.utility
 import scanner_utils.findings
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def iter_artefact_metadata(

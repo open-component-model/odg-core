@@ -4,9 +4,8 @@ import datetime
 import aiohttp
 import dacite
 import dateutil.parser
-import yaml
-
 import version
+import yaml
 
 import osinfo.model
 import util

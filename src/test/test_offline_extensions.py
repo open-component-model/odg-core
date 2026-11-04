@@ -24,7 +24,6 @@ import sys
 
 import odg.logging_cfg as lc
 
-
 EXTENSION_MODULES = [
     'artefact_enumerator',
     'backlog_controller',

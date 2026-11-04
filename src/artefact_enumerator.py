@@ -2,10 +2,10 @@ import atexit
 import collections.abc
 import dataclasses
 import datetime
-import logging
 
 import ocm
 import ocm.iter
+import structlog
 
 import k8s.backlog
 import k8s.logging
@@ -21,8 +21,7 @@ import odg.util
 import odg_client
 import paths
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging(service_name='artefact-enumerator')
 

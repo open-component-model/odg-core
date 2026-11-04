@@ -2,11 +2,11 @@
 import argparse
 import asyncio
 import concurrent.futures
-import logging
 import os
 
 import aiohttp.web
 import aiohttp_swagger3
+import structlog
 
 import artefacts
 import blobstore.blob
@@ -34,7 +34,7 @@ import service_extensions
 import special_component
 import sprints
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 own_dir = os.path.abspath(os.path.dirname(__file__))
 default_cache_dir = os.path.join(own_dir, '.cache')

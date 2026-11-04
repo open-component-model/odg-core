@@ -2,7 +2,6 @@ import collections.abc
 import dataclasses
 import hashlib
 import io
-import logging
 import os
 import tarfile
 import tempfile
@@ -10,8 +9,6 @@ import time
 
 import botocore.exceptions
 import dacite
-import requests.exceptions
-
 import oci.client
 import oci.client_async
 import oci.model
@@ -19,6 +16,8 @@ import ocm
 import ocm.iter
 import ocm.oci
 import ocm.retrieve_async
+import requests.exceptions
+import structlog
 import tarutil
 
 import odg.labels
@@ -27,8 +26,7 @@ import secret_mgmt
 import secret_mgmt.aws
 import util
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def _fetch_blob_with_retries(

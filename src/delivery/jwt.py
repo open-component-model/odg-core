@@ -9,16 +9,15 @@ import dataclasses
 import datetime
 import enum
 import functools
-import logging
 import typing
 
 import Crypto.PublicKey.RSA
 import Crypto.Util.number
 import dacite
 import jwt
+import structlog
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 JWT_KEY = 'bearer_token'
 REFRESH_TOKEN_KEY = 'refresh_token'
 

@@ -1,15 +1,14 @@
 import collections.abc
 import dataclasses
 import functools
-import logging
 
 import aiohttp.web
+import github.codeowners
 import github3
 import github3.exceptions
 import github3.users
-
-import github.codeowners
 import ocm
+import structlog
 
 import ctx_util
 import lookups
@@ -19,8 +18,7 @@ import responsibles.labels
 import secret_mgmt.github
 import util
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @dataclasses.dataclass(frozen=True)

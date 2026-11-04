@@ -1,9 +1,9 @@
 import calendar
 import time
+from unittest.mock import patch
 
 import pytest
 import yaml
-from unittest.mock import patch
 
 import paths
 import responsibles.github_statistics as rg

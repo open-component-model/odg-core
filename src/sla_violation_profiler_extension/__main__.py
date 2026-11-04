@@ -1,10 +1,10 @@
 import collections.abc
 import datetime
-import logging
 
 import ocm
 import ocm.iter
 import ocm.retrieve
+import structlog
 
 import k8s.logging
 import lookups
@@ -17,7 +17,7 @@ import paths
 import rescore.utility
 import util
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging(service_name='sla-violation-profiler')
 

@@ -1,16 +1,15 @@
 import asyncio
 import datetime
-import logging
 
 import aiohttp.typedefs
 import aiohttp.web
 import aiohttp.web_exceptions
 import prometheus_client
+import structlog
 
 import middleware.auth
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Metric names — these appear in Prometheus exposition; changing them is a breaking change.
 METRIC_REQUEST_CONCURRENCY_STARTED_SECONDS = 'request_concurrency_started_seconds'

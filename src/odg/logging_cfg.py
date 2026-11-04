@@ -47,7 +47,6 @@ import typing
 
 import structlog
 
-
 # well-known field names (OpenTelemetry semantic conventions)
 SERVICE_NAME = 'service.name'
 SERVICE_VERSION = 'service.version'

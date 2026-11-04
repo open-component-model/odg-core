@@ -6,13 +6,11 @@ import os
 
 import github3.exceptions
 import github3.repos
-import yaml
-
 import oci.client
 import ocm
+import yaml
 
 import lookups
-
 
 own_dir = os.path.abspath(os.path.dirname(__file__))
 root_dir = os.path.abspath(os.path.join(own_dir, os.pardir))

@@ -11,7 +11,6 @@ to the CVEs a team needs to fix.
 import collections
 import dataclasses
 import enum
-import logging
 import os
 import tempfile
 
@@ -22,11 +21,12 @@ import github3.pulls
 import gitutil
 import mako.template
 import ocm
+import structlog
 import version as version_util
 
+import k8s.logging
 import lookups
 import odg.extensions_cfg
-import k8s.logging
 import odg.findings
 import odg.logging_cfg
 import odg.model
@@ -37,7 +37,7 @@ import util
 
 k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging(service_name='sla-report')
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 own_dir = os.path.abspath(os.path.dirname(__file__))
 templates_dir = os.path.join(own_dir, 'templates')

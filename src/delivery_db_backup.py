@@ -2,7 +2,6 @@ import atexit
 import collections.abc
 import datetime
 import hashlib
-import logging
 import os
 import subprocess
 import tarfile
@@ -15,6 +14,7 @@ import ocm.access
 import ocm.iter
 import ocm.retrieve
 import ocm.upload
+import structlog
 import version
 
 import ctx_util
@@ -29,8 +29,7 @@ import paths
 import secret_mgmt
 import secret_mgmt.oci_registry
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging(service_name='delivery-db-backup')
 

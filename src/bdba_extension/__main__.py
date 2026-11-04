@@ -1,8 +1,8 @@
 import functools
-import logging
 
 import oci.client
 import ocm
+import structlog
 
 import bdba.client
 import bdba_utils.scan
@@ -20,8 +20,7 @@ import paths
 import secret_mgmt
 import secret_mgmt.bdba
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging(service_name='bdba')
 

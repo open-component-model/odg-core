@@ -1,10 +1,10 @@
 import collections.abc
 import dataclasses
 import itertools
-import logging
 import pprint
 
 import ocm.iter
+import structlog
 import tabulate
 import tarutil
 
@@ -18,7 +18,7 @@ import odg.model
 import util
 
 __cmd_name__ = 'bdba'
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # monkeypatch: disable html escaping
 tabulate.htmlescape = lambda x: x

@@ -1,7 +1,6 @@
 import abc
 import collections.abc
 import json
-import logging
 import os
 import tempfile
 
@@ -9,12 +8,13 @@ import oci.client
 import oci.model
 import ocm
 import ocm.iter
+import structlog
 
 import ocm_util
 import scanner_utils.model
 import secret_mgmt
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 _OCI_IMAGE_ARCHIVE_MEDIA_TYPES = frozenset(
     {

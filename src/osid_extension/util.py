@@ -1,12 +1,10 @@
-import logging
-
 import awesomeversion
+import structlog
 
 import odg.model
 import osinfo.model
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def find_branch_info(

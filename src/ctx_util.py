@@ -1,14 +1,13 @@
 import functools
-import logging
 import os
 
+import structlog
 import watchdog.events
 import watchdog.observers.polling
 
 import secret_mgmt
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 own_dir = os.path.abspath(os.path.dirname(__file__))
 
 

@@ -9,7 +9,6 @@ import requests.cookies
 import odg_client
 import odg_client.jwt
 
-
 ISSUER = 'test-issuer'
 private_key = Crypto.PublicKey.RSA.generate(4096)
 public_key = private_key.public_key()
