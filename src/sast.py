@@ -3,9 +3,9 @@ import collections.abc
 import datetime
 import enum
 import functools
-import logging
 
 import ocm
+import structlog
 
 import k8s.logging
 import k8s.util
@@ -19,8 +19,7 @@ import odg_client
 import paths
 import rescore.utility
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging(service_name='sast')
 

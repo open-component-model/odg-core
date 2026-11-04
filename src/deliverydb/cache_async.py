@@ -3,13 +3,13 @@ import collections.abc
 import dataclasses
 import datetime
 import http
-import logging
 import traceback
 
 import aiohttp.web
 import dacite
 import sqlalchemy.exc
 import sqlalchemy.ext.asyncio as sqlasync
+import structlog
 
 import consts
 import deliverydb
@@ -19,8 +19,7 @@ import deliverydb_cache.util as dcu
 import features
 import util
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 async def update_cache_entry(

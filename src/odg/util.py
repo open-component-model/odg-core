@@ -2,7 +2,6 @@ import argparse
 import atexit
 import collections.abc
 import dataclasses
-import logging
 import os
 import signal
 import sys
@@ -11,6 +10,7 @@ import uuid
 
 import oci.client
 import ocm
+import structlog
 
 import consts
 import ctx_util
@@ -25,8 +25,7 @@ import odg_client
 import paths
 import secret_mgmt
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 own_dir = os.path.abspath(os.path.dirname(__file__))
 root_dir = os.path.join(own_dir, os.pardir)

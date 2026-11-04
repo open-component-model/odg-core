@@ -1,6 +1,5 @@
-import logging
-
 import ocm.iter
+import structlog
 
 import bdba.client
 import bdba.model as bm
@@ -9,7 +8,7 @@ import odg.model
 import rescore.utility as ru
 import scanner_utils.rescore
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def rescore(

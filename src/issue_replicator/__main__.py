@@ -3,7 +3,6 @@ import collections.abc
 import dataclasses
 import enum
 import functools
-import logging
 import time
 
 import cachetools
@@ -11,6 +10,7 @@ import dacite
 import github.user
 import github3.repos
 import ocm
+import structlog
 
 import github_util
 import issue_replicator.github
@@ -32,8 +32,7 @@ import sprints.model as sm
 import sprints.util as su
 import util
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging(service_name='issue-replicator')
 

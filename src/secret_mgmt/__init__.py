@@ -1,17 +1,17 @@
 import collections.abc
 import dataclasses
 import enum
-import logging
 import os
 import typing
 
 import dacite
 import dacite.exceptions
+import structlog
 import yaml
 
 import util
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @dataclasses.dataclass

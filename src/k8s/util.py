@@ -1,6 +1,5 @@
 import dataclasses
 import http
-import logging
 import random
 import re
 import time
@@ -10,17 +9,16 @@ import kubernetes.client.models.v1_deployment
 import kubernetes.client.rest
 import kubernetes.config
 import kubernetes.dynamic
-import yaml
-
 import ocm
 import ocm.iter
+import structlog
+import yaml
 
 import k8s.model
 import odg.extensions_cfg
 import odg.model
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @dataclasses.dataclass(frozen=True)

@@ -2,15 +2,14 @@ import json
 import pathlib
 import unittest.mock
 
-import pytest
-
 import oci.model
 import ocm
+import pytest
+
+import ocm_util
 import odg.extensions_cfg
 import odg.labels
 import odg.model
-
-import ocm_util
 import sbom_generator
 import test.resources.lookup_mocks as _lookup_mocks
 

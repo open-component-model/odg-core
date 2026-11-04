@@ -1,9 +1,9 @@
 import datetime
 import functools
-import logging
 
 import aiohttp.web
 import dateutil.parser
+import structlog
 import yaml
 
 import consts
@@ -13,8 +13,7 @@ import osinfo.model
 import osinfo.paths
 import util
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @functools.cache

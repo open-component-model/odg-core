@@ -2,7 +2,6 @@ import json
 import zlib
 
 import aiohttp.web
-
 import oci.model
 import ocm
 

@@ -3,13 +3,13 @@ import datetime
 import enum
 import hashlib
 import http
-import logging
 import os
 import time
 
 import dacite
 import dateutil.parser
 import kubernetes.client.rest
+import structlog
 
 import k8s.model
 import k8s.util
@@ -17,8 +17,7 @@ import odg.extensions_cfg
 import odg.model
 import util
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 LABEL_CLAIMED = f'{k8s.model.BacklogItemCrd.DOMAIN}/claimed'
 ANNOTATION_CLAIMED_BY = f'{k8s.model.BacklogItemCrd.DOMAIN}/claimed-by'

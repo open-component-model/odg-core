@@ -6,23 +6,22 @@ import collections.abc
 import datetime
 import enum
 import functools
-import logging
 import time
 import traceback
 import urllib.parse
-import urllib3.util.retry
 
 import cachecontrol
 import dacite
 import dateutil.parser
 import requests
+import structlog
+import urllib3.util.retry
 
 import bdba.limits
 import bdba.model as bm
 import bdba.util as bu
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def kebab_to_snake_case_keys(d: dict[str, dict | list | str | int]) -> dict:

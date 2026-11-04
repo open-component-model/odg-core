@@ -18,12 +18,13 @@ import dacite
 import kubernetes.client
 import kubernetes.client.rest
 import kubernetes.watch
-import urllib3
-import yaml
-
 import oci.client
 import ocm
 import ocm.iter
+import structlog
+import urllib3
+import version as versionutil
+import yaml
 
 import k8s.model
 import k8s.util
@@ -36,11 +37,9 @@ import odg_operator.odg_model as odgm
 import odg_operator.odg_util as odgu
 import paths
 import util
-import version as versionutil
-
 
 odg.logging_cfg.configure_logging(service_name='odg-operator')
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 ODG_CLEAN_UP_FINALISER = 'open-delivery-gear.ocm.software/odg-clean-up'
 ODG_RECONCILE_ANNOTATION = 'open-delivery-gear.ocm.software/reconcile'

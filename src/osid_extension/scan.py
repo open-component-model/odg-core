@@ -2,10 +2,10 @@ import collections.abc
 import tarfile
 
 import dacite
+import version
 
 import ocm_util
 import odg.model
-import version
 
 
 def _parse_os_release(contents: str) -> collections.abc.Generator[tuple[str, str], None, None]:

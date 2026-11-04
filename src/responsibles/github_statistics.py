@@ -1,7 +1,6 @@
 import collections.abc
 import dataclasses
 import enum
-import logging
 import time
 import urllib.parse
 
@@ -9,6 +8,7 @@ import cachetools
 import github3
 import github3.orgs
 import github3.repos.repo
+import structlog
 
 import ctx_util
 import odg.model
@@ -17,8 +17,7 @@ import responsibles
 import secret_mgmt.github
 import util
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class ResponsibleDeterminationConfidence(enum.Enum):

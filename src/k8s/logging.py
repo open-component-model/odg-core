@@ -6,13 +6,13 @@ import time
 import traceback
 
 import kubernetes.client.rest
+import structlog
 
 import k8s.model
 import k8s.util
 import odg.extensions_cfg
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 supported_log_levels = {logging.INFO, logging.WARNING, logging.ERROR}
 

@@ -1,17 +1,15 @@
 import dataclasses
-import logging
 import re
 
 import github3.github
 import github3.session
-
 import http_requests
+import structlog
 
 import secret_mgmt
 import util
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @dataclasses.dataclass

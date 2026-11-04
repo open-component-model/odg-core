@@ -1,10 +1,10 @@
 import datetime
 import http
-import logging
 import math
 
 import dateutil.parser
 import kubernetes.client.rest
+import structlog
 import urllib3.exceptions
 
 import k8s.backlog
@@ -16,8 +16,7 @@ import odg.logging_cfg
 import odg.util
 import paths
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging(service_name='backlog-controller')
 

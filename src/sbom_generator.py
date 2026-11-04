@@ -3,7 +3,6 @@ import dataclasses
 import datetime
 import hashlib
 import json
-import logging
 import os
 import tempfile
 import time
@@ -12,6 +11,7 @@ import oci.client
 import ocm
 import ocm.iter
 import requests.exceptions
+import structlog
 
 import bdba.client
 import bdba.model
@@ -29,7 +29,7 @@ import secret_mgmt
 import secret_mgmt.bdba
 import syft
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging(service_name='sbom-generator')
 own_dir = os.path.abspath(os.path.dirname(__file__))

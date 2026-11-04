@@ -9,7 +9,6 @@ import sqlalchemy.orm.decl_api
 
 import secret_mgmt.oauth_cfg
 
-
 Base: sqlalchemy.orm.decl_api.DeclarativeMeta = sqlalchemy.orm.declarative_base()
 
 uuid = str

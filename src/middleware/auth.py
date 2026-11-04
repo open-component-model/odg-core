@@ -3,7 +3,6 @@ import collections.abc
 import datetime
 import enum
 import functools
-import logging
 import re
 import urllib.parse
 import uuid
@@ -16,8 +15,9 @@ import cryptography.hazmat.primitives.asymmetric.rsa
 import jsonschema
 import jsonschema.exceptions
 import jwt
-import sqlalchemy.orm
 import sqlalchemy.ext.asyncio as sqlasync
+import sqlalchemy.orm
+import structlog
 import yaml
 
 import consts
@@ -31,8 +31,7 @@ import secret_mgmt.rbac
 import secret_mgmt.signing_cfg
 import util
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 SESSION_TOKEN_MAX_AGE = datetime.timedelta(minutes=5)
 

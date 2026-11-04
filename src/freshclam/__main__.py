@@ -12,7 +12,6 @@ import uvicorn
 import odg.logging_cfg
 import paths
 
-
 odg.logging_cfg.configure_logging(service_name='freshclam')
 odg.logging_cfg.route_foreign_loggers('uvicorn', 'uvicorn.access', 'uvicorn.error')
 # drop noisy kubelet probe access-log entries (2xx/3xx; failures still logged)

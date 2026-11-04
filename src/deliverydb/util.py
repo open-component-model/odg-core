@@ -2,15 +2,14 @@ import collections.abc
 import dataclasses
 import hashlib
 
-import sqlalchemy as sa
-import sqlalchemy.ext.asyncio as sqlasync
-import sqlalchemy.sql.elements as sqle
-
 import oci.model
 import ocm
 import ocm.iter
 import ocm.iter_async
 import ocm.retrieve_async
+import sqlalchemy as sa
+import sqlalchemy.ext.asyncio as sqlasync
+import sqlalchemy.sql.elements as sqle
 
 import deliverydb.model as dm
 import odg.model
