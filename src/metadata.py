@@ -1,6 +1,7 @@
 import collections.abc
 import datetime
 import http
+import json
 import typing
 import uuid
 
@@ -1110,22 +1111,6 @@ class ArtefactMetadataQuery(aiohttp.web.View):
                 ),
             )
 
-        async def serialise_and_enrich_finding(
-            finding: odg.model.ArtefactMetadata,
-        ) -> dict:
-            def result_dict(
-                finding: odg.model.ArtefactMetadata,
-                meta: dict = None,
-            ) -> dict:
-                finding_dict = util.dict_serialisation(finding)
-
-                if meta:
-                    finding_dict['meta'] = meta
-
-                return finding_dict
-
-            return result_dict(finding)
-
         db_session: sqlasync.session.AsyncSession = self.request[consts.REQUEST_DB_SESSION]
         db_stream = await db_session.stream(db_statement)
 
@@ -1147,24 +1132,27 @@ class ArtefactMetadataQuery(aiohttp.web.View):
         try:
             async for partition in db_stream.partitions(size=50):
                 for row in partition:
-                    artefact_metadatum = du.db_artefact_metadata_row_to_dso(row)
+                    row_dict = du.db_artefact_metadata_to_dict(row[0])
 
-                    # only yield findings not explicitly filtered-out by central finding-cfg
-                    for finding_cfg in finding_cfgs:
-                        type_matches = finding_cfg.type == artefact_metadatum.meta.type
-                        if type_matches and not finding_cfg.matches(artefact_metadatum.artefact):
-                            # artefact metadatum is filtered-out, do not include it
-                            break
-                    else:
-                        # artefact metadatum was not explicitly filtered-out by central finding-cfg
-                        if not first:
-                            await response.write(b',')
-                        first = False
-                        await response.write(
-                            util.dict_to_json_factory(
-                                await serialise_and_enrich_finding(artefact_metadatum),
-                            ).encode(),
-                        )
+                    if finding_cfgs:
+                        # only pay the dataclass cost when cfgs are configured
+                        artefact_metadatum = odg.model.ArtefactMetadata.from_dict(raw=row_dict)
+                        skip = False
+                        for finding_cfg in finding_cfgs:
+                            if (
+                                finding_cfg.type == artefact_metadatum.meta.type
+                                and not finding_cfg.matches(artefact_metadatum.artefact)
+                            ):
+                                skip = True
+                                break
+                        if skip:
+                            continue
+
+                    if not first:
+                        await response.write(b',')
+                    first = False
+                    await response.write(json.dumps(row_dict).encode())
+
             await response.write(b']')
             await response.write_eof()
         except Exception:
