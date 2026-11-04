@@ -3,6 +3,7 @@ import collections.abc
 import datetime
 import enum
 import functools
+import hashlib
 import re
 import urllib.parse
 import uuid
@@ -530,6 +531,10 @@ def find_oidc_role_bindings(
         )
 
 
+def hash_refresh_token_identifier(identifier: str) -> str:
+    return hashlib.sha256(identifier.encode()).hexdigest()
+
+
 async def set_session_and_refresh_token(
     user_id: str,
     issuer: str,
@@ -554,6 +559,7 @@ async def set_session_and_refresh_token(
     refresh_tokens = list(user.refresh_tokens)
 
     if existing_refresh_token_identifier is not None:
+        existing_hash = hash_refresh_token_identifier(existing_refresh_token_identifier)
         # check if provided refresh token is valid (not expired) and if so, remove it from list of
         # persisted tokens -> user will get a new refresh token
         for refresh_token in refresh_tokens:
@@ -563,7 +569,7 @@ async def set_session_and_refresh_token(
             )
             if token_exp <= now:
                 continue
-            if refresh_token['identifier'] == existing_refresh_token_identifier:
+            if refresh_token['identifier'] == existing_hash:
                 refresh_tokens.remove(refresh_token)
                 break
         else:
@@ -575,7 +581,7 @@ async def set_session_and_refresh_token(
     if use_refresh_token:
         refresh_tokens.append(
             {
-                'identifier': refresh_token_identifier,
+                'identifier': hash_refresh_token_identifier(refresh_token_identifier),
                 'exp': int(refresh_token_exp.timestamp()),
             },
         )
@@ -916,10 +922,11 @@ class OAuthLogout(aiohttp.web.View):
         if not (user := await db_session.get(dm.User, user_id)):
             return response
 
+        identifier_hash = hash_refresh_token_identifier(refresh_token_identifier)
         user.refresh_tokens = [
             refresh_token
             for refresh_token in user.refresh_tokens
-            if refresh_token['identifier'] != refresh_token_identifier
+            if refresh_token['identifier'] != identifier_hash
         ]
         db_session.add(user)
         await db_session.commit()
