@@ -3,6 +3,12 @@ Tests for `migrations.bootstrap.main`. The third test reproduces the bug from
 PR review: a follow-up revision exists on disk but was never applied to the
 legacy database, and bootstrap must stamp at the base revision and upgrade
 instead of stamping at head.
+
+The legacy database is simulated faithfully: apply the baseline migration, then
+drop `alembic_version`. Using `create_all` instead would bake the current model
+into the database (including columns added after the baseline), which is not a
+state any real create_all-era database can be in and makes `upgrade head` fail
+on re-adding them.
 """
 
 import os
@@ -11,10 +17,10 @@ import sys
 import textwrap
 from collections.abc import Generator
 
+from alembic.config import main as alembic_main
 import pytest
 import sqlalchemy
 
-import deliverydb.model
 import migrations.bootstrap
 
 
@@ -49,12 +55,14 @@ def test_alembic_managed_database_is_idempotent(bootstrap_db: sqlalchemy.Engine)
 TEST_REVISION_ID = 'b00t5trap0test'
 TEST_MARKER_COLUMN = 'bootstrap_test_marker'
 
-FOLLOWUP_REVISION = textwrap.dedent(f"""
+
+def _followup_revision(down_revision: str) -> str:
+    return textwrap.dedent(f"""
 from alembic import op
 import sqlalchemy as sa
 
 revision: str = {TEST_REVISION_ID!r}
-down_revision: str | None = {'cc90ad81441c'!r}
+down_revision: str | None = {down_revision!r}
 
 def schema_upgrade() -> None:
     op.add_column('cache', sa.Column({TEST_MARKER_COLUMN!r}, sa.Integer, nullable=True))
@@ -101,6 +109,9 @@ def _run_bootstrap_in_subprocess(dsn: str) -> str:
     return result.stderr
 
 
+BASE_REVISION = 'cc90ad81441c'
+
+
 def test_legacy_database_picks_up_followup_revision(
     bootstrap_db: sqlalchemy.Engine,
 ):
@@ -110,11 +121,26 @@ def test_legacy_database_picks_up_followup_revision(
     and the post-check must pass.
     """
     engine = bootstrap_db
-    deliverydb.model.Base.metadata.create_all(engine)
+
+    # legacy database: schema at the baseline revision, but not alembic-managed
+    alembic_main(
+        argv=[
+            '-c',
+            migrations.ini_path,
+            '-x',
+            f'db_url={engine.url.render_as_string(hide_password=False)}',
+            'upgrade',
+            BASE_REVISION,
+        ],
+    )
+    with engine.begin() as connection:
+        connection.execute(sqlalchemy.text('DROP TABLE alembic_version'))
 
     versions_dir = pathlib.Path(migrations.bootstrap.migrations.__file__).parent / 'versions'
     revision_file = versions_dir / f'{TEST_REVISION_ID}_bootstrap_followup.py'
-    revision_file.write_text(FOLLOWUP_REVISION)
+    # chain off the current head: any revision checked in after the baseline is
+    # applied on top of it, so the follow-up must come after it
+    revision_file.write_text(_followup_revision(down_revision=migrations.bootstrap._head_revision()))
     try:
         _run_bootstrap_in_subprocess(engine.url.render_as_string(hide_password=False))
     finally:
