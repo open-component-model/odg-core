@@ -1,17 +1,14 @@
 import datetime
 import functools
 
-import aiohttp.web
 import dateutil.parser
 import structlog
 import yaml
 
-import consts
 import eol
 import osinfo.alpine
 import osinfo.model
 import osinfo.paths
-import util
 
 logger = structlog.get_logger(__name__)
 
@@ -128,57 +125,3 @@ def os_release_info_from_release_cycle(
         eol_date=eol_date(),
         reached_eol=reached_eol(),
     )
-
-
-class OsInfoRoutes(aiohttp.web.View):
-    async def options(self):
-        return aiohttp.web.Response()
-
-    async def get(self):
-        """
-        ---
-        tags:
-        - OS info
-        parameters:
-        - in: path
-          name: os_id
-          required: true
-          schema:
-            type: string
-        responses:
-          "200":
-            description: Successful operation.
-            content:
-              application/json:
-                schema:
-                  type: array
-                  items:
-                    type: object
-                    required:
-                    - name
-                    - reached_eol
-                    properties:
-                      name:
-                        type: string
-                      reached_eol:
-                        type: boolean
-                      greatest_version:
-                        type: string
-                      eol_date:
-                        type: string
-        """
-        os_id = self.request.match_info.get('os_id')
-
-        release_infos = os_release_infos(
-            os_id=eol.normalise_os_id(os_id),
-            eol_client=self.request.app[consts.APP_EOL_CLIENT],
-        )
-
-        if not release_infos:
-            # change to 404 eventually
-            raise aiohttp.web.HTTPBadRequest(text=os_id)
-
-        return aiohttp.web.json_response(
-            data=release_infos,
-            dumps=util.dict_to_json_factory,
-        )
