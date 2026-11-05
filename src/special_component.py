@@ -1,7 +1,20 @@
 import aiohttp.web
+import github3.exceptions
 
 import features
 import util
+
+
+def retrieve_version(version_cfg, component_id: str) -> str | None:
+    if not version_cfg:
+        return None
+    try:
+        return version_cfg.retrieve()
+    except (ValueError, github3.exceptions.NotFoundError) as e:
+        raise aiohttp.web.HTTPUnprocessableEntity(
+            reason=f'special component {component_id!r} has a misconfigured '
+            f'currentVersion.source.repo: {e}',
+        )
 
 
 class CurrentDependencies(aiohttp.web.View):
@@ -43,9 +56,7 @@ class CurrentDependencies(aiohttp.web.View):
             {
                 'name': dependency.name,
                 'displayName': dependency.displayName,
-                'version': (
-                    dependency.currentVersion.retrieve() if dependency.currentVersion else None
-                ),
+                'version': retrieve_version(dependency.currentVersion, dependency.name),
             }
             for dependency in component_cfg.dependencies
         ]
@@ -54,8 +65,6 @@ class CurrentDependencies(aiohttp.web.View):
             data={
                 'displayName': component_cfg.displayName,
                 'componentDependencies': resolved_dependencies,
-                'version': (
-                    component_cfg.currentVersion.retrieve() if component_cfg.currentVersion else None
-                ),
+                'version': retrieve_version(component_cfg.currentVersion, id),
             },
         )
