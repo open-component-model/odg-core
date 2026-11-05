@@ -25,10 +25,10 @@ class Snapshot:
         self._path = pathlib.Path(path)
         self._is_json = self._path.suffix == '.json'
 
-    def _serialise(self, actual: dict | list | str) -> str:
+    def _serialise(self, actual: dict | list | tuple | str) -> str:
         if not self._is_json:
             return actual
-        if isinstance(actual, list):
+        if isinstance(actual, (list, tuple)):
             return (
                 json.dumps(
                     sorted(actual, key=lambda e: json.dumps(e, sort_keys=True)),
