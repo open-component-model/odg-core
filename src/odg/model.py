@@ -27,6 +27,25 @@ def _as_key(
     return separator.join(absent_indicator if arg is None else arg for arg in args)
 
 
+def append_nvd_url(cve: str, urls: list[str]) -> list[str]:
+    nvd_url = f'https://nvd.nist.gov/vuln/detail/{cve}'
+    if cve.startswith('CVE-') and nvd_url not in urls:
+        return [*urls, nvd_url]
+    return urls
+
+
+def backfill_cvss_score(cvss_score: float | None, cvss_v3_score: float | None) -> float | None:
+    return cvss_v3_score if cvss_score is None else cvss_score
+
+
+def normalise_timestamp(value: str | datetime.datetime | None) -> str | None:
+    if isinstance(value, datetime.datetime):
+        return value.isoformat()
+    if isinstance(value, str):
+        return datetime.datetime.fromisoformat(value).isoformat()
+    return value
+
+
 class Datatype(enum.StrEnum):
     # finding independent datatypes/"meta"-types
     ARTEFACT_SCAN_INFO = 'meta/artefact_scan_info'
@@ -517,9 +536,7 @@ class VulnerabilityFinding(Finding):
     def __post_init__(self):
         if self.cvss_score is None:
             raise ValueError(f'cvss_score is required (cve={self.cve})')
-        nvd_url = f'https://nvd.nist.gov/vuln/detail/{self.cve}'
-        if self.cve.startswith('CVE-') and nvd_url not in self.urls:
-            self.urls.append(nvd_url)
+        self.urls = append_nvd_url(self.cve, self.urls)
 
     @property
     def key(self) -> str:
@@ -534,8 +551,7 @@ class BDBAVulnerabilityFinding(VulnerabilityFinding, BDBAMixin):
     ] = None
 
     def __post_init__(self):
-        if self.cvss_score is None and self.cvss_v3_score is not None:
-            self.cvss_score = self.cvss_v3_score
+        self.cvss_score = backfill_cvss_score(self.cvss_score, self.cvss_v3_score)
         super().__post_init__()
 
 

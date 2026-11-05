@@ -64,6 +64,31 @@ def to_db_artefact_metadata(
 def db_artefact_metadata_to_dict(
     artefact_metadata: dm.ArtefactMetaData,
 ) -> dict:
+    meta = artefact_metadata.meta or {}
+    data = artefact_metadata.data
+    row_type = artefact_metadata.type
+
+    if isinstance(data, dict):
+        if row_type == odg.model.Datatype.VULNERABILITY_FINDING:
+            cve = data.get('cve') or ''
+            data = {
+                **data,
+                'cvss_score': odg.model.backfill_cvss_score(
+                    data.get('cvss_score'),
+                    data.get('cvss_v3_score'),
+                ),
+                'purl': data.get('purl'),
+                'rating_source': data.get('rating_source'),
+                'recommendation': data.get('recommendation'),
+                'urls': odg.model.append_nvd_url(cve, list(data.get('urls') or [])),
+            }
+        elif row_type == odg.model.Datatype.RESCORING:
+            data = {
+                **data,
+                'allowed_processing_time': data.get('allowed_processing_time'),
+                'due_date': data.get('due_date'),
+            }
+
     return {
         'artefact': {
             'component_name': artefact_metadata.component_name,
@@ -75,9 +100,16 @@ def db_artefact_metadata_to_dict(
                 'artefact_type': artefact_metadata.artefact_type,
                 'artefact_extra_id': artefact_metadata.artefact_extra_id,
             },
+            'references': [],
         },
-        'meta': artefact_metadata.meta,
-        'data': artefact_metadata.data,
+        'meta': {
+            **meta,
+            'assignee_mode': meta.get('assignee_mode'),
+            'creation_date': odg.model.normalise_timestamp(meta.get('creation_date')),
+            'last_update': odg.model.normalise_timestamp(meta.get('last_update')),
+            'responsibles': meta.get('responsibles'),
+        },
+        'data': data,
         'discovery_date': (
             artefact_metadata.discovery_date.isoformat()
             if artefact_metadata.discovery_date
