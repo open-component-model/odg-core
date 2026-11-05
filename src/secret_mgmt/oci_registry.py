@@ -8,6 +8,7 @@ import oci.util
 import structlog
 
 import secret_mgmt
+import util
 
 
 logger = structlog.get_logger(__name__)
@@ -26,6 +27,22 @@ class OciRegistry:
                 'Found OCI registry credentials without `image_reference_prefixes` configured, '
                 'the credentials will not be utilised',
             )
+
+        image_reference_prefixes = []
+
+        for image_reference_prefix in self.image_reference_prefixes:
+            parsed_url = util.urlparse(image_reference_prefix)
+
+            if not parsed_url.netloc:
+                logger.warning(
+                    'Found OCI registry credentials with empty image reference prefix, skipping',
+                    image_reference_prefix=image_reference_prefix,
+                )
+
+            path = parsed_url.path or '/'
+            image_reference_prefixes.append(f'{parsed_url.netloc}{path}')
+
+        self.image_reference_prefixes = image_reference_prefixes
 
     def image_reference_matches(
         self,

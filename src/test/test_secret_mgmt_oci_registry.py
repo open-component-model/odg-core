@@ -15,6 +15,12 @@ def _make_cfg(
     )
 
 
+def test_prefix_bare_host_gets_slash():
+    # path defaults to '/' when absent so the prefix ends with /
+    cfg = _make_cfg(['ghcr.io'])
+    assert cfg.image_reference_prefixes == ['ghcr.io/']
+
+
 def test_prefix_multiple_entries_all_normalised():
     cfg = _make_cfg(['ghcr.io/a/', 'quay.io/b/'])
     assert cfg.image_reference_prefixes == ['ghcr.io/a/', 'quay.io/b/']
