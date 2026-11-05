@@ -623,6 +623,7 @@ async def set_session_and_refresh_token(
         ),
         httponly=True,
         samesite='strict',
+        secure=True,
         max_age=int(SESSION_TOKEN_MAX_AGE.total_seconds()),
     )
 
@@ -646,6 +647,7 @@ async def set_session_and_refresh_token(
         ),
         httponly=True,
         samesite='strict',
+        secure=True,
         max_age=int(REFRESH_TOKEN_MAX_AGE.total_seconds()),
     )
 
