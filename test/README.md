@@ -84,6 +84,13 @@ uv run pytest test_canary.py -v --profile memray   # memray only
 Output files (py-spy speedscope JSON, memray binary, container log) are written to a
 temporary directory logged at the end of the run.
 
+To open a memray binary as a flamegraph in the browser:
+
+```bash
+uvx memray flamegraph <file>.memray.bin --output <file>.flamegraph.html
+open <file>.flamegraph.html
+```
+
 ### Snapshots
 
 `Snapshot` auto-writes on first run and asserts equality on subsequent runs.
