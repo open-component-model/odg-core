@@ -299,16 +299,26 @@ def generate_sbom_for_artefact(
     if existing_metadata:
         old_digest = existing_metadata.get('data', {}).get('digest')
 
-        if extension_cfg.on_exist is odg.model.OnExist.SKIP:
-            logger.info(
-                f'SBOM already exists for {artefact}, skipping generation (digest: {old_digest})',
-            )
-            return None
+        try:
+            delivery_service_client.get_blob(digest=old_digest)
 
-        logger.info(
-            f'SBOM exists for {artefact}, will overwrite and clean up old blob '
-            f'(old digest: {old_digest})',
-        )
+            if extension_cfg.on_exist is odg.model.OnExist.SKIP:
+                logger.info(
+                    f'SBOM already exists for {artefact}, skipping generation ({old_digest=})',
+                )
+                return None
+
+            logger.info(
+                f'SBOM exists for {artefact}, will overwrite and clean up old blob '
+                f'(old digest: {old_digest})',
+            )
+        except requests.exceptions.HTTPError as e:
+            if e.response is None or e.response.status_code != 404:
+                raise
+
+            logger.warning(
+                'SBOM metadata artefact exists but blob could not be found, generating new one',
+            )
 
     else:
         logger.info(f'No existing SBOM found for {artefact}, generating new one')

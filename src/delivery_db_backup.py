@@ -52,9 +52,9 @@ def create_local_backup(
         '--format',
         'tar',
         '--verbose',
+        '--table',
+        'artefact_metadata',
     ] + additional_args
-
-    logger.info(f'{pg_dump_argv=}')
 
     process = subprocess.Popen(
         pg_dump_argv,

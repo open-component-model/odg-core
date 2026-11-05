@@ -69,6 +69,12 @@ make run JSON_LOGS=1
 ```
 The flag is a per-invocation override, so you can flip it per run without changing any file.
 
+Log level defaults to `INFO` and can be set via the `ODG_LOG_LEVEL` env var (any ODG process),
+or the `--log-level` CLI flag for the delivery-service (wins over the env var):
+```shell
+ODG_LOG_LEVEL=DEBUG make run
+```
+
 Extensions always log JSON. To read them locally, pipe through `jq` (non-JSON lines pass through unchanged):
 ```shell
 uv run python -m malware 2>&1 | jq -Rr 'fromjson? // .'

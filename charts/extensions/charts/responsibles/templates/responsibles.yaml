@@ -58,6 +58,8 @@ spec:
               value: /findings_cfg/findings_cfg
             - name: K8S_TARGET_NAMESPACE
               value: {{ .Values.target_namespace | default .Release.Namespace }}
+            - name: ODG_LOG_LEVEL
+              value: {{ .Values.logLevel | default "INFO" | quote }}
           volumeMounts:
             - name: github
               mountPath: /secrets/github

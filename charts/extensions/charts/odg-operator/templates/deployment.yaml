@@ -59,6 +59,8 @@ spec:
             value: /secrets
           - name: EXTENSIONS_CFG_PATH
             value: /extensions_cfg/extensions_cfg
+          - name: ODG_LOG_LEVEL
+            value: {{ .Values.logLevel | default "INFO" | quote }}
           {{- if default dict .Values.envVars }}
           {{- range $key, $value := .Values.envVars }}
           - name: {{ $key }}

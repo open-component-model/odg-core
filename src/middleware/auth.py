@@ -3,6 +3,7 @@ import collections.abc
 import datetime
 import enum
 import functools
+import hashlib
 import re
 import urllib.parse
 import uuid
@@ -530,19 +531,8 @@ def find_oidc_role_bindings(
         )
 
 
-def build_refresh_token_payload(
-    user_id: str,
-    refresh_token_identifier: str,
-    separator: str = '|',
-) -> str:
-    return f'{user_id}{separator}{refresh_token_identifier}'
-
-
-def parse_refresh_token_payload(
-    refresh_token_payload: str,
-    separator: str = '|',
-) -> tuple[str, str]:
-    return refresh_token_payload.split(separator)
+def hash_refresh_token_identifier(identifier: str) -> str:
+    return hashlib.sha256(identifier.encode()).hexdigest()
 
 
 async def set_session_and_refresh_token(
@@ -565,26 +555,34 @@ async def set_session_and_refresh_token(
     if not (role_bindings := user.role_bindings):
         raise aiohttp.web.HTTPUnauthorized(text='User is not authorised to access this service')
 
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
     refresh_tokens = list(user.refresh_tokens)
 
     if existing_refresh_token_identifier is not None:
-        # check if provided refresh token is valid and if so, remove it from list of persisted tokens
-        # -> user will get a new refresh token
+        existing_hash = hash_refresh_token_identifier(existing_refresh_token_identifier)
+        # check if provided refresh token is valid (not expired) and if so, remove it from list of
+        # persisted tokens -> user will get a new refresh token
         for refresh_token in refresh_tokens:
-            if refresh_token['identifier'] == existing_refresh_token_identifier:
+            token_exp = datetime.datetime.fromtimestamp(
+                timestamp=refresh_token['exp'],
+                tz=datetime.timezone.utc,
+            )
+            if token_exp <= now:
+                continue
+            if refresh_token['identifier'] == existing_hash:
                 refresh_tokens.remove(refresh_token)
                 break
         else:
             raise aiohttp.web.HTTPUnauthorized(text='The provided refresh token is not valid')
 
-    now = datetime.datetime.now(tz=datetime.timezone.utc)
     refresh_token_identifier = str(uuid.uuid4())
+    refresh_token_exp = now + REFRESH_TOKEN_MAX_AGE
 
     if use_refresh_token:
         refresh_tokens.append(
             {
-                'identifier': refresh_token_identifier,
-                'exp': int((now + REFRESH_TOKEN_MAX_AGE).timestamp()),
+                'identifier': hash_refresh_token_identifier(refresh_token_identifier),
+                'exp': int(refresh_token_exp.timestamp()),
             },
         )
 
@@ -625,22 +623,31 @@ async def set_session_and_refresh_token(
         ),
         httponly=True,
         samesite='strict',
+        secure=True,
         max_age=int(SESSION_TOKEN_MAX_AGE.total_seconds()),
     )
 
     if not use_refresh_token:
         return response
 
-    refresh_token_payload = build_refresh_token_payload(
-        user_id=user_id,
-        refresh_token_identifier=refresh_token_identifier,
-    )
+    refresh_token = {
+        'iss': issuer,
+        'exp': int(refresh_token_exp.timestamp()),
+        'key_id': signing_cfg.id,
+        'sub': user_id,
+        'identifier': refresh_token_identifier,
+    }
 
     response.set_cookie(
         name=odg_client.jwt.REFRESH_TOKEN_KEY,
-        value=refresh_token_payload,
+        value=jwt.encode(
+            refresh_token,
+            _prepared_signing_key(signing_cfg.private_key, signing_cfg.algorithm),
+            algorithm=signing_cfg.algorithm,
+        ),
         httponly=True,
         samesite='strict',
+        secure=True,
         max_age=int(REFRESH_TOKEN_MAX_AGE.total_seconds()),
     )
 
@@ -834,7 +841,38 @@ class OAuthRefresh(aiohttp.web.View):
                 text='Please provide a refresh token in your cookie',
             )
 
-        user_id, refresh_token_identifier = parse_refresh_token_payload(refresh_token)
+        decoded_refresh_token = decode_jwt(
+            token=refresh_token,
+            issuer=issuer,
+            verify_signature=False,
+        )
+
+        secret_factory = ctx_util.secret_factory()
+
+        signing_cfg = get_signing_cfg_for_key(
+            secret_factory=secret_factory,
+            key_id=decoded_refresh_token.get('key_id'),
+        )
+
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            functools.partial(
+                decode_jwt,
+                token=refresh_token,
+                issuer=issuer,
+                signing_cfg=signing_cfg,
+                verify_signature=True,
+            ),
+        )
+
+        user_id = decoded_refresh_token['sub']
+
+        if 'identifier' not in decoded_refresh_token:
+            raise aiohttp.web.HTTPUnauthorized(
+                text='The provided refresh token is not valid',
+            )
+        refresh_token_identifier = decoded_refresh_token['identifier']
 
         return await set_session_and_refresh_token(
             user_id=user_id,
@@ -864,17 +902,33 @@ class OAuthLogout(aiohttp.web.View):
         if not refresh_token:
             return response
 
+        issuer = self.request.app[consts.APP_BASE_URL]
         db_session: sqlasync.session.AsyncSession = self.request[consts.REQUEST_DB_SESSION]
 
-        user_id, refresh_token_identifier = parse_refresh_token_payload(refresh_token)
+        try:
+            decoded_refresh_token = decode_jwt(
+                token=refresh_token,
+                issuer=issuer,
+                verify_signature=False,
+            )
+        except aiohttp.web.HTTPUnauthorized:
+            return response
+
+        user_id = decoded_refresh_token['sub']
+
+        if 'identifier' not in decoded_refresh_token:
+            return response
+
+        refresh_token_identifier = decoded_refresh_token['identifier']
 
         if not (user := await db_session.get(dm.User, user_id)):
-            raise aiohttp.web.HTTPUnauthorized(text=f'Did not find user with {user_id=}')
+            return response
 
+        identifier_hash = hash_refresh_token_identifier(refresh_token_identifier)
         user.refresh_tokens = [
             refresh_token
             for refresh_token in user.refresh_tokens
-            if refresh_token['identifier'] != refresh_token_identifier
+            if refresh_token['identifier'] != identifier_hash
         ]
         db_session.add(user)
         await db_session.commit()
