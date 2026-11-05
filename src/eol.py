@@ -1,6 +1,5 @@
 import requests
 
-import caching
 import util
 
 
@@ -45,7 +44,6 @@ class EolClient:
     ):
         self._routes = routes
 
-    @caching.cached(caching.TTLFilesystemCache(ttl=60 * 60 * 24, max_total_size_mib=200))  # 24h
     def cycles(
         self,
         product: str,
