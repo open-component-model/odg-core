@@ -32,6 +32,7 @@ def packages() -> list[str]:
 
 def package_data() -> dict[str, list[str]]:
     return {
+        'migrations': ['alembic.ini', 'README.md', 'script.py.mako', 'versions/*.py'],
         'features': ['*.yaml'],
         'freshclam': ['freshclam.conf'],
         'odg': ['*.yaml'],

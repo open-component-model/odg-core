@@ -5,8 +5,6 @@ import sqlalchemy.ext.asyncio as sqlasync
 import sqlalchemy.orm.session
 from psycopg.types.json import set_json_dumps, set_json_loads
 
-import deliverydb.model as dm
-
 set_json_loads(orjson.loads)
 set_json_dumps(orjson.dumps)
 
@@ -58,9 +56,6 @@ async def _sqlalchemy_sessionmaker_async(
         },
     )
 
-    async with engine.begin() as conn:
-        await conn.run_sync(dm.Base.metadata.create_all)
-
     sessionmaker = sqlasync.async_sessionmaker(bind=engine)
     sessionmakers_async[(pool_size, max_overflow, pool_timeout)] = sessionmaker
 
@@ -110,8 +105,6 @@ def _sqlalchemy_sessionmaker(
             'options': '-c idle_in_transaction_session_timeout=1800000',
         },
     )
-
-    dm.Base.metadata.create_all(engine)
 
     sessionmaker = sqlalchemy.orm.sessionmaker(bind=engine)
     sessionmakers[(pool_size, max_overflow, pool_timeout)] = sessionmaker
