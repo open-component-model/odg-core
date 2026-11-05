@@ -226,3 +226,47 @@ def test_crypto_validation(
     assert len([finding for finding in findings if finding.standard == 'FIPS']) == 2
 
     assert len([finding for finding in findings if finding.standard == 'NCS']) == 3
+
+
+@pytest.mark.parametrize(
+    ('subject_name', 'issuer_name', 'expected'),
+    [
+        pytest.param(
+            'COMODO ECC Certification Authority',
+            'COMODO ECC Certification Authority',
+            odg.model.CertificateKind.ROOT_CA,
+            id='self-signed-without-root-phrase',
+        ),
+        pytest.param(
+            'GlobalSign',
+            'GlobalSign',
+            odg.model.CertificateKind.ROOT_CA,
+            id='self-signed-without-any-phrase',
+        ),
+        pytest.param(
+            'R11',
+            'ISRG Root X1',
+            odg.model.CertificateKind.END_USER,
+            id='issued-by-root',
+        ),
+        pytest.param(
+            'Example Intermediate',
+            'ISRG Root X1',
+            odg.model.CertificateKind.INTERMEDIATE_CA,
+            id='issued-intermediate',
+        ),
+        pytest.param('', '', odg.model.CertificateKind.END_USER, id='missing-subject'),
+    ],
+)
+def test_guess_certificate_kind(
+    subject_name: str,
+    issuer_name: str,
+    expected: odg.model.CertificateKind,
+):
+    assert (
+        crypto_extension.model.guess_certificate_kind(
+            subject_name=subject_name,
+            issuer_name=issuer_name,
+        )
+        is expected
+    )
