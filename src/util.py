@@ -161,6 +161,7 @@ def param(
     *,
     required: bool = False,
     default=None,
+    validator: collections.abc.Callable[[str], bool] | None = None,
 ):
     if required and default:
         raise ValueError('there must be no default value if `required` is set to `True`')
@@ -173,7 +174,15 @@ def param(
             )
         return default
 
-    return params[name]
+    value = params[name]
+
+    if validator and not validator(value):
+        raise aiohttp.web.HTTPBadRequest(
+            reason='Parameter value not allowed',
+            text=f'The value of the {name} parameter is not allowed: {value}',
+        )
+
+    return value
 
 
 def param_as_bool(
