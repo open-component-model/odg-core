@@ -18,29 +18,28 @@ import dacite
 import kubernetes.client
 import kubernetes.client.rest
 import kubernetes.watch
-import urllib3
-import yaml
-
-import ci.log
 import oci.client
 import ocm
 import ocm.iter
+import structlog
+import urllib3
+import version as versionutil
+import yaml
 
 import k8s.model
 import k8s.util
 import lookups
 import ocm_util
+import odg.extensions_cfg
+import odg.logging_cfg
+import odg.util
 import odg_operator.odg_model as odgm
 import odg_operator.odg_util as odgu
-import odg.extensions_cfg
-import odg.util
 import paths
 import util
-import version as versionutil
 
-
-ci.log.configure_default_logging()
-logger = logging.getLogger(__name__)
+odg.logging_cfg.configure_logging(service_name='odg-operator')
+logger = structlog.get_logger(__name__)
 
 ODG_CLEAN_UP_FINALISER = 'open-delivery-gear.ocm.software/odg-clean-up'
 ODG_RECONCILE_ANNOTATION = 'open-delivery-gear.ocm.software/reconcile'
@@ -926,9 +925,9 @@ if __name__ == '__main__':
     parsed = parser.parse_args()
 
     if parsed.debug:
-        ci.log.configure_default_logging(
-            stdout_level=logging.DEBUG,
-            force=True,
+        odg.logging_cfg.configure_logging(
+            log_level=logging.DEBUG,
+            service_name='odg-operator',
         )
 
     if not (extensions_cfg_path := parsed.extensions_cfg_path):

@@ -3,14 +3,14 @@ import collections.abc
 import dataclasses
 import enum
 import functools
-import logging
+import time
 
 import cachetools
-import ci.log
 import dacite
 import github.user
 import github3.repos
 import ocm
+import structlog
 
 import github_util
 import issue_replicator.github
@@ -20,6 +20,7 @@ import k8s.model
 import k8s.util
 import odg.extensions_cfg
 import odg.findings
+import odg.logging_cfg
 import odg.model
 import odg.util
 import odg_client
@@ -31,10 +32,9 @@ import sprints.model as sm
 import sprints.util as su
 import util
 
-
-logger = logging.getLogger(__name__)
-ci.log.configure_default_logging()
+logger = structlog.get_logger(__name__)
 k8s.logging.configure_kubernetes_logging()
+odg.logging_cfg.configure_logging(service_name='issue-replicator')
 
 
 def _iter_findings_for_artefact(
@@ -576,10 +576,15 @@ def replicate_issue(
         ),
     )
 
+    # cache clear is necessary to prevent creating duplicated issues
+    github_util.all_issues.cache_clear()
+    last_cache_clear = time.monotonic()
+
     for finding_cfg in finding_cfgs:
-        # cache clear is necessary to prevent creating duplicated issues and to force
-        # re-authentication
-        github_util.all_issues.cache_clear()
+        if time.monotonic() - last_cache_clear > 60 * 25:
+            # cache clear is necessary to force re-authentication
+            github_util.all_issues.cache_clear()
+            last_cache_clear = time.monotonic()
 
         replicate_issue_for_finding_type(
             artefact=artefact,

@@ -10,19 +10,17 @@ import asyncio
 import atexit
 import collections.abc
 import datetime
-import logging
 
-import requests
-import sqlalchemy
-import sqlalchemy.ext.asyncio as sqlasync
-import sqlalchemy.sql.elements
-
-import ci.log
 import oci.client_async
 import ocm
 import ocm.iter
 import ocm.iter_async
 import ocm.retrieve_async
+import requests
+import sqlalchemy
+import sqlalchemy.ext.asyncio as sqlasync
+import sqlalchemy.sql.elements
+import structlog
 
 import compliance_summary
 import components as components_module
@@ -35,15 +33,15 @@ import k8s.util
 import lookups
 import odg.extensions_cfg
 import odg.findings
+import odg.logging_cfg
 import odg.model
 import odg.util
 import odg_client
 import paths
 
-
-logger = logging.getLogger(__name__)
-ci.log.configure_default_logging()
+logger = structlog.get_logger(__name__)
 k8s.logging.configure_kubernetes_logging()
+odg.logging_cfg.configure_logging(service_name='cache-manager')
 
 
 def bytes_to_str(
@@ -241,22 +239,34 @@ async def prefill_function_caches(
                 )
 
 
-async def iter_sbom_artefacts(
+async def cleanup_sboms(
     artefact_enumerator_cfg: odg.extensions_cfg.ArtefactEnumeratorConfig,
     sbom_generator_cfg: odg.extensions_cfg.SBOMGeneratorConfig,
     delivery_service_client: odg_client.DeliveryServiceClient,
     component_descriptor_lookup: ocm.ComponentDescriptorLookup,
-) -> collections.abc.AsyncGenerator[odg.model.ComponentArtefactId, None]:
+    db_session: sqlasync.session.AsyncSession,
+    retention_period_seconds: int,
+):
+    artefact_keys = set()
+    skipped_components = []
+
     for component in artefact_enumerator_cfg.components:
         if resolved_version := component.resolved_version:
             # if an explicit version is specified, use it without any further implict lookup
             versions = [resolved_version]
         else:
-            versions = delivery_service_client.greatest_component_versions(
-                component_name=component.component_name,
-                max_versions=component.max_versions_limit,
-                ocm_repo=component.ocm_repo,
-            )
+            try:
+                versions = delivery_service_client.greatest_component_versions(
+                    component_name=component.component_name,
+                    max_versions=component.max_versions_limit,
+                    ocm_repo=component.ocm_repo,
+                )
+            except odg_client.EXTERNAL_DEPENDENCY_EXCEPTIONS as e:
+                logger.warning(
+                    f'failed to retrieve versions for {component.component_name=}, skip: {e}',
+                )
+                skipped_components.append(component.component_name)
+                continue
 
         ocm_repository_lookup = lookups.extended_ocm_repository_lookup(component.ocm_repo)
 
@@ -287,26 +297,14 @@ async def iter_sbom_artefacts(
                     access_type=artefact_node.artefact.access.type,
                     artefact_type=component_artefact_id.artefact.artefact_type,
                 ):
-                    yield component_artefact_id
+                    artefact_keys.add(component_artefact_id.key)
 
-
-async def cleanup_sboms(
-    artefact_enumerator_cfg: odg.extensions_cfg.ArtefactEnumeratorConfig,
-    sbom_generator_cfg: odg.extensions_cfg.SBOMGeneratorConfig,
-    delivery_service_client: odg_client.DeliveryServiceClient,
-    component_descriptor_lookup: ocm.ComponentDescriptorLookup,
-    db_session: sqlasync.session.AsyncSession,
-    retention_period_seconds: int,
-):
-    artefact_keys = set()
-
-    async for artefact in iter_sbom_artefacts(
-        artefact_enumerator_cfg=artefact_enumerator_cfg,
-        sbom_generator_cfg=sbom_generator_cfg,
-        delivery_service_client=delivery_service_client,
-        component_descriptor_lookup=component_descriptor_lookup,
-    ):
-        artefact_keys.add(artefact.key)
+    if skipped_components:
+        logger.warning(
+            f'skipping SBOM cleanup: enumeration incomplete due to failed version lookups for '
+            f'{skipped_components=}',
+        )
+        return
 
     db_statement = sqlalchemy.select(dm.ArtefactMetaData).where(
         dm.ArtefactMetaData.type == odg.model.Datatype.ARTEFACT_SCAN_INFO,

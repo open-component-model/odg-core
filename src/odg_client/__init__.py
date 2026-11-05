@@ -9,18 +9,26 @@ import warnings
 
 import dacite
 import jwt as pyjwt
+import ocm
 import requests.adapters
 import requests.exceptions
 import requests.sessions
-
-import ocm
+import structlog
 
 import odg_client.jwt
 import odg_client.model as om
 import odg_client.util
 
+logger = structlog.get_logger(__name__)
 
-logger = logging.getLogger(__name__)
+# Exceptions from external dependencies (network failures, upstream HTTP errors).
+# Catch these at call sites to skip the current operation and continue,
+# rather than exiting the process over issues outside our control.
+EXTERNAL_DEPENDENCY_EXCEPTIONS: tuple[type[Exception], ...] = (
+    requests.exceptions.ConnectionError,
+    requests.exceptions.HTTPError,
+    requests.exceptions.Timeout,
+)
 
 
 class DeliveryServiceRoutes:
@@ -312,8 +320,10 @@ class DeliveryServiceClient:
                 raise
             return _retry(f'caught {type(e).__name__}: {e}')
 
-        if res.status_code >= 500 and remaining_retries > 0:
-            return _retry(f'delivery-service returned {res.status_code=}: {res.text}')
+        if res.status_code >= 500:
+            if remaining_retries > 0:
+                return _retry(f'delivery-service returned {res.status_code=}: {res.text}')
+            res.raise_for_status()
 
         return res
 

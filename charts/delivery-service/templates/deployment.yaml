@@ -45,6 +45,24 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      initContainers:
+        - name: {{ $podName }}-migrate
+          image: {{ include "image" .Values.image }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - python3
+            - -m
+            - migrations.bootstrap
+          securityContext:
+            allowPrivilegeEscalation: false
+          env:
+          - name: SECRET_FACTORY_PATH
+            value: /secrets
+          - name: K8S_TARGET_NAMESPACE
+            value: {{ .Values.target_namespace | default .Release.Namespace }}
+          volumeMounts:
+            - name: delivery-db
+              mountPath: /secrets/delivery-db
       containers:
         - name: {{ $podName }}
           image: {{ include "image" .Values.image }}

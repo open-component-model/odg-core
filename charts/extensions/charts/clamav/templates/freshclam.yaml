@@ -36,6 +36,9 @@ spec:
             - freshclam
           securityContext:
             allowPrivilegeEscalation: false
+          env:
+            - name: ODG_LOG_LEVEL
+              value: {{ .Values.logLevel | default "INFO" | quote }}
           startupProbe:
             httpGet:
               path: /readiness

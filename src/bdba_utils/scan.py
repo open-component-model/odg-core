@@ -1,29 +1,25 @@
 import collections.abc
-import logging
 
 import botocore.exceptions
-import requests
-
-import ci.log
 import oci.client
 import ocm.iter
+import requests
+import structlog
 import tarutil
 
 import bdba.client
 import bdba.model as bm
 import bdba_utils.assessments
+import bdba_utils.model
 import bdba_utils.rescore
 import bdba_utils.util
-import bdba_utils.model
+import ocm_util
 import odg.findings
 import odg.model
 import odg_client
-import ocm_util
 import secret_mgmt
 
-
-logger = logging.getLogger(__name__)
-ci.log.configure_default_logging(print_thread_id=True)
+logger = structlog.get_logger(__name__)
 
 
 def normalize_display_name(value: str) -> str:

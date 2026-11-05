@@ -3,15 +3,15 @@ import dataclasses
 import datetime
 import enum
 import functools
-import logging
 import math
 import os
-import watchdog.events
-import watchdog.observers.polling
 
 import aiohttp.web
 import cachetools
 import dacite
+import structlog
+import watchdog.events
+import watchdog.observers.polling
 import yaml
 
 import k8s.util
@@ -24,11 +24,10 @@ import sprints.model as sm
 import util
 import yp
 
-
 own_dir = os.path.abspath(os.path.dirname(__file__))
 repo_dir = os.path.abspath(os.path.join(own_dir, os.pardir))
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 feature_cfgs = []
 
 

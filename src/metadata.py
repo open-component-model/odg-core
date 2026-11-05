@@ -1,16 +1,15 @@
 import collections.abc
 import datetime
 import http
-import logging
 import typing
 import uuid
 
 import aiohttp.web
 import dacite
+import ocm
 import sqlalchemy as sa
 import sqlalchemy.ext.asyncio as sqlasync
-
-import ocm
+import structlog
 
 import consts
 import deliverydb.model as dm
@@ -25,8 +24,7 @@ import odg.findings
 import odg.model
 import util
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 _FIELD_TO_COL = {

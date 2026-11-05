@@ -1,0 +1,316 @@
+# Alembic tutorial: your first schema change
+
+This tutorial shows you the full workflow of a schema change.
+You will:
+
+1. Start a local, empty Postgres database
+2. Apply the head migration
+3. Insert one row with SQL
+4. Add a new column to the model
+5. Generate a new migration
+6. Add a data migration
+7. Upgrade the database
+8. Downgrade the database
+
+Time: about 15 minutes.
+
+All shell commands run from `src/`. Run `cd src` once from the repository root.
+
+---
+
+## Step 1: Start Postgres
+
+Run this command. It starts a Postgres container and removes it when you stop it.
+
+```bash
+docker run --rm -d \
+    --name alembic-tutorial-db \
+    -e POSTGRES_PASSWORD=password-123 \
+    -p 55432:5432 \
+    postgres:17
+```
+
+The connection string is:
+
+```
+postgresql+psycopg://postgres:password-123@localhost:55432/postgres
+```
+
+Copy it. You will need it in many steps.
+
+Check that the container runs:
+
+```bash
+docker ps --filter name=alembic-tutorial-db
+```
+
+---
+
+## Step 2: Apply the head migration
+
+Apply the head migration, which sets up the current schema.
+Later examples introduce further migrations on top.
+
+```bash
+uv run --project .. alembic -c migrations/alembic.ini \
+    -x db_url=postgresql+psycopg://postgres:password-123@localhost:55432/postgres \
+    upgrade head
+```
+
+Check the result. The command must print the newest version in `src/migrations/versions`:
+
+```bash
+uv run --project .. alembic -c migrations/alembic.ini \
+    -x db_url=postgresql+psycopg://postgres:password-123@localhost:55432/postgres \
+    current
+```
+
+The database now has (at least) five tables. One of them is `cache`.
+
+---
+
+## Step 3: Insert one row with SQL
+
+Now you create test data. You do this before the schema change, so that
+there is old data in the table. Old data is the interesting case: the new
+column has no value for it.
+
+Connect to the database with DBeaver:
+
+- Host: `localhost`
+- Port: `55432`
+- Database: `postgres`
+- User: `postgres`
+- Password: `password-123`
+
+Open a SQL editor and edit this statement. 
+It inserts one cache entry.
+Before executing, check that the cache table hasn't changed and adapt if necessary.
+
+```sql
+INSERT INTO cache (
+    id,
+    descriptor,
+    costs,
+    size,
+    value,
+    read_count,
+    revision
+) VALUES (
+    '00000000000000000000000000000001',
+    '{"tutorial": true}',
+    1,
+    5,
+    '\x68656c6c6f',
+    0,
+    0
+);
+```
+
+Check that the row is there:
+
+```sql
+SELECT id, descriptor, size, value FROM cache;
+```
+
+You see one row. Keep DBeaver open.
+
+---
+
+## Step 4: Add the column to the model
+
+The schema is defined in `deliverydb/model.py`. The `cache` table is
+the class `DBCache`.
+
+Add one new column in alphabetical order: the class ends with `costs`,
+`size`, `value`, so add `encoding` between `costs` and `size`.
+
+Open `deliverydb/model.py`, find the class `DBCache`, and change this
+block:
+
+```python
+    costs = sa.Column(sa.Integer)
+
+    size = sa.Column(sa.Integer)
+    value = sa.Column(sa.LargeBinary)
+```
+
+to this:
+
+```python
+    costs = sa.Column(sa.Integer)
+
+    encoding = sa.Column(sa.String(length=32), nullable=True)
+    size = sa.Column(sa.Integer)
+    value = sa.Column(sa.LargeBinary)
+```
+
+Important: the model is now different from the database. That is fine. The
+model is the **target** state. Alembic compares the two and makes the
+change plan.
+
+---
+
+## Step 5: Generate the new migration
+
+Run autogenerate:
+
+```bash
+uv run --project .. alembic -c migrations/alembic.ini \
+    -x db_url=postgresql+psycopg://postgres:password-123@localhost:55432/postgres \
+    revision --autogenerate -m "add encoding to cache"
+```
+
+This creates a new file in `migrations/versions/`. The filename starts
+with a timestamp and ends with `add_encoding_to_cache.py`.
+
+**Note: the database must be up for this step.**
+
+Autogenerate does two things:
+
+1. It reads the **current schema** of the live database (introspection).
+2. It reads the **target schema** from the model (`Base.metadata`).
+
+The difference between the two becomes the migration. Alembic does not
+keep model history. The only record of "what the schema looks like now" is
+the live database itself. Without a running database, autogenerate has
+nothing to compare against, and it fails — or, worse, generates a
+migration that re-creates every table.
+
+Every generated revision has four functions. Look at the new file:
+
+- `schema_upgrade()` — structure changes (DDL). Autogenerate fills this in.
+- `data_upgrade()` — data changes. Stays `pass` unless you fill it in.
+- `schema_downgrade()` and `data_downgrade()` — the other direction.
+
+`upgrade()` only calls the two upgrade functions. `downgrade()` calls the
+two downgrade functions in reverse order (data first, then schema).
+
+In your new file, `schema_upgrade()` contains the new column:
+
+```python
+def schema_upgrade() -> None:
+    # ### commands auto generated by Alembic - please adjust! ###
+    op.add_column('cache', sa.Column('encoding', sa.String(length=32), nullable=True))
+    # ### end Alembic commands ###
+```
+
+Do not commit yet. The next step adds the data migration.
+
+---
+
+## Step 6: Add the data migration
+
+The schema change alone leaves the new column empty (`NULL`) for old rows.
+Usually you want a default value instead.
+
+In the new migration file, fill in `data_upgrade()`. Use pure SQLAlchemy
+expressions — not raw SQL strings. This keeps the code type-checked and
+portable:
+
+```python
+def data_upgrade() -> None:
+    # give existing rows a value for the new column
+    cache_table = sa.table(
+        'cache',
+        sa.column('encoding', sa.String),
+    )
+    op.execute(cache_table.update().where(cache_table.c.encoding.is_(None)).values(encoding='raw'))
+```
+
+Keep `schema_upgrade()` unchanged — autogenerate already put
+`op.add_column(...)` there. The file now does, in order: add the column,
+then fill it.
+
+`schema_downgrade()` already contains `op.drop_column('cache', 'encoding')`.
+`data_downgrade()` stays `pass`: the data is lost with the column, there
+is nothing to undo before that.
+
+How the SQLAlchemy data migration works:
+
+- `sa.table(...)` builds a lightweight table definition. It exists only
+  inside this migration. Do not import `DBCache` from the model — the
+  model will change again in the future, but a migration file must stay
+  valid forever.
+- `cache_table.update().where(...).values(...)` is the SQLAlchemy
+  expression for `UPDATE cache SET encoding = 'raw' WHERE encoding IS NULL`.
+- `op.execute(...)` sends it to the database.
+
+---
+
+## Step 7: Upgrade
+
+Apply the new migration. `head` now means your new revision:
+
+```bash
+uv run --project .. alembic -c migrations/alembic.ini \
+    -x db_url=postgresql+psycopg://postgres:password-123@localhost:55432/postgres \
+    upgrade head
+```
+
+Check in DBeaver:
+
+```sql
+SELECT id, encoding FROM cache;
+```
+
+The row from step 3 now has `encoding = 'raw'`. The schema change and the
+data migration ran in one step.
+
+---
+
+## Step 8: Downgrade
+
+`downgrade -1` goes back exactly one revision:
+
+```bash
+uv run --project .. alembic -c migrations/alembic.ini \
+    -x db_url=postgresql+psycopg://postgres:password-123@localhost:55432/postgres \
+    downgrade -1
+```
+
+Check in DBeaver:
+
+```sql
+SELECT * FROM cache;
+```
+
+The row is still there, but the column `encoding` is gone. The database is
+back at revision `cc90ad81441c`.
+
+You can go forward and back as often as you want:
+
+```bash
+# forward again
+uv run --project .. alembic -c migrations/alembic.ini \
+    -x db_url=postgresql+psycopg://postgres:password-123@localhost:55432/postgres \
+    upgrade head
+
+# edit a SQL cell in DBeaver, set encoding to something else, then:
+uv run --project .. alembic -c migrations/alembic.ini \
+    -x db_url=postgresql+psycopg://postgres:password-123@localhost:55432/postgres \
+    downgrade -1
+```
+
+Note: the data backfill only runs inside `data_upgrade()`. On downgrade,
+`data_downgrade()` is a `pass` and the column with its values disappears
+with `DROP COLUMN` in `schema_downgrade()`.
+
+For long-running backfills, see "Long-running migrations" in `README.md`.
+
+---
+
+## Clean up
+
+When you are done:
+
+1. Delete the migration file you created in `migrations/versions/`
+   (only if you do not want to keep it for a real change).
+2. Remove the `encoding` column from `DBCache` in `deliverydb/model.py`.
+3. Stop the container:
+
+   ```bash
+   docker stop alembic-tutorial-db
+   ```
+
+   The `--rm` flag from step 1 removes it automatically.

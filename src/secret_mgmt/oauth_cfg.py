@@ -4,7 +4,6 @@ import re
 
 import util
 
-
 RoleName = str
 
 
@@ -42,7 +41,7 @@ class OAuthCfg:
     type: OAuthCfgTypes
     api_url: str
     client_id: str
-    client_secret: str
+    client_secret: str = dataclasses.field(repr=False)
     role_bindings: list[RoleBinding] = dataclasses.field(default_factory=list)
 
     @property

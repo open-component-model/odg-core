@@ -6,7 +6,6 @@ import datetime
 import enum
 import functools
 import http
-import logging
 import statistics
 import typing
 import urllib.parse
@@ -22,6 +21,7 @@ import ocm.iter_async
 import ocm.retrieve_async
 import ocm.util
 import sqlalchemy.ext.asyncio as sqlasync
+import structlog
 import version as versionutil
 
 import caching
@@ -30,7 +30,7 @@ import consts
 import lookups
 import util
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 changes_by_dependencies_cache = dict()
 
 
@@ -876,6 +876,7 @@ class DoraMetrics(aiohttp.web.View):
 def _cache_key_diff_components(
     component_vector: components.ComponentVector,
     component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,
+    ocm_repository_lookup: ocm.OcmRepositoryLookup,
 ):
     return cachetools.keys.hashkey(
         component_vector.start.name,

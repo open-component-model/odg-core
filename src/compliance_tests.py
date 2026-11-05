@@ -1,18 +1,14 @@
 import io
-import logging
 import zipfile
 
 import aiohttp.web
-
-import ci.log
+import structlog
 
 import consts
 import features
 import util
 
-
-ci.log.configure_default_logging()
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class DownloadTestResults(aiohttp.web.View):

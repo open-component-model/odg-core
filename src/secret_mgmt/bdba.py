@@ -22,7 +22,7 @@ class MatchScore(enum.IntEnum):
 @dataclasses.dataclass
 class BDBA:
     api_url: str
-    token: str
+    token: str = dataclasses.field(repr=False)
     group_ids: list[int] = dataclasses.field(default_factory=list)
     tls_verify: bool = True
 

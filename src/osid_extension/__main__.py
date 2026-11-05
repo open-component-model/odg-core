@@ -2,19 +2,19 @@ import collections.abc
 import dataclasses
 import datetime
 import functools
-import logging
 
 import awesomeversion.exceptions
+import oci.client
+import ocm
+import structlog
 
-import ci.log
 import eol
 import k8s.logging
 import k8s.util
-import oci.client
-import ocm
 import ocm_util
 import odg.extensions_cfg
 import odg.findings
+import odg.logging_cfg
 import odg.model
 import odg.util
 import odg_client
@@ -24,10 +24,9 @@ import osinfo
 import paths
 import secret_mgmt
 
-
-logger = logging.getLogger(__name__)
-ci.log.configure_default_logging()
+logger = structlog.get_logger(__name__)
 k8s.logging.configure_kubernetes_logging()
+odg.logging_cfg.configure_logging(service_name='osid')
 
 
 def determine_os_status(

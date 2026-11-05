@@ -7,7 +7,6 @@ import pytest
 
 import middleware.auth
 
-
 ISSUER = 'delivery_service'
 JWT_KEY = 'foobar-test-key-padded-to-32-bytes!'
 JWT_ALGORITHM = 'HS256'

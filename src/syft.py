@@ -1,17 +1,16 @@
 import enum
-import logging
 import os
 import subprocess
 
 import oci.client
 import ocm
+import structlog
 import tarutil
 
 import ocm_util
 import secret_mgmt
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 own_dir = os.path.abspath(os.path.dirname(__file__))
 
 

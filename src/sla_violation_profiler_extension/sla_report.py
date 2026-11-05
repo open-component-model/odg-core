@@ -11,11 +11,9 @@ to the CVEs a team needs to fix.
 import collections
 import dataclasses
 import enum
-import logging
 import os
 import tempfile
 
-import ci.log
 import dacite
 import git
 import github.pullrequest
@@ -23,19 +21,23 @@ import github3.pulls
 import gitutil
 import mako.template
 import ocm
+import structlog
 import version as version_util
 
+import k8s.logging
 import lookups
 import odg.extensions_cfg
 import odg.findings
+import odg.logging_cfg
 import odg.model
 import odg.util
 import odg_client
 import paths
 import util
 
-ci.log.configure_default_logging()
-logger = logging.getLogger(__name__)
+k8s.logging.configure_kubernetes_logging()
+odg.logging_cfg.configure_logging(service_name='sla-report')
+logger = structlog.get_logger(__name__)
 
 own_dir = os.path.abspath(os.path.dirname(__file__))
 templates_dir = os.path.join(own_dir, 'templates')

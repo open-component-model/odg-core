@@ -1,12 +1,17 @@
 import functools
 
+import k8s.logging
 import odg.extensions_cfg
 import odg.findings
+import odg.logging_cfg
 import odg.model
 import odg.util
 import paths
 import scanner_utils.orchestrator
 import trivy_extension.scanner
+
+k8s.logging.configure_kubernetes_logging()
+odg.logging_cfg.configure_logging(service_name='trivy')
 
 
 def main():

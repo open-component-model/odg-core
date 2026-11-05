@@ -1,8 +1,7 @@
 import collections.abc
 
-import yaml
-
 import ocm
+import yaml
 
 
 def load_component_descriptors(file: str):

@@ -1,17 +1,18 @@
 import dataclasses
 import json
-import logging
 import os
 import subprocess
 import tarfile
 import tempfile
+
+import structlog
 
 import ocm_util
 import odg.extensions_cfg
 import scanner_utils.scanner
 import secret_mgmt.oci_registry
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @dataclasses.dataclass

@@ -3,16 +3,15 @@ import dataclasses
 import datetime
 import hashlib
 import json
-import logging
 import os
 import tempfile
 import time
 
-import ci.log
 import oci.client
 import ocm
 import ocm.iter
 import requests.exceptions
+import structlog
 
 import bdba.client
 import bdba.model
@@ -22,6 +21,7 @@ import k8s.logging
 import k8s.util
 import ocm_util
 import odg.extensions_cfg
+import odg.logging_cfg
 import odg.model
 import odg.util
 import odg_client
@@ -29,9 +29,9 @@ import secret_mgmt
 import secret_mgmt.bdba
 import syft
 
-logger = logging.getLogger(__name__)
-ci.log.configure_default_logging()
+logger = structlog.get_logger(__name__)
 k8s.logging.configure_kubernetes_logging()
+odg.logging_cfg.configure_logging(service_name='sbom-generator')
 own_dir = os.path.abspath(os.path.dirname(__file__))
 
 
@@ -299,16 +299,26 @@ def generate_sbom_for_artefact(
     if existing_metadata:
         old_digest = existing_metadata.get('data', {}).get('digest')
 
-        if extension_cfg.on_exist is odg.model.OnExist.SKIP:
-            logger.info(
-                f'SBOM already exists for {artefact}, skipping generation (digest: {old_digest})',
-            )
-            return None
+        try:
+            delivery_service_client.get_blob(digest=old_digest)
 
-        logger.info(
-            f'SBOM exists for {artefact}, will overwrite and clean up old blob '
-            f'(old digest: {old_digest})',
-        )
+            if extension_cfg.on_exist is odg.model.OnExist.SKIP:
+                logger.info(
+                    f'SBOM already exists for {artefact}, skipping generation ({old_digest=})',
+                )
+                return None
+
+            logger.info(
+                f'SBOM exists for {artefact}, will overwrite and clean up old blob '
+                f'(old digest: {old_digest})',
+            )
+        except requests.exceptions.HTTPError as e:
+            if e.response is None or e.response.status_code != 404:
+                raise
+
+            logger.warning(
+                'SBOM metadata artefact exists but blob could not be found, generating new one',
+            )
 
     else:
         logger.info(f'No existing SBOM found for {artefact}, generating new one')

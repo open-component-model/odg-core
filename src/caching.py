@@ -8,7 +8,6 @@ import threading
 
 import cachetools.keys
 
-
 own_dir = os.path.abspath(os.path.dirname(__file__))
 default_cache_dir = os.path.join(own_dir, '.cache', 'dora')
 
