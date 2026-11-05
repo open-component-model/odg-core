@@ -6,7 +6,6 @@ globally available.
 
 APP_BASE_URL = 'base_url'
 APP_COMPONENT_DESCRIPTOR_LOOKUP = 'component_descriptor_lookup'
-APP_EOL_CLIENT = 'eol_client'
 APP_GITHUB_API_LOOKUP = 'github_api_lookup'
 APP_GITHUB_REPO_LOOKUP = 'github_repo_lookup'
 APP_KUBERNETES_API = 'kubernetes_api'

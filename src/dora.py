@@ -24,7 +24,6 @@ import sqlalchemy.ext.asyncio as sqlasync
 import structlog
 import version as versionutil
 
-import caching
 import components
 import consts
 import lookups
@@ -185,21 +184,6 @@ async def versions_descriptors_newer_than(
     return descriptors
 
 
-def _cache_key_gen_all_versions_sorted(
-    component: ocm.ComponentName,
-    sorting_direction: typing.Literal['asc', 'desc'] = 'desc',
-    db_session: sqlasync.session.AsyncSession = None,
-):
-    return cachetools.keys.hashkey(
-        ocm.to_component_name(component),
-        sorting_direction,
-    )
-
-
-@caching.async_cached(
-    cache=caching.TTLFilesystemCache(ttl=60 * 60 * 24, max_total_size_mib=128),  # 1 day
-    key_func=_cache_key_gen_all_versions_sorted,
-)
 async def all_versions_sorted(
     component: ocm.ComponentName,
     sorting_direction: typing.Literal['asc', 'desc'] = 'desc',
@@ -281,21 +265,6 @@ def can_process(dependency_update: components.ComponentVector):
     return True
 
 
-def _cache_key_gen_component_vector_and_lookup(
-    left_commit: str,
-    right_commit: str,
-    github_repo,
-):
-    return cachetools.keys.hashkey(
-        left_commit,
-        right_commit,
-    )
-
-
-@caching.cached(
-    cache=caching.LFUFilesystemCache(max_total_size_mib=256),
-    key_func=_cache_key_gen_component_vector_and_lookup,
-)
 def commits_for_component_change(
     left_commit: str,
     right_commit: str,
@@ -412,35 +381,6 @@ def categorize_by_changed_component(
     return dependencies
 
 
-def _cache_key_gen_dora(
-    component_dependency_changes_with_commits: list[ComponentDependencyChangeWithCommits],
-    time_span_days: int | None = None,
-    calculation_type: CalculationType | None = None,
-):
-    component_versions = tuple(
-        component_dependency_change_with_commits.component.version
-        for component_dependency_change_with_commits in component_dependency_changes_with_commits
-    )
-    hashkey_elements = (
-        component_dependency_changes_with_commits[0].component.name,
-        component_dependency_changes_with_commits[0].dependency_component_vector.start.name,
-        component_dependency_changes_with_commits[0].dependency_component_vector.end.name,
-        component_dependency_changes_with_commits[0].dependency_component_vector.start.version,
-        component_dependency_changes_with_commits[0].dependency_component_vector.end.version,
-        component_versions,
-    )
-    if time_span_days:
-        hashkey_elements += (time_span_days, datetime.date.today())
-    if calculation_type:
-        hashkey_elements += (calculation_type,)
-
-    return cachetools.keys.hashkey(*hashkey_elements)
-
-
-@caching.cached(
-    cache=caching.LFUFilesystemCache(max_total_size_mib=128),
-    key_func=_cache_key_gen_dora,
-)
 def calculate_change_lead_time(
     component_dependency_changes_with_commits: list[ComponentDependencyChangeWithCommits],
     time_span_days: int,
@@ -470,10 +410,6 @@ def calculate_change_lead_time(
     return datetime.timedelta(seconds=result_in_seconds)
 
 
-@caching.cached(
-    cache=caching.LFUFilesystemCache(max_total_size_mib=128),
-    key_func=_cache_key_gen_dora,
-)
 def dora_changes_monthly(
     component_dependency_changes_with_commits: list[ComponentDependencyChangeWithCommits],
     time_span_days: int,
@@ -546,10 +482,6 @@ def dora_changes_monthly(
     return by_month_list
 
 
-@caching.cached(
-    cache=caching.LFUFilesystemCache(max_total_size_mib=128),
-    key_func=_cache_key_gen_dora,
-)
 def dora_deployments(
     component_dependency_changes_with_commits: list[ComponentDependencyChangeWithCommits],
 ) -> list[DoraDeploymentsResponse]:
@@ -873,23 +805,6 @@ class DoraMetrics(aiohttp.web.View):
         )
 
 
-def _cache_key_diff_components(
-    component_vector: components.ComponentVector,
-    component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,
-    ocm_repository_lookup: ocm.OcmRepositoryLookup,
-):
-    return cachetools.keys.hashkey(
-        component_vector.start.name,
-        component_vector.end.name,
-        component_vector.start.version,
-        component_vector.end.version,
-    )
-
-
-@caching.async_cached(
-    cache=caching.LFUFilesystemCache(max_total_size_mib=256),
-    key_func=_cache_key_diff_components,
-)
 async def _diff_components(
     component_vector: components.ComponentVector,
     component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,

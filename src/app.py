@@ -15,7 +15,6 @@ import components
 import consts
 import deliverydb.cache_async
 import dora
-import eol
 import features
 import k8s.util
 import lookups
@@ -27,7 +26,6 @@ import middleware.errors
 import middleware.prometheus
 import middleware.route_feature_check as rfc
 import odg.logging_cfg
-import osinfo
 import paths
 import rescore.artefacts
 import service_extensions
@@ -137,7 +135,6 @@ def add_app_context_vars(
 
     app[consts.APP_BASE_URL] = base_url
     app[consts.APP_COMPONENT_DESCRIPTOR_LOOKUP] = component_descriptor_lookup
-    app[consts.APP_EOL_CLIENT] = eol.EolClient()
     app[consts.APP_GITHUB_API_LOOKUP] = github_api_lookup
     app[consts.APP_GITHUB_REPO_LOOKUP] = github_repo_lookup
     app[consts.APP_KUBERNETES_API] = kubernetes_api
@@ -285,10 +282,6 @@ def add_routes(
     swagger.add_view(
         path='/ocm/component/responsibles',
         handler=components.ComponentResponsibles,
-    )
-    swagger.add_view(
-        path='/os/{os_id}/branches',
-        handler=osinfo.OsInfoRoutes,
     )
     swagger.add_view(
         path='/rescore',
