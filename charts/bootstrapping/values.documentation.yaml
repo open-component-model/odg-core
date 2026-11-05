@@ -1921,7 +1921,7 @@ secrets:
       # @param secrets.oci-registry.<name>.password the password of the serviceaccount
       password: ""
       # @param secrets.oci-registry.<name>.image_reference_prefixes list of image prefixes for which
-      # these credentials should be used, if no prefixes are specified, they might always be used
+      # these credentials should be used.
       # note: The prefixes are _not_ evaluated as a regex
       # e.g.
       # image_reference_prefixes:

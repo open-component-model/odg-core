@@ -5,8 +5,12 @@ import functools
 import oci.auth
 import oci.model
 import oci.util
+import structlog
 
 import secret_mgmt
+
+
+logger = structlog.get_logger(__name__)
 
 
 @dataclasses.dataclass
@@ -15,6 +19,13 @@ class OciRegistry:
     password: str = dataclasses.field(repr=False)
     image_reference_prefixes: list[str] = dataclasses.field(default_factory=list)
     privileges: oci.auth.Privileges = oci.auth.Privileges.READONLY
+
+    def __post_init__(self):
+        if not self.image_reference_prefixes:
+            logger.warning(
+                'Found OCI registry credentials without `image_reference_prefixes` configured, '
+                'the credentials will not be utilised',
+            )
 
     def image_reference_matches(
         self,
@@ -25,10 +36,6 @@ class OciRegistry:
 
         if privileges and self.privileges < privileges:
             return False
-
-        if not self.image_reference_prefixes:
-            # credentials are not restricted to any image-ref prefix -> may always be used
-            return True
 
         for image_reference_prefix in self.image_reference_prefixes:
             if image_reference.startswith(image_reference_prefix):
