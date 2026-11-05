@@ -46,8 +46,16 @@ class MinMaxEnumProperties:
 
 @dataclasses.dataclass
 class CryptoLibrary:
+    """
+    :param list[str] go_fips140_modules:
+        Versions of the Go Cryptographic Module (selected at build time via `GOFIPS140`) which are
+        validated for the standard. If set, Go binaries are rated by the linked module version and
+        whether FIPS 140-3 mode is enabled, instead of by `versions`.
+    """
+
     name: str
     versions: list[str]
+    go_fips140_modules: list[str] | None = None
 
 
 @dataclasses.dataclass
