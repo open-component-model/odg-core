@@ -7,7 +7,7 @@ on:
         required: true
         type: string
         description:
-          mode as expected by `cc-util/.github/workflows/prepare`
+          mode as expected by `cc-utils/.github/workflows/prepare`
           either of
           - snapshot
           - release
