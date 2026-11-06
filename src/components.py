@@ -13,6 +13,7 @@ import oci.client_async
 import oci.model as om
 import ocm
 import ocm.diff
+import ocm.gardener
 import ocm.iter
 import ocm.iter_async
 import ocm.retrieve
@@ -863,6 +864,29 @@ async def iter_component_dependencies(
 
         async for component_node in iter_component_dependencies(
             component_id=cref_id,
+            component_descriptor_lookup=component_descriptor_lookup,
+            ocm_repository_lookup=ocm_repository_lookup,
+            recursion_depth=recursion_depth,
+            ignore_missing=ignore_missing,
+            path=path,
+        ):
+            yield component_node
+
+    if not (
+        extra_crefs_label := component.find_label(
+            name=ocm.gardener.ExtraComponentReferencesLabel.name,
+        )
+    ):
+        return
+
+    for extra_cref in extra_crefs_label.value:
+        extra_cref_id = ocm.ComponentIdentity(
+            name=extra_cref['component_reference']['name'],
+            version=extra_cref['component_reference']['version'],
+        )
+
+        async for component_node in iter_component_dependencies(
+            component_id=extra_cref_id,
             component_descriptor_lookup=component_descriptor_lookup,
             ocm_repository_lookup=ocm_repository_lookup,
             recursion_depth=recursion_depth,
