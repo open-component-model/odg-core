@@ -1815,23 +1815,23 @@ class ArtefactMetadata:
             # BDBAVulnerabilityFinding and VulnerabilityFinding share the same Datatype;
             # presence of 'base_url' (a BDBAMixin field) distinguishes them.
             data = (
-                _decoders[1].decode(raw['data'])
+                _decode_bdba_vulnerability_finding.decode(raw['data'])
                 if 'base_url' in raw['data']
-                else _decoders[2].decode(raw['data'])
+                else _decode_vulnerability_finding.decode(raw['data'])
             )
         elif meta_type == Datatype.RESCORING:
             rescoring_data = raw['data']
             user_raw = rescoring_data.get('user')
-            rescoring = _decoders[4].decode(rescoring_data)
+            rescoring = _decode_custom_rescoring.decode(rescoring_data)
             if user_raw is not None:
                 rescoring = dataclasses.replace(rescoring, user=_decode_user(user_raw))
             data = rescoring
         elif meta_type == Datatype.ARTEFACT_SCAN_INFO:
             data = raw['data']
         else:
-            return _decoders[0].decode(raw)
+            return _decode_artefact_metadata.decode(raw)
 
-        artefact = _decoders[3].decode(raw['artefact'])
+        artefact = _decode_component_artefact_id.decode(raw['artefact'])
         raw_meta = raw['meta']
         responsibles_raw = raw_meta.get('responsibles')
         meta = Metadata(
@@ -1848,7 +1848,7 @@ class ArtefactMetadata:
                 else None
             ),
             responsibles=(
-                [_decoders[5].decode(r) for r in responsibles_raw]
+                [_decode_user_identity.decode(r) for r in responsibles_raw]
                 if responsibles_raw is not None
                 else None
             ),
@@ -1913,7 +1913,19 @@ class ArtefactMetadata:
         return hash(self.key)
 
 
-_user_decoders: dict[str, mashumaro.codecs.BasicDecoder] = {}  # populated after class definitions
+_decode_artefact_metadata = mashumaro.codecs.BasicDecoder(ArtefactMetadata)
+_decode_bdba_vulnerability_finding = mashumaro.codecs.BasicDecoder(BDBAVulnerabilityFinding)
+_decode_vulnerability_finding = mashumaro.codecs.BasicDecoder(VulnerabilityFinding)
+_decode_component_artefact_id = mashumaro.codecs.BasicDecoder(ComponentArtefactId)
+_decode_custom_rescoring = mashumaro.codecs.BasicDecoder(CustomRescoring)
+_decode_user_identity = mashumaro.codecs.BasicDecoder(UserIdentity)
+
+_user_decoders: dict[str, mashumaro.codecs.BasicDecoder] = {
+    'bdba-user': mashumaro.codecs.BasicDecoder(BDBAUser),
+    'github-user': mashumaro.codecs.BasicDecoder(GitHubUser),
+    'oidc-user': mashumaro.codecs.BasicDecoder(OidcUser),
+    'user': mashumaro.codecs.BasicDecoder(User),
+}
 
 
 def _decode_user(raw: dict) -> BDBAUser | GitHubUser | OidcUser | User:
@@ -1925,24 +1937,6 @@ def _decode_user(raw: dict) -> BDBAUser | GitHubUser | OidcUser | User:
         return User(username=raw['username'], type=user_type)
     return decoder.decode(raw)
 
-
-_decoders = (
-    mashumaro.codecs.BasicDecoder(ArtefactMetadata),  # [0]
-    mashumaro.codecs.BasicDecoder(BDBAVulnerabilityFinding),  # [1]
-    mashumaro.codecs.BasicDecoder(VulnerabilityFinding),  # [2]
-    mashumaro.codecs.BasicDecoder(ComponentArtefactId),  # [3]
-    mashumaro.codecs.BasicDecoder(CustomRescoring),  # [4]
-    mashumaro.codecs.BasicDecoder(UserIdentity),  # [5]
-)
-
-_user_decoders.update(
-    {
-        'bdba-user': mashumaro.codecs.BasicDecoder(BDBAUser),
-        'github-user': mashumaro.codecs.BasicDecoder(GitHubUser),
-        'oidc-user': mashumaro.codecs.BasicDecoder(OidcUser),
-        'user': mashumaro.codecs.BasicDecoder(User),
-    },
-)
 
 artefact_metadata_encoder = mashumaro.codecs.orjson.ORJSONEncoder(ArtefactMetadata)
 artefact_metadata_basic_encoder = mashumaro.codecs.BasicEncoder(ArtefactMetadata)
