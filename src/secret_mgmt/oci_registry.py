@@ -38,6 +38,7 @@ class OciRegistry:
                     'Found OCI registry credentials with empty image reference prefix, skipping',
                     image_reference_prefix=image_reference_prefix,
                 )
+                continue
 
             path = parsed_url.path or '/'
             image_reference_prefixes.append(f'{parsed_url.netloc}{path}')
