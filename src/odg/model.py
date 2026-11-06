@@ -7,7 +7,9 @@ import hashlib
 import textwrap
 import typing
 
-import dacite
+import mashumaro.codecs
+import mashumaro.codecs.orjson
+import mashumaro.types
 import ocm
 import ocm.iter
 import structlog
@@ -178,7 +180,16 @@ class UserIdentity:
     Collection of identities that refer to the same user
     """
 
-    identifiers: list[EmailAddress | GithubUser | MetaOrigin | PersonalName | UserIdentifierBase]
+    identifiers: list[
+        typing.Annotated[
+            EmailAddress | GithubUser | MetaOrigin | PersonalName | UserIdentifierBase,
+            mashumaro.types.Discriminator(
+                field='type',
+                include_supertypes=True,
+                include_subtypes=True,
+            ),
+        ]
+    ]
 
 
 class SastStatus(enum.StrEnum):
@@ -1018,7 +1029,7 @@ class CustomRescoring:
     )
     referenced_type: str
     severity: str
-    user: BDBAUser | GitHubUser | User
+    user: BDBAUser | GitHubUser | OidcUser | User
     matching_rules: list[str] = dataclasses.field(default_factory=list)
     comment: str | None = None
     allowed_processing_time: str | None = None
@@ -1796,21 +1807,18 @@ class ArtefactMetadata:
 
     @staticmethod
     def from_dict(raw: dict):
-        return dacite.from_dict(
-            data_class=ArtefactMetadata,
-            data=raw,
-            config=dacite.Config(
-                type_hooks={
-                    datetime.datetime: datetime.datetime.fromisoformat,
-                    datetime.date: lambda date: datetime.datetime.fromisoformat(date).date(),
-                },
-                cast=[
-                    enum.StrEnum,
-                    MatchCondition,
-                ],
-                strict=True,
-            ),
-        )
+        # mashumaro silently ignores unknown keys (dacite strict=True would reject them);
+        # acceptable since payloads come from the delivery-db, not untrusted input.
+        #
+        # RESCORING needs a dedicated branch: ResponsibleInfo and CustomRescoring both have a
+        # `referenced_type` field, so mashumaro's union resolution hits ResponsibleInfo first
+        # and returns the wrong type. All other Datatypes are unambiguous in the union and go
+        # through the generic decoder directly.
+        if raw['meta']['type'] != Datatype.RESCORING:
+            return _decode_artefact_metadata.decode(raw)
+
+        rescoring = _decode_custom_rescoring.decode(raw['data'])
+        return dataclasses.replace(_decode_artefact_metadata.decode(raw), data=rescoring)
 
     @property
     def key(self) -> str:
@@ -1852,6 +1860,13 @@ class ArtefactMetadata:
 
     def __hash__(self) -> int:
         return hash(self.key)
+
+
+_decode_artefact_metadata = mashumaro.codecs.BasicDecoder(ArtefactMetadata)
+_decode_custom_rescoring = mashumaro.codecs.BasicDecoder(CustomRescoring)
+
+artefact_metadata_encoder = mashumaro.codecs.orjson.ORJSONEncoder(ArtefactMetadata)
+artefact_metadata_basic_encoder = mashumaro.codecs.BasicEncoder(ArtefactMetadata)
 
 
 def artefact_scan_info(
