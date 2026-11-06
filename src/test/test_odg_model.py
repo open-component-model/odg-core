@@ -3,7 +3,6 @@ import datetime
 import enum
 
 import dacite
-import pytest
 
 import odg.model
 from odg.model import ArtefactMetadata, MatchCondition
@@ -64,9 +63,30 @@ def _artefact_envelope(meta_type: str, data: dict) -> dict:
     }
 
 
-def test_artefact_metadata_id():
-    artefact_metadatum_1 = odg.model.ArtefactMetadata(
-        artefact=odg.model.ComponentArtefactId(
+class TestArtefactMetadataId:
+    def test_without_version(self):
+        am = odg.model.ArtefactMetadata(
+            artefact=odg.model.ComponentArtefactId(
+                component_name='my-component',
+                component_version=None,
+                artefact_kind=odg.model.ArtefactKind.RESOURCE,
+                artefact=odg.model.LocalArtefactId(
+                    artefact_name='my-artefact',
+                    artefact_version='0.1.0',
+                    artefact_type='my-artefact-type',
+                    artefact_extra_id={
+                        'extra-identity-key-1': 'extra-identity-value-1',
+                        'extra-identity-key-2': 'extra-identity-value-2',
+                    },
+                ),
+            ),
+            meta=odg.model.Metadata(datasource='my-datasource', type='my-type'),
+            data={},
+        )
+        assert am.id == 'de25c7bf37c6031b6d38ef14288b0e2b'
+
+    def test_with_references(self):
+        ref = odg.model.ComponentArtefactId(
             component_name='my-component',
             component_version=None,
             artefact_kind=odg.model.ArtefactKind.RESOURCE,
@@ -79,66 +99,152 @@ def test_artefact_metadata_id():
                     'extra-identity-key-2': 'extra-identity-value-2',
                 },
             ),
-        ),
-        meta=odg.model.Metadata(
-            datasource='my-datasource',
-            type='my-type',
-        ),
-        data={},
-    )
-
-    artefact_metadatum_2 = odg.model.ArtefactMetadata(
-        artefact=odg.model.ComponentArtefactId(
-            component_name='my-component',
-            component_version='0.1.0',
-            artefact=odg.model.LocalArtefactId(
-                artefact_name='my-artefact',
-                artefact_version='0.1.0',
-                artefact_type='my-artefact-type',
+        )
+        am = odg.model.ArtefactMetadata(
+            artefact=odg.model.ComponentArtefactId(
+                component_name='my-component',
+                component_version='0.1.0',
+                artefact=odg.model.LocalArtefactId(
+                    artefact_name='my-artefact',
+                    artefact_version='0.1.0',
+                    artefact_type='my-artefact-type',
+                ),
+                references=[ref],
             ),
-            references=[artefact_metadatum_1.artefact],
-        ),
-        meta=odg.model.Metadata(
-            datasource='my-datasource',
-            type='my-type',
-        ),
-        data={},
-    )
-
-    assert artefact_metadatum_1.id == 'de25c7bf37c6031b6d38ef14288b0e2b'
-    assert artefact_metadatum_2.id == 'e7645c972e93cdf01526df135253584d'
+            meta=odg.model.Metadata(datasource='my-datasource', type='my-type'),
+            data={},
+        )
+        assert am.id == 'e7645c972e93cdf01526df135253584d'
 
 
-@pytest.mark.parametrize(
-    'raw',
-    [
-        _artefact_envelope(
+class TestFromDictMatchesDacite:
+    """Verify mashumaro from_dict produces identical output to the original dacite implementation."""
+
+    def _assert_matches(self, raw: dict):
+        assert _normalize(_from_dict_dacite(raw)) == _normalize(ArtefactMetadata.from_dict(raw))
+
+    def test_bdba_vulnerability_with_cvss(self):
+        # Dominant shape in production: BDBAVulnerabilityFinding with full CVSS struct.
+        self._assert_matches(
+            _artefact_envelope(
+                odg.model.Datatype.VULNERABILITY_FINDING,
+                {
+                    'package_name': 'openssl',
+                    'package_version': '3.0.7',
+                    'base_url': 'https://bdba.example.com',
+                    'report_url': 'https://bdba.example.com/products/42/',
+                    'product_id': 42,
+                    'group_id': 7,
+                    'severity': 'HIGH',
+                    'cve': 'CVE-2023-0286',
+                    'cvss_score': 7.4,
+                    'cvss': {
+                        'access_vector': 'N',
+                        'attack_complexity': 'H',
+                        'user_interaction': 'N',
+                        'privileges_required': 'N',
+                        'scope': 'U',
+                        'confidentiality': 'H',
+                        'integrity': 'N',
+                        'availability': 'H',
+                    },
+                    'summary': 'Type confusion in X.400 address processing.',
+                    'urls': ['https://nvd.nist.gov/vuln/detail/CVE-2023-0286'],
+                },
+            ),
+        )
+
+    def test_generic_vulnerability(self):
+        self._assert_matches(
+            _artefact_envelope(
+                odg.model.Datatype.VULNERABILITY_FINDING,
+                {
+                    'package_name': 'curl',
+                    'package_version': '8.0.0',
+                    'severity': 'MEDIUM',
+                    'cve': 'CVE-2025-9999',
+                    'cvss_score': 5.3,
+                },
+            ),
+        )
+
+    def test_rescoring_bdba_user(self):
+        self._assert_matches(
+            _artefact_envelope(
+                odg.model.Datatype.RESCORING,
+                {
+                    'finding': {'package_name': 'openssl', 'cve': 'CVE-2023-0286'},
+                    'referenced_type': 'finding/vulnerability',
+                    'severity': 'LOW',
+                    'user': {
+                        'username': 'jdoe',
+                        'type': 'bdba-user',
+                        'email': 'jdoe@example.com',
+                        'firstname': 'Jane',
+                        'lastname': 'Doe',
+                    },
+                },
+            ),
+        )
+
+    def test_rescoring_github_user(self):
+        self._assert_matches(
+            _artefact_envelope(
+                odg.model.Datatype.RESCORING,
+                {
+                    'finding': {'package_name': 'linux_kernel', 'cve': 'CVE-2024-1234'},
+                    'referenced_type': 'finding/vulnerability',
+                    'severity': 'NONE',
+                    'user': {
+                        'username': 'd046309',
+                        'type': 'github-user',
+                        'github_hostname': 'github.wdf.sap.corp',
+                    },
+                },
+            ),
+        )
+
+    def test_responsibles(self):
+        self._assert_matches(
+            _artefact_envelope(
+                odg.model.Datatype.RESPONSIBLES,
+                {'referenced_type': 'finding/vulnerability'},
+            ),
+        )
+
+    def test_compliance_snapshot(self):
+        self._assert_matches(
+            _artefact_envelope(
+                odg.model.Datatype.COMPLIANCE_SNAPSHOTS,
+                {'state': []},
+            ),
+        )
+
+    def test_artefact_scan_info(self):
+        self._assert_matches(
+            _artefact_envelope(
+                odg.model.Datatype.ARTEFACT_SCAN_INFO,
+                {'referenced_type': 'finding/vulnerability'},
+            ),
+        )
+
+    def test_meta_optional_fields(self):
+        raw = _artefact_envelope(
             odg.model.Datatype.VULNERABILITY_FINDING,
             {
                 'package_name': 'openssl',
                 'package_version': '3.0.7',
-                'base_url': 'https://bdba.example.com',
-                'report_url': 'https://bdba.example.com/products/42/',
-                'product_id': 42,
-                'group_id': 7,
                 'severity': 'HIGH',
                 'cve': 'CVE-2023-0286',
                 'cvss_score': 7.4,
-                'cvss': {
-                    'access_vector': 'N',
-                    'attack_complexity': 'H',
-                    'user_interaction': 'N',
-                    'privileges_required': 'N',
-                    'scope': 'U',
-                    'confidentiality': 'H',
-                    'integrity': 'N',
-                    'availability': 'H',
-                },
-                'summary': 'Type confusion in X.400 address processing.',
-                'urls': ['https://nvd.nist.gov/vuln/detail/CVE-2023-0286'],
             },
-        ),
-        _artefact_envelope(
+        )
+        raw['meta']['last_update'] = '2025-06-02T08:00:00+00:00'
+        raw['meta']['assignee_mode'] = 'extend'
+        self._assert_matches(raw)
+
+    def test_meta_responsibles(self):
+        raw = _artefact_envelope(
             odg.model.Datatype.VULNERABILITY_FINDING,
             {
                 'package_name': 'curl',
@@ -147,79 +253,73 @@ def test_artefact_metadata_id():
                 'cve': 'CVE-2025-9999',
                 'cvss_score': 5.3,
             },
-        ),
-        _artefact_envelope(
+        )
+        raw['meta']['responsibles'] = [
+            {
+                'identifiers': [
+                    {
+                        'source': 'codeowners',
+                        'type': 'githubUser',
+                        'username': 'jdoe',
+                        'github_hostname': 'github.com',
+                    },
+                ],
+            },
+        ]
+        self._assert_matches(raw)
+
+
+class TestRescoringUserFallback:
+    """Unknown user types (e.g. bdba-extension-user) must decode to User, preserving type string."""
+
+    def test_bdba_extension_user_decodes_to_user(self):
+        raw = _artefact_envelope(
             odg.model.Datatype.RESCORING,
             {
                 'finding': {'package_name': 'openssl', 'cve': 'CVE-2023-0286'},
                 'referenced_type': 'finding/vulnerability',
                 'severity': 'LOW',
-                'user': {
+                'user': {'username': 'bdba-extension-auto-rescoring', 'type': 'bdba-extension-user'},
+                'matching_rules': ['finding-update'],
+            },
+        )
+        result = ArtefactMetadata.from_dict(raw)
+        assert type(result.data.user) is odg.model.User
+        assert result.data.user.username == 'bdba-extension-auto-rescoring'
+        assert result.data.user.type == 'bdba-extension-user'
+
+    def test_known_user_types_decode_to_subclass(self):
+        cases = [
+            (
+                {
                     'username': 'jdoe',
                     'type': 'bdba-user',
-                    'email': 'jdoe@example.com',
-                    'firstname': 'Jane',
-                    'lastname': 'Doe',
+                    'email': 'j@x.com',
+                    'firstname': 'J',
+                    'lastname': 'D',
                 },
-            },
-        ),
-        _artefact_envelope(
-            odg.model.Datatype.RESPONSIBLES,
-            {'referenced_type': 'finding/vulnerability'},
-        ),
-        _artefact_envelope(
-            odg.model.Datatype.COMPLIANCE_SNAPSHOTS,
-            {'state': []},
-        ),
-    ],
-)
-def test_mashumaro_matches_dacite(raw):
-    dacite_result = _from_dict_dacite(raw)
-    mashumaro_result = ArtefactMetadata.from_dict(raw)
-    assert _normalize(dacite_result) == _normalize(mashumaro_result)
-
-
-def test_mashumaro_matches_dacite_with_responsibles():
-    raw = _artefact_envelope(
-        odg.model.Datatype.VULNERABILITY_FINDING,
-        {
-            'package_name': 'curl',
-            'package_version': '8.0.0',
-            'severity': 'MEDIUM',
-            'cve': 'CVE-2025-9999',
-            'cvss_score': 5.3,
-        },
-    )
-    raw['meta']['responsibles'] = [
-        {
-            'identifiers': [
+                odg.model.BDBAUser,
+            ),
+            (
+                {'username': 'd046309', 'type': 'github-user', 'github_hostname': 'github.com'},
+                odg.model.GitHubUser,
+            ),
+            (
+                {'username': 'alice', 'type': 'oidc-user', 'issuer': 'https://accounts.example.com'},
+                odg.model.OidcUser,
+            ),
+        ]
+        for user_raw, expected_type in cases:
+            raw = _artefact_envelope(
+                odg.model.Datatype.RESCORING,
                 {
-                    'source': 'codeowners',
-                    'type': 'githubUser',
-                    'username': 'jdoe',
-                    'github_hostname': 'github.com',
+                    'finding': {'package_name': 'pkg', 'cve': 'CVE-1'},
+                    'referenced_type': 'finding/vulnerability',
+                    'severity': 'LOW',
+                    'user': user_raw,
                 },
-            ],
-        },
-    ]
-    dacite_result = _from_dict_dacite(raw)
-    mashumaro_result = ArtefactMetadata.from_dict(raw)
-    assert _normalize(dacite_result) == _normalize(mashumaro_result)
-
-
-def test_mashumaro_matches_dacite_full_meta():
-    raw = _artefact_envelope(
-        odg.model.Datatype.VULNERABILITY_FINDING,
-        {
-            'package_name': 'openssl',
-            'package_version': '3.0.7',
-            'severity': 'HIGH',
-            'cve': 'CVE-2023-0286',
-            'cvss_score': 7.4,
-        },
-    )
-    raw['meta']['last_update'] = '2025-06-02T08:00:00+00:00'
-    raw['meta']['assignee_mode'] = 'extend'
-    dacite_result = _from_dict_dacite(raw)
-    mashumaro_result = ArtefactMetadata.from_dict(raw)
-    assert _normalize(dacite_result) == _normalize(mashumaro_result)
+            )
+            result = ArtefactMetadata.from_dict(raw)
+            assert type(result.data.user) is expected_type, (
+                f'expected {expected_type.__name__} for type={user_raw["type"]!r}'
+            )

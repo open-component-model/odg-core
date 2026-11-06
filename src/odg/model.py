@@ -1029,10 +1029,7 @@ class CustomRescoring:
     )
     referenced_type: str
     severity: str
-    user: typing.Annotated[
-        BDBAUser | GitHubUser | User,
-        mashumaro.types.Discriminator(field='type', include_supertypes=True, include_subtypes=True),
-    ]
+    user: BDBAUser | GitHubUser | OidcUser | User
     matching_rules: list[str] = dataclasses.field(default_factory=list)
     comment: str | None = None
     allowed_processing_time: str | None = None
@@ -1823,7 +1820,12 @@ class ArtefactMetadata:
                 else _decoders[2].decode(raw['data'])
             )
         elif meta_type == Datatype.RESCORING:
-            data = _decoders[4].decode(raw['data'])
+            rescoring_data = raw['data']
+            user_raw = rescoring_data.get('user')
+            rescoring = _decoders[4].decode(rescoring_data)
+            if user_raw is not None:
+                rescoring = dataclasses.replace(rescoring, user=_decode_user(user_raw))
+            data = rescoring
         elif meta_type == Datatype.ARTEFACT_SCAN_INFO:
             data = raw['data']
         else:
@@ -1911,6 +1913,19 @@ class ArtefactMetadata:
         return hash(self.key)
 
 
+_user_decoders: dict[str, mashumaro.codecs.BasicDecoder] = {}  # populated after class definitions
+
+
+def _decode_user(raw: dict) -> BDBAUser | GitHubUser | OidcUser | User:
+    user_type = raw.get('type', 'user')
+    decoder = _user_decoders.get(user_type)
+    if decoder is None:
+        # Unknown type (e.g. 'bdba-extension-user') — fall back to base User,
+        # preserving the original type string.
+        return User(username=raw['username'], type=user_type)
+    return decoder.decode(raw)
+
+
 _decoders = (
     mashumaro.codecs.BasicDecoder(ArtefactMetadata),  # [0]
     mashumaro.codecs.BasicDecoder(BDBAVulnerabilityFinding),  # [1]
@@ -1918,6 +1933,15 @@ _decoders = (
     mashumaro.codecs.BasicDecoder(ComponentArtefactId),  # [3]
     mashumaro.codecs.BasicDecoder(CustomRescoring),  # [4]
     mashumaro.codecs.BasicDecoder(UserIdentity),  # [5]
+)
+
+_user_decoders.update(
+    {
+        'bdba-user': mashumaro.codecs.BasicDecoder(BDBAUser),
+        'github-user': mashumaro.codecs.BasicDecoder(GitHubUser),
+        'oidc-user': mashumaro.codecs.BasicDecoder(OidcUser),
+        'user': mashumaro.codecs.BasicDecoder(User),
+    },
 )
 
 artefact_metadata_encoder = mashumaro.codecs.orjson.ORJSONEncoder(ArtefactMetadata)
