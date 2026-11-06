@@ -1097,11 +1097,11 @@ wheels = [
 
 [[package]]
 name = "jsonpath-ng"
-version = "1.14.0"
+version = "1.15.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/e7/5b/9d0997cd369dab82b286220e6cf1318d78354f5688c396e209adb1240287/jsonpath_ng-1.14.0.tar.gz", hash = "sha256:8c8b0b32c24421ba150621863c6a943e84861edbe6a4414261d1ad7cba7828bc", size = 118234, upload-time = "2026-10-26T12:55:18.521Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/30/40/00f1c0fef301f69aae20f9b24ab4072c188afd753096d969e2cdedd09954/jsonpath_ng-1.15.0.tar.gz", hash = "sha256:6857e3817a04555375d68eb5be17562eea6d3a3de2d10dad6f54f259282ee1c9", size = 119781, upload-time = "2026-10-29T14:18:11.098Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/09/6a/43e980ff10778b9b628310d822d4a62ada9bba8941523568b90abb973651/jsonpath_ng-1.14.0-py3-none-any.whl", hash = "sha256:748ffe4fce1a5f7f67f5414206ab4919bab99f800598de1f60df280a211d71df", size = 84383, upload-time = "2026-10-26T12:55:17.065Z" },
+    { url = "https://files.pythonhosted.org/packages/4b/a1/ec64128a063e501bd84b73cfbd2f204f9756c20d9be7eceeea8d997bd6f2/jsonpath_ng-1.15.0-py3-none-any.whl", hash = "sha256:a079a4d1d3e9ecb452437f26c18ec6854bd1beab36f5d5bafc121ea7330ad1b7", size = 84764, upload-time = "2026-10-29T14:18:09.724Z" },
 ]
 
 [[package]]
@@ -1603,7 +1603,7 @@ requires-dist = [
     { name = "gardener-cicd-libs", specifier = "==1.2866.0" },
     { name = "github3-py", specifier = "==4.0.1" },
     { name = "greenlet", specifier = "==3.5.6" },
-    { name = "jsonpath-ng", specifier = "==1.14.0" },
+    { name = "jsonpath-ng", specifier = "==1.15.0" },
     { name = "jsonschema", specifier = "==4.26.0" },
     { name = "kubernetes", specifier = "==36.0.3" },
     { name = "mako", specifier = "==1.4.3" },
