@@ -8,6 +8,7 @@ import textwrap
 import typing
 
 import mashumaro.codecs
+import mashumaro.codecs.orjson
 import mashumaro.types
 import ocm
 import ocm.iter
@@ -1918,6 +1919,9 @@ _decoders = (
     mashumaro.codecs.BasicDecoder(CustomRescoring),  # [4]
     mashumaro.codecs.BasicDecoder(UserIdentity),  # [5]
 )
+
+artefact_metadata_encoder = mashumaro.codecs.orjson.ORJSONEncoder(ArtefactMetadata)
+artefact_metadata_basic_encoder = mashumaro.codecs.BasicEncoder(ArtefactMetadata)
 
 
 def artefact_scan_info(
