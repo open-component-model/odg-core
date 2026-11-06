@@ -269,6 +269,87 @@ class TestFromDictMatchesDacite:
         self._assert_matches(raw)
 
 
+class TestFromDictSinglePath:
+    """
+    Hot-path types (VULNERABILITY_FINDING, RESCORING) must decode all Metadata and
+    ArtefactMetadata fields identically to the generic decoder. A separate hand-written
+    path that constructs Metadata by hand will miss newly-added fields.
+    """
+
+    def _assert_matches(self, raw: dict):
+        assert _normalize(_from_dict_dacite(raw)) == _normalize(ArtefactMetadata.from_dict(raw))
+
+    def test_vulnerability_finding_all_meta_fields(self):
+        raw = _artefact_envelope(
+            odg.model.Datatype.VULNERABILITY_FINDING,
+            {
+                'package_name': 'openssl',
+                'package_version': '3.0.7',
+                'base_url': 'https://bdba.example.com',
+                'report_url': 'https://bdba.example.com/products/42/',
+                'product_id': 42,
+                'group_id': 7,
+                'severity': 'HIGH',
+                'cve': 'CVE-2023-0286',
+                'cvss_score': 7.4,
+            },
+        )
+        raw['meta']['last_update'] = '2025-06-01T10:00:00+00:00'
+        raw['meta']['assignee_mode'] = 'extend'
+        raw['meta']['responsibles'] = [
+            {
+                'identifiers': [
+                    {
+                        'source': 'codeowners',
+                        'type': 'githubUser',
+                        'username': 'jdoe',
+                        'github_hostname': 'github.com',
+                    },
+                ],
+            },
+        ]
+        self._assert_matches(raw)
+
+    def test_rescoring_all_meta_fields(self):
+        raw = _artefact_envelope(
+            odg.model.Datatype.RESCORING,
+            {
+                'finding': {'package_name': 'openssl', 'cve': 'CVE-2023-0286'},
+                'referenced_type': 'finding/vulnerability',
+                'severity': 'LOW',
+                'user': {
+                    'username': 'jdoe',
+                    'type': 'github-user',
+                    'github_hostname': 'github.com',
+                },
+            },
+        )
+        raw['meta']['last_update'] = '2025-07-01T12:00:00+00:00'
+        raw['meta']['assignee_mode'] = 'extend'
+        self._assert_matches(raw)
+
+    def test_rescoring_generic_decoder_alone_wrong_type(self):
+        """Without the RESCORING branch, the generic decoder mis-resolves to ResponsibleInfo."""
+        raw = _artefact_envelope(
+            odg.model.Datatype.RESCORING,
+            {
+                'finding': {'package_name': 'openssl', 'cve': 'CVE-2023-0286'},
+                'referenced_type': 'finding/vulnerability',
+                'severity': 'LOW',
+                'user': {'username': 'jdoe', 'type': 'github-user', 'github_hostname': 'github.com'},
+            },
+        )
+        import mashumaro.codecs
+
+        generic = mashumaro.codecs.BasicDecoder(odg.model.ArtefactMetadata)
+        result = generic.decode(raw)
+        # The generic path hits ResponsibleInfo before CustomRescoring in the union — the
+        # RESCORING branch in from_dict exists specifically to correct this.
+        assert not isinstance(result.data, odg.model.CustomRescoring), (
+            'If this fails, the RESCORING branch in from_dict can be removed'
+        )
+
+
 class TestRescoringUserFallback:
     """Unknown user types (e.g. bdba-extension-user) must decode to User, preserving type string."""
 

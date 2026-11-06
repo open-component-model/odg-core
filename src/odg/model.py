@@ -1809,67 +1809,16 @@ class ArtefactMetadata:
     def from_dict(raw: dict):
         # mashumaro silently ignores unknown keys (dacite strict=True would reject them);
         # acceptable since payloads come from the delivery-db, not untrusted input.
-        meta_type = raw['meta']['type']
-
-        if meta_type == Datatype.VULNERABILITY_FINDING:
-            # BDBAVulnerabilityFinding and VulnerabilityFinding share the same Datatype;
-            # presence of 'base_url' (a BDBAMixin field) distinguishes them.
-            data = (
-                _decode_bdba_vulnerability_finding.decode(raw['data'])
-                if 'base_url' in raw['data']
-                else _decode_vulnerability_finding.decode(raw['data'])
-            )
-        elif meta_type == Datatype.RESCORING:
-            rescoring_data = raw['data']
-            user_raw = rescoring_data.get('user')
-            rescoring = _decode_custom_rescoring.decode(rescoring_data)
-            if user_raw is not None:
-                rescoring = dataclasses.replace(rescoring, user=_decode_user(user_raw))
-            data = rescoring
-        elif meta_type == Datatype.ARTEFACT_SCAN_INFO:
-            data = raw['data']
-        else:
+        #
+        # RESCORING needs a dedicated branch: ResponsibleInfo and CustomRescoring both have a
+        # `referenced_type` field, so mashumaro's union resolution hits ResponsibleInfo first
+        # and returns the wrong type. All other Datatypes are unambiguous in the union and go
+        # through the generic decoder directly.
+        if raw['meta']['type'] != Datatype.RESCORING:
             return _decode_artefact_metadata.decode(raw)
 
-        artefact = _decode_component_artefact_id.decode(raw['artefact'])
-        raw_meta = raw['meta']
-        responsibles_raw = raw_meta.get('responsibles')
-        meta = Metadata(
-            datasource=raw_meta['datasource'],
-            type=raw_meta['type'],
-            creation_date=(
-                datetime.datetime.fromisoformat(raw_meta['creation_date'])
-                if raw_meta.get('creation_date')
-                else None
-            ),
-            last_update=(
-                datetime.datetime.fromisoformat(raw_meta['last_update'])
-                if raw_meta.get('last_update')
-                else None
-            ),
-            responsibles=(
-                [_decode_user_identity.decode(r) for r in responsibles_raw]
-                if responsibles_raw is not None
-                else None
-            ),
-            assignee_mode=(
-                ResponsibleAssigneeModes(raw_meta['assignee_mode'])
-                if raw_meta.get('assignee_mode') is not None
-                else None
-            ),
-        )
-        discovery_date_raw = raw.get('discovery_date')
-        return ArtefactMetadata(
-            artefact=artefact,
-            meta=meta,
-            data=data,
-            discovery_date=(
-                datetime.datetime.fromisoformat(discovery_date_raw).date()
-                if discovery_date_raw
-                else None
-            ),
-            allowed_processing_time=raw.get('allowed_processing_time'),
-        )
+        rescoring = _decode_custom_rescoring.decode(raw['data'])
+        return dataclasses.replace(_decode_artefact_metadata.decode(raw), data=rescoring)
 
     @property
     def key(self) -> str:
@@ -1914,29 +1863,7 @@ class ArtefactMetadata:
 
 
 _decode_artefact_metadata = mashumaro.codecs.BasicDecoder(ArtefactMetadata)
-_decode_bdba_vulnerability_finding = mashumaro.codecs.BasicDecoder(BDBAVulnerabilityFinding)
-_decode_vulnerability_finding = mashumaro.codecs.BasicDecoder(VulnerabilityFinding)
-_decode_component_artefact_id = mashumaro.codecs.BasicDecoder(ComponentArtefactId)
 _decode_custom_rescoring = mashumaro.codecs.BasicDecoder(CustomRescoring)
-_decode_user_identity = mashumaro.codecs.BasicDecoder(UserIdentity)
-
-_user_decoders: dict[str, mashumaro.codecs.BasicDecoder] = {
-    'bdba-user': mashumaro.codecs.BasicDecoder(BDBAUser),
-    'github-user': mashumaro.codecs.BasicDecoder(GitHubUser),
-    'oidc-user': mashumaro.codecs.BasicDecoder(OidcUser),
-    'user': mashumaro.codecs.BasicDecoder(User),
-}
-
-
-def _decode_user(raw: dict) -> BDBAUser | GitHubUser | OidcUser | User:
-    user_type = raw.get('type', 'user')
-    decoder = _user_decoders.get(user_type)
-    if decoder is None:
-        # Unknown type (e.g. 'bdba-extension-user') — fall back to base User,
-        # preserving the original type string.
-        return User(username=raw['username'], type=user_type)
-    return decoder.decode(raw)
-
 
 artefact_metadata_encoder = mashumaro.codecs.orjson.ORJSONEncoder(ArtefactMetadata)
 artefact_metadata_basic_encoder = mashumaro.codecs.BasicEncoder(ArtefactMetadata)
