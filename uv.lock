@@ -1279,18 +1279,6 @@ wheels = [
 ]
 
 [[package]]
-name = "mashumaro"
-version = "3.23"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/09/18/6383ce957a0551d8704936ffef1ecf0b0c620543999a44f9adf6c5f30888/mashumaro-3.23.tar.gz", hash = "sha256:ed69d5bc548c76efbb5286cc0e541a6b8796e621385f986e25b750364011abf5", size = 141901, upload-time = "2026-09-30T20:21:40.905Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/4e/eb/2c5e2b0df54c9c979d45bfa4820687ab24797fe1ad42d4fdfc0c8ece59f1/mashumaro-3.23-py3-none-any.whl", hash = "sha256:a671279ce93119d41c54adcd767753ae68adb32b9473de2f9d5d1720d2376231", size = 78621, upload-time = "2026-09-30T20:21:39.403Z" },
-]
-
-[[package]]
 name = "mccabe"
 version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1569,7 +1557,6 @@ dependencies = [
     { name = "jsonschema" },
     { name = "kubernetes" },
     { name = "mako" },
-    { name = "mashumaro" },
     { name = "numpy" },
     { name = "odg-client" },
     { name = "orjson" },
@@ -1594,7 +1581,6 @@ dev = [
     { name = "greenlet" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
-    { name = "pytest-benchmark" },
     { name = "ruff" },
     { name = "semver" },
     { name = "setuptools" },
@@ -1621,7 +1607,6 @@ requires-dist = [
     { name = "jsonschema", specifier = "==4.26.0" },
     { name = "kubernetes", specifier = "==36.0.3" },
     { name = "mako", specifier = "==1.4.3" },
-    { name = "mashumaro", specifier = "==3.23" },
     { name = "numpy", specifier = "==2.5.4" },
     { name = "odg-client", editable = "packages/odg-client" },
     { name = "orjson", specifier = "==3.13.0" },
@@ -1646,7 +1631,6 @@ dev = [
     { name = "greenlet", specifier = "==3.5.6" },
     { name = "pytest", specifier = "==9.2.0" },
     { name = "pytest-asyncio", specifier = "==1.4.1" },
-    { name = "pytest-benchmark", specifier = "==5.3.0" },
     { name = "ruff", specifier = "==0.17.3" },
     { name = "semver", specifier = "==3.1.0" },
     { name = "setuptools", specifier = "==84.2.1" },
@@ -1859,15 +1843,6 @@ wheels = [
 ]
 
 [[package]]
-name = "py-cpuinfo2"
-version = "10.1.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/dc/97/a8b1ddada14c8280a047c0746f95cb05d94a31b1a331cea22bcdc2b2a82d/py_cpuinfo2-10.1.1.tar.gz", hash = "sha256:7861133863663f16e06eca63b12904ef100b5760415e92372dac0162799a4771", size = 100840, upload-time = "2026-03-25T21:49:40.797Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/23/0a/ba69d2dde1ae12ef1d389ea5a216384c5ff6ef7a1e7a48d1e9b6686f6790/py_cpuinfo2-10.1.1-py3-none-any.whl", hash = "sha256:adc53396bfb206e6498d078ec2ab407f85799ecd819584ac36a8f80a2d4d762d", size = 23791, upload-time = "2026-03-25T21:49:39.574Z" },
-]
-
-[[package]]
 name = "py-serializable"
 version = "2.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1999,19 +1974,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/f8/9a/887535e477847f5159377ab35303923644840b13c0ca03c0a467f84d4680/pytest_asyncio-1.4.1.tar.gz", hash = "sha256:e8266eb094e5ee9ffdb2068c9836f33e209ea77a970eb846933d416b5602669b", size = 145237, upload-time = "2026-10-25T21:05:37.135Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/46/d7/cd9e2708afdbf059658adaf08bdb0792ca52489871051d6ce7d498b51277/pytest_asyncio-1.4.1-py3-none-any.whl", hash = "sha256:507afa78ec77c6661164ef1a2368bc7820383fd1a14b2a7f813de8b5a92949cc", size = 17061, upload-time = "2026-10-25T21:05:35.473Z" },
-]
-
-[[package]]
-name = "pytest-benchmark"
-version = "5.3.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "py-cpuinfo2" },
-    { name = "pytest" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/63/8f/83a15e40dbc34a580ee56eb56983cae5394c6e94d50cf28fe268e457be25/pytest_benchmark-5.3.0.tar.gz", hash = "sha256:358444d4e89be901ee2b6404fb043ac3d7684002ad7f3563cc153fca6339c965", size = 375410, upload-time = "2026-08-23T17:45:08.891Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/eb/42/7e80f7cfa191e0a766d1de99b4661847415ad5db34f8209d81fd42175b59/pytest_benchmark-5.3.0-py3-none-any.whl", hash = "sha256:920ab1dfcffa718d49aa15ba144c7e357bda59216a0dc308016cc1c7236f719d", size = 48401, upload-time = "2026-08-23T17:45:07.094Z" },
 ]
 
 [[package]]

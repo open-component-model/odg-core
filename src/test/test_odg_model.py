@@ -1,5 +1,43 @@
+import dataclasses
+import datetime
+import enum
+
+import dacite
 import pytest
+
 import odg.model
+from odg.model import ArtefactMetadata, MatchCondition
+
+
+def _from_dict_dacite(raw: dict) -> ArtefactMetadata:
+    return dacite.from_dict(
+        data_class=ArtefactMetadata,
+        data=raw,
+        config=dacite.Config(
+            type_hooks={
+                datetime.datetime: datetime.datetime.fromisoformat,
+                datetime.date: lambda date: datetime.datetime.fromisoformat(date).date(),
+            },
+            cast=[
+                enum.StrEnum,
+                MatchCondition,
+            ],
+            strict=True,
+        ),
+    )
+
+
+def _normalize(value):
+    """Recursively convert dataclasses and enums to plain dicts/primitives for comparison."""
+    if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        return {f.name: _normalize(getattr(value, f.name)) for f in dataclasses.fields(value)}
+    if isinstance(value, enum.Enum):
+        return value.value
+    if isinstance(value, dict):
+        return {k: _normalize(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_normalize(item) for item in value]
+    return value
 
 
 def _artefact_envelope(meta_type: str, data: dict) -> dict:
@@ -72,9 +110,9 @@ def test_artefact_metadata_id():
 
 
 @pytest.mark.parametrize(
-    'meta_type,data,expected_type',
+    'raw',
     [
-        (
+        _artefact_envelope(
             odg.model.Datatype.VULNERABILITY_FINDING,
             {
                 'package_name': 'openssl',
@@ -86,10 +124,21 @@ def test_artefact_metadata_id():
                 'severity': 'HIGH',
                 'cve': 'CVE-2023-0286',
                 'cvss_score': 7.4,
+                'cvss': {
+                    'access_vector': 'N',
+                    'attack_complexity': 'H',
+                    'user_interaction': 'N',
+                    'privileges_required': 'N',
+                    'scope': 'U',
+                    'confidentiality': 'H',
+                    'integrity': 'N',
+                    'availability': 'H',
+                },
+                'summary': 'Type confusion in X.400 address processing.',
+                'urls': ['https://nvd.nist.gov/vuln/detail/CVE-2023-0286'],
             },
-            odg.model.BDBAVulnerabilityFinding,
         ),
-        (
+        _artefact_envelope(
             odg.model.Datatype.VULNERABILITY_FINDING,
             {
                 'package_name': 'curl',
@@ -98,9 +147,8 @@ def test_artefact_metadata_id():
                 'cve': 'CVE-2025-9999',
                 'cvss_score': 5.3,
             },
-            odg.model.VulnerabilityFinding,
         ),
-        (
+        _artefact_envelope(
             odg.model.Datatype.RESCORING,
             {
                 'finding': {'package_name': 'openssl', 'cve': 'CVE-2023-0286'},
@@ -114,31 +162,24 @@ def test_artefact_metadata_id():
                     'lastname': 'Doe',
                 },
             },
-            odg.model.CustomRescoring,
         ),
-        (
-            odg.model.Datatype.ARTEFACT_SCAN_INFO,
-            {'referenced_type': 'finding/vulnerability'},
-            dict,
-        ),
-        (
+        _artefact_envelope(
             odg.model.Datatype.RESPONSIBLES,
             {'referenced_type': 'finding/vulnerability'},
-            odg.model.ResponsibleInfo,
         ),
-        (
+        _artefact_envelope(
             odg.model.Datatype.COMPLIANCE_SNAPSHOTS,
             {'state': []},
-            odg.model.ComplianceSnapshot,
         ),
     ],
 )
-def test_from_dict_dispatch(meta_type, data, expected_type):
-    am = odg.model.ArtefactMetadata.from_dict(_artefact_envelope(meta_type, data))
-    assert type(am.data) is expected_type
+def test_mashumaro_matches_dacite(raw):
+    dacite_result = _from_dict_dacite(raw)
+    mashumaro_result = ArtefactMetadata.from_dict(raw)
+    assert _normalize(dacite_result) == _normalize(mashumaro_result)
 
 
-def test_from_dict_hot_path_with_responsibles():
+def test_mashumaro_matches_dacite_with_responsibles():
     raw = _artefact_envelope(
         odg.model.Datatype.VULNERABILITY_FINDING,
         {
@@ -161,7 +202,24 @@ def test_from_dict_hot_path_with_responsibles():
             ],
         },
     ]
-    am = odg.model.ArtefactMetadata.from_dict(raw)
-    assert len(am.meta.responsibles) == 1
-    assert isinstance(am.meta.responsibles[0], odg.model.UserIdentity)
-    assert isinstance(am.meta.responsibles[0].identifiers[0], odg.model.GithubUser)
+    dacite_result = _from_dict_dacite(raw)
+    mashumaro_result = ArtefactMetadata.from_dict(raw)
+    assert _normalize(dacite_result) == _normalize(mashumaro_result)
+
+
+def test_mashumaro_matches_dacite_full_meta():
+    raw = _artefact_envelope(
+        odg.model.Datatype.VULNERABILITY_FINDING,
+        {
+            'package_name': 'openssl',
+            'package_version': '3.0.7',
+            'severity': 'HIGH',
+            'cve': 'CVE-2023-0286',
+            'cvss_score': 7.4,
+        },
+    )
+    raw['meta']['last_update'] = '2025-06-02T08:00:00+00:00'
+    raw['meta']['assignee_mode'] = 'extend'
+    dacite_result = _from_dict_dacite(raw)
+    mashumaro_result = ArtefactMetadata.from_dict(raw)
+    assert _normalize(dacite_result) == _normalize(mashumaro_result)
