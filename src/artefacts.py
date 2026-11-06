@@ -82,7 +82,11 @@ class ArtefactBlob(aiohttp.web.View):
             artefact = {}
             artefact_version = None
 
-        ocm_repository = util.param(params, 'ocm_repository')
+        ocm_repository = util.param(
+            params,
+            'ocm_repository',
+            validator=lambda url: not url or lookups.is_allowlisted_ocm_repo(url),
+        )
         unzip = util.param_as_bool(params, 'unzip', default=True)
 
         component_descriptor_lookup = self.request.app[consts.APP_COMPONENT_DESCRIPTOR_LOOKUP]
