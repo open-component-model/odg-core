@@ -146,6 +146,9 @@ def mutate_finding_id(
         data['cve'] = f'CVE-PERF-{rng.randint(100000, 999999)}'
     elif 'package_name' in data:
         data['package_name'] = f'perf-pkg-{rng.randint(10000, 99999)}'
+    else:
+        # No recognised key field — inject a synthetic one so the id actually changes
+        data['_perf_mutation_key'] = f'perf-{rng.randint(100000, 999999)}'
     mutated.data = data
     return mutated
 

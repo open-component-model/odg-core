@@ -106,9 +106,21 @@ class ArtefactMetadataFilters:
     def by_name_and_type(
         artefact_metadata: dm.ArtefactMetaData,
     ):
+        component_version_filter = (
+            dm.ArtefactMetaData.component_version.is_(None)
+            if artefact_metadata.component_version is None
+            else dm.ArtefactMetaData.component_version == artefact_metadata.component_version
+        )
+        artefact_version_filter = (
+            dm.ArtefactMetaData.artefact_version.is_(None)
+            if artefact_metadata.artefact_version is None
+            else dm.ArtefactMetaData.artefact_version == artefact_metadata.artefact_version
+        )
         return sa.and_(
             dm.ArtefactMetaData.component_name == artefact_metadata.component_name,
+            component_version_filter,
             dm.ArtefactMetaData.artefact_name == artefact_metadata.artefact_name,
+            artefact_version_filter,
             dm.ArtefactMetaData.type == artefact_metadata.type,
             dm.ArtefactMetaData.datasource == artefact_metadata.datasource,
         )
