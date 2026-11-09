@@ -1788,7 +1788,6 @@ MetaModels = (
     | ComplianceSnapshot
     | ArtefactUUID
     | SlaViolations
-    | dict
 )
 
 
@@ -1811,7 +1810,7 @@ class ArtefactMetadata:
 
     artefact: ComponentArtefactId
     meta: Metadata
-    data: FindingModels | InformationalModels | MetaModels
+    data: FindingModels | MetaModels | InformationalModels | dict
     discovery_date: datetime.date | None = None  # required for finding specific SLA tracking
     allowed_processing_time: str | None = None
 
@@ -1824,11 +1823,22 @@ class ArtefactMetadata:
         # `referenced_type` field, so mashumaro's union resolution hits ResponsibleInfo first
         # and returns the wrong type. All other Datatypes are unambiguous in the union and go
         # through the generic decoder directly.
-        if raw['meta']['type'] != Datatype.RESCORING:
+        #
+        # Unknown meta.type: keep data as a plain dict so any 'key' field is preserved for ID
+        # computation — structural union resolution would match vulnerability-shaped data to
+        # VulnerabilityFinding and produce a wrong key.
+        try:
+            meta_type = Datatype(raw['meta']['type'])
+        except ValueError:
+            envelope = _decode_artefact_metadata.decode({**raw, 'data': {}})
+            return dataclasses.replace(envelope, data=raw['data'])
+
+        if meta_type != Datatype.RESCORING:
             return _decode_artefact_metadata.decode(raw)
 
         rescoring = _decode_custom_rescoring.decode(raw['data'])
-        return dataclasses.replace(_decode_artefact_metadata.decode(raw), data=rescoring)
+        envelope = _decode_artefact_metadata.decode({**raw, 'data': {}})
+        return dataclasses.replace(envelope, data=rescoring)
 
     @property
     def key(self) -> str:

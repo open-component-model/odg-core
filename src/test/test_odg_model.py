@@ -318,8 +318,10 @@ class TestFromDictSinglePath:
         raw['meta']['assignee_mode'] = 'extend'
         self._assert_matches(raw)
 
-    def test_rescoring_generic_decoder_alone_wrong_type(self):
-        """Without the RESCORING branch, the generic decoder mis-resolves to ResponsibleInfo."""
+    def test_rescoring_generic_decoder_resolves_correctly(self):
+        """With MetaModels before InformationalModels, the generic decoder resolves RESCORING
+        to CustomRescoring directly. The dedicated RESCORING branch in from_dict is still needed
+        for the unknown meta.type fallback path."""
         raw = _artefact_envelope(
             odg.model.Datatype.RESCORING,
             {
@@ -333,11 +335,12 @@ class TestFromDictSinglePath:
 
         generic = mashumaro.codecs.BasicDecoder(odg.model.ArtefactMetadata)
         result = generic.decode(raw)
-        # The generic path hits ResponsibleInfo before CustomRescoring in the union — the
-        # RESCORING branch in from_dict exists specifically to correct this.
-        assert not isinstance(result.data, odg.model.CustomRescoring), (
-            'If this fails, the RESCORING branch in from_dict can be removed'
-        )
+        assert isinstance(result.data, odg.model.CustomRescoring)
+
+    def test_unknown_meta_type_preserves_data_as_dict(self):
+        raw = _artefact_envelope('custom/unknown-type', {'key': 'my-key', 'extra': 'value'})
+        result = odg.model.ArtefactMetadata.from_dict(raw)
+        assert result.data == {'key': 'my-key', 'extra': 'value'}
 
 
 class TestRescoringUserFallback:
