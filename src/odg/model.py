@@ -1014,29 +1014,7 @@ class ArtefactUUID:
     uuid4: str
 
 
-# Maps each rescoring finding class to the Datatype.value string stored in referenced_type.
-# Used by _tag_rescoring_finding to drive the Discriminator in CustomRescoring and SlaViolation.
-_RESCORING_FINDING_REFERENCED_TYPES: dict[type, str] = {
-    MalwareFindingDetails: Datatype.MALWARE_FINDING,
-    RescoreCodeqlFinding: Datatype.CODEQL_FINDING,
-    RescoreGitHubSecretFinding: Datatype.GHAS_FINDING,
-    RescoreOsIdFinding: Datatype.OSID_FINDING,
-    RescoreSastFinding: Datatype.SAST_FINDING,
-    RescoringCryptoFinding: Datatype.CRYPTO_FINDING,
-    RescoringDikiFinding: Datatype.DIKI_FINDING,
-    RescoringFalcoFinding: Datatype.FALCO_FINDING,
-    RescoringIPFinding: Datatype.IP_FINDING,
-    RescoringKyvernoFinding: Datatype.KYVERNO_FINDING,
-    RescoringLicenseFinding: Datatype.LICENSE_FINDING,
-    RescoringVulnerabilityFinding: Datatype.VULNERABILITY_FINDING,
-}
-
-
-def _tag_rescoring_finding(cls: type) -> str | None:
-    return _RESCORING_FINDING_REFERENCED_TYPES.get(cls)
-
-
-_RescoringFindingField = typing.Annotated[
+_RescoringFindingField = (
     RescoringVulnerabilityFinding
     | RescoringIPFinding
     | RescoringLicenseFinding
@@ -1048,13 +1026,8 @@ _RescoringFindingField = typing.Annotated[
     | RescoreOsIdFinding
     | RescoringFalcoFinding
     | RescoringKyvernoFinding
-    | RescoreGitHubSecretFinding,
-    mashumaro.types.Discriminator(
-        field='referenced_type',
-        variant_tagger_fn=_tag_rescoring_finding,
-        include_supertypes=True,
-    ),
-]
+    | RescoreGitHubSecretFinding
+)
 
 
 @dataclasses.dataclass
@@ -1077,10 +1050,10 @@ class CustomRescoring:
 
     @classmethod
     def __pre_deserialize__(cls, d: dict) -> dict:
-        # Discriminator(field='referenced_type') reads from the finding dict, not the parent —
-        # inject the parent's referenced_type so the field is visible at dispatch time.
-        if isinstance(d.get('finding'), dict):
-            d = {**d, 'finding': {**d['finding'], 'referenced_type': d.get('referenced_type', '')}}
+        # Normalise ISO datetime strings (legacy DB rows) to plain date strings for due_date.
+        if isinstance(d.get('due_date'), str) and 'T' in d['due_date']:
+            due = datetime.datetime.fromisoformat(d['due_date']).strftime('%Y-%m-%d')
+            d = {**d, 'due_date': due}
         return d
 
     @property
@@ -1119,14 +1092,6 @@ class SlaViolation:
     severity: str
     artefact: ComponentArtefactId
     trace: list[SlaViolationTraceEntry] = dataclasses.field(default_factory=list)
-
-    @classmethod
-    def __pre_deserialize__(cls, d: dict) -> dict:
-        # Discriminator(field='referenced_type') reads from the finding dict, not the parent —
-        # inject the parent's referenced_type so the field is visible at dispatch time.
-        if isinstance(d.get('finding'), dict):
-            d = {**d, 'finding': {**d['finding'], 'referenced_type': d.get('referenced_type', '')}}
-        return d
 
 
 @dataclasses.dataclass
