@@ -571,7 +571,7 @@ async def component_versions(
     version_filter: lookups.VersionFilter | str | None = None,
     oci_client: oci.client_async.Client = None,
     db_session: sqlasync.session.AsyncSession = None,  # required for db-cache
-) -> set[str]:
+) -> list[str]:
     if not oci_client:
         oci_client = lookups.semver_sanitising_oci_client_async()
 
@@ -614,7 +614,7 @@ async def component_versions(
             reason=f'Component {component_name!r} not found (upstream access denied)',
         )
 
-    return included_versions
+    return list(included_versions)
 
 
 async def greatest_component_version(
