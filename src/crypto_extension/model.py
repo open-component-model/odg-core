@@ -34,6 +34,9 @@ NIST_CURVES_BY_OID = {
     '1.3.132.0.39': ('B-571', 571),
 }
 
+GO_STDLIB_NAME = 'stdlib'
+GO_STDLIB_PURL_PREFIX = f'pkg:golang/{GO_STDLIB_NAME}@'
+
 
 class SupportedSchemaVersions(enum.Enum):
     V1_6 = cyclonedx.schema.SchemaVersion.V1_6
@@ -88,6 +91,15 @@ def filter_crypto_assets(
         ):
             continue
 
+        if (
+            component_type is ComponentTypes.LIBRARY
+            and component['name'] == GO_STDLIB_NAME
+            and not component.get('purl', '').startswith(GO_STDLIB_PURL_PREFIX)
+        ):
+            # `stdlib` refers to the Go standard library (containing the Go Cryptographic Module),
+            # other ecosystems' components of that name must not be rated as such
+            continue
+
         if component_type is ComponentTypes.LIBRARY:
             asset_type = odg.model.CryptoAssetTypes.LIBRARY
 
@@ -104,6 +116,20 @@ def filter_crypto_assets(
         yield component
 
 
+def iter_property_values(
+    component: dict,
+    name_regex: str,
+) -> collections.abc.Generator[str, None, None]:
+    for property in component.get('properties', []):
+        if not (value := property.get('value')):
+            continue
+
+        if not re.fullmatch(name_regex, property['name']):
+            continue
+
+        yield value
+
+
 def iter_locations(
     crypto_asset_raw: dict,
 ) -> collections.abc.Generator[str, None, None]:
@@ -117,15 +143,38 @@ def iter_locations(
             for occurrence in occurrences:
                 yield occurrence['location']
 
-    for property in crypto_asset_raw.get('properties', []):
-        if not (value := property.get('value')):
+    # syft stores path information of a component in a label matching this regex
+    yield from iter_property_values(
+        component=crypto_asset_raw,
+        name_regex=r'^syft:location:\d+:path$',
+    )
+
+
+def go_crypto_settings_by_location(
+    components: collections.abc.Iterable[dict],
+) -> dict[str, set[str]]:
+    """
+    syft records the crypto build settings of a Go binary (e.g. `GOFIPS140=v1.0.0-c2097c7c`,
+    `GODEBUG=fips140=on`) only on the component of the binary's main module. They are collected per
+    binary path so they can be attached to the Go standard library (which contains the Go
+    Cryptographic Module) found in the same binary.
+    """
+    crypto_settings_by_location: dict[str, set[str]] = collections.defaultdict(set)
+
+    for component in components:
+        crypto_settings = set(
+            iter_property_values(
+                component=component,
+                name_regex=r'^syft:metadata:goCryptoSettings:\d+$',
+            ),
+        )
+        if not crypto_settings:
             continue
 
-        # syft stores path information of a component in a label matching this regex
-        if not re.fullmatch(r'^syft:location:\d+:path$', property['name']):
-            continue
+        for location in iter_locations(crypto_asset_raw=component):
+            crypto_settings_by_location[location].update(crypto_settings)
 
-        yield value
+    return crypto_settings_by_location
 
 
 def bom_ref_to_data_key(
@@ -142,6 +191,8 @@ def bom_ref_to_data_key(
         crypto_asset = deserialise_crypto_asset(
             crypto_asset_raw=crypto_asset_raw,
             crypto_assets_raw=crypto_assets_raw,
+            # bom-refs only reference algorithms and related crypto material, never libraries
+            go_crypto_settings_by_location={},
         )
 
         return crypto_asset.key
@@ -370,12 +421,14 @@ def deserialise_related_crypto_material(
 def deserialise_crypto_asset(
     crypto_asset_raw: dict,
     crypto_assets_raw: collections.abc.Sequence[dict],
+    go_crypto_settings_by_location: collections.abc.Mapping[str, set[str]],
 ) -> odg.model.CryptoAsset:
     name = crypto_asset_raw['name']
     type = ComponentTypes(crypto_asset_raw['type'])
     version = crypto_asset_raw.get('version')
     description = crypto_asset_raw.get('description')
     crypto_properties = crypto_asset_raw.get('cryptoProperties')
+    locations = set(iter_locations(crypto_asset_raw=crypto_asset_raw))
 
     if type is ComponentTypes.LIBRARY:
         asset_type = odg.model.CryptoAssetTypes.LIBRARY
@@ -406,9 +459,15 @@ def deserialise_crypto_asset(
         )
 
     elif asset_type is odg.model.CryptoAssetTypes.LIBRARY:
+        crypto_settings = set()
+        if crypto_asset_raw.get('purl', '').startswith(GO_STDLIB_PURL_PREFIX):
+            for location in locations:
+                crypto_settings.update(go_crypto_settings_by_location.get(location, ()))
+
         properties = odg.model.LibraryProperties(
             name=name,
             version=version,
+            crypto_settings=sorted(crypto_settings),
         )
 
     elif asset_type is odg.model.CryptoAssetTypes.PROTOCOL:
@@ -428,8 +487,6 @@ def deserialise_crypto_asset(
 
     else:
         raise RuntimeError('this is a bug, we checked supported asset types before')
-
-    locations = set(iter_locations(crypto_asset_raw=crypto_asset_raw))
 
     return odg.model.CryptoAsset(
         names=[name],
@@ -477,18 +534,25 @@ def iter_crypto_assets(
         schema_version_raw=cbom['specVersion'],
     )
 
+    components = cbom.get('components') or []
+
     crypto_assets_raw = list(
         filter_crypto_assets(
-            components=cbom.get('components') or [],
+            components=components,
             known_crypto_libraries=crypto_libraries,
             included_asset_types=included_asset_types,
         ),
+    )
+
+    go_crypto_settings = go_crypto_settings_by_location(
+        components=components,
     )
 
     crypto_assets = list(
         deserialise_crypto_asset(
             crypto_asset_raw=crypto_asset_raw,
             crypto_assets_raw=crypto_assets_raw,
+            go_crypto_settings_by_location=go_crypto_settings,
         )
         for crypto_asset_raw in crypto_assets_raw
     )
