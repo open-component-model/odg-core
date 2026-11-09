@@ -109,7 +109,7 @@ def find_cached_value(
 
 
 def dbcached_function(
-    encoding_format: dcm.EncodingFormat | str = dcm.EncodingFormat.PICKLE,
+    encoding_format: dcm.EncodingFormat = dcm.EncodingFormat.JSON,
     ttl_seconds: int = 0,
     keep_at_least_seconds: int = 0,
     max_size_octets: int = 0,
@@ -227,7 +227,7 @@ def mark_for_deletion(
 
 
 def mark_function_cache_for_deletion(
-    encoding_format: dcm.EncodingFormat | str,
+    encoding_format: dcm.EncodingFormat,
     function: collections.abc.Callable | str,
     db_session: sqlalchemy.orm.session.Session,
     delete_after: datetime.datetime | None = None,
