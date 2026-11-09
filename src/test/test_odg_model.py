@@ -2,6 +2,7 @@ import datetime
 import enum
 
 import dacite
+import mashumaro.codecs
 
 import odg.model
 import util
@@ -331,8 +332,6 @@ class TestFromDictSinglePath:
                 'user': {'username': 'jdoe', 'type': 'github-user', 'github_hostname': 'github.com'},
             },
         )
-        import mashumaro.codecs
-
         generic = mashumaro.codecs.BasicDecoder(odg.model.ArtefactMetadata)
         result = generic.decode(raw)
         assert isinstance(result.data, odg.model.CustomRescoring)

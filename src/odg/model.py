@@ -186,7 +186,6 @@ class UserIdentity:
             mashumaro.types.Discriminator(
                 field='type',
                 include_supertypes=True,
-                include_subtypes=True,
             ),
         ]
     ]
