@@ -554,7 +554,8 @@ class BDBAVulnerabilityFinding(VulnerabilityFinding, BDBAMixin):
 class RescoringIPFinding:
     package_name: str
     license: License | None
-    labels: list[str]
+    # keep for backwards compatibility — old rows may not have labels
+    labels: list[str] = dataclasses.field(default_factory=list)
 
     @property
     def key(self) -> str:
@@ -1014,6 +1015,49 @@ class ArtefactUUID:
     uuid4: str
 
 
+# Maps each rescoring finding class to the Datatype.value string stored in referenced_type.
+# Used by _tag_rescoring_finding to drive the Discriminator in CustomRescoring and SlaViolation.
+_RESCORING_FINDING_REFERENCED_TYPES: dict[type, str] = {
+    MalwareFindingDetails: Datatype.MALWARE_FINDING,
+    RescoreCodeqlFinding: Datatype.CODEQL_FINDING,
+    RescoreGitHubSecretFinding: Datatype.GHAS_FINDING,
+    RescoreOsIdFinding: Datatype.OSID_FINDING,
+    RescoreSastFinding: Datatype.SAST_FINDING,
+    RescoringCryptoFinding: Datatype.CRYPTO_FINDING,
+    RescoringDikiFinding: Datatype.DIKI_FINDING,
+    RescoringFalcoFinding: Datatype.FALCO_FINDING,
+    RescoringIPFinding: Datatype.IP_FINDING,
+    RescoringKyvernoFinding: Datatype.KYVERNO_FINDING,
+    RescoringLicenseFinding: Datatype.LICENSE_FINDING,
+    RescoringVulnerabilityFinding: Datatype.VULNERABILITY_FINDING,
+}
+
+
+def _tag_rescoring_finding(cls: type) -> str | None:
+    return _RESCORING_FINDING_REFERENCED_TYPES.get(cls)
+
+
+_RescoringFindingField = typing.Annotated[
+    RescoringVulnerabilityFinding
+    | RescoringIPFinding
+    | RescoringLicenseFinding
+    | MalwareFindingDetails
+    | RescoreSastFinding
+    | RescoreCodeqlFinding
+    | RescoringCryptoFinding
+    | RescoringDikiFinding
+    | RescoreOsIdFinding
+    | RescoringFalcoFinding
+    | RescoringKyvernoFinding
+    | RescoreGitHubSecretFinding,
+    mashumaro.types.Discriminator(
+        field='referenced_type',
+        variant_tagger_fn=_tag_rescoring_finding,
+        include_supertypes=True,
+    ),
+]
+
+
 @dataclasses.dataclass
 class CustomRescoring:
     """
@@ -1023,20 +1067,7 @@ class CustomRescoring:
     individual discovery dates (for example, this might be the case if exceptions apply).
     """
 
-    finding: (
-        RescoringVulnerabilityFinding
-        | RescoringIPFinding
-        | RescoringLicenseFinding
-        | MalwareFindingDetails
-        | RescoreSastFinding
-        | RescoreCodeqlFinding
-        | RescoringCryptoFinding
-        | RescoringDikiFinding
-        | RescoreOsIdFinding
-        | RescoringFalcoFinding
-        | RescoringKyvernoFinding
-        | RescoreGitHubSecretFinding
-    )
+    finding: _RescoringFindingField
     referenced_type: str
     severity: str
     user: BDBAUser | GitHubUser | OidcUser | User
@@ -1044,6 +1075,14 @@ class CustomRescoring:
     comment: str | None = None
     allowed_processing_time: str | None = None
     due_date: datetime.date | None = None
+
+    @classmethod
+    def __pre_deserialize__(cls, d: dict) -> dict:
+        # Discriminator(field='referenced_type') reads from the finding dict, not the parent —
+        # inject the parent's referenced_type so the field is visible at dispatch time.
+        if isinstance(d.get('finding'), dict):
+            d = {**d, 'finding': {**d['finding'], 'referenced_type': d.get('referenced_type', '')}}
+        return d
 
     @property
     def key(self) -> str:
@@ -1076,24 +1115,19 @@ class SlaViolationTraceEntry:
 
 @dataclasses.dataclass
 class SlaViolation:
-    finding: (
-        RescoringVulnerabilityFinding
-        | RescoringIPFinding
-        | RescoringLicenseFinding
-        | MalwareFindingDetails
-        | RescoreSastFinding
-        | RescoreCodeqlFinding
-        | RescoringCryptoFinding
-        | RescoringDikiFinding
-        | RescoreOsIdFinding
-        | RescoringFalcoFinding
-        | RescoringKyvernoFinding
-        | RescoreGitHubSecretFinding
-    )
+    finding: _RescoringFindingField
     referenced_type: str
     severity: str
     artefact: ComponentArtefactId
     trace: list[SlaViolationTraceEntry] = dataclasses.field(default_factory=list)
+
+    @classmethod
+    def __pre_deserialize__(cls, d: dict) -> dict:
+        # Discriminator(field='referenced_type') reads from the finding dict, not the parent —
+        # inject the parent's referenced_type so the field is visible at dispatch time.
+        if isinstance(d.get('finding'), dict):
+            d = {**d, 'finding': {**d['finding'], 'referenced_type': d.get('referenced_type', '')}}
+        return d
 
 
 @dataclasses.dataclass
