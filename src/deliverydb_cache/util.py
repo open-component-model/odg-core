@@ -3,7 +3,6 @@ import dataclasses
 import datetime
 import enum
 import json
-import pickle
 
 import yaml
 
@@ -82,13 +81,9 @@ def normalise_and_serialise_object(
 
 def serialise_cache_value(
     value,
-    encoding_format: dcm.EncodingFormat | str,
+    encoding_format: dcm.EncodingFormat,
 ) -> bytes:
-    if encoding_format.startswith('pickle'):
-        protocol = dcm.EncodingFormat.pickle_protocol(pickle_encoding=encoding_format)
-        return pickle.dumps(value, protocol)
-
-    elif encoding_format is dcm.EncodingFormat.JSON:
+    if encoding_format is dcm.EncodingFormat.JSON:
         return json.dumps(value).encode('utf-8')
 
     elif encoding_format is dcm.EncodingFormat.YAML:
@@ -100,13 +95,9 @@ def serialise_cache_value(
 
 def deserialise_cache_value(
     value: bytes,
-    encoding_format: dcm.EncodingFormat | str,
+    encoding_format: dcm.EncodingFormat,
 ):
-    if encoding_format.startswith('pickle'):
-        # the pickle protocol is automatically detected, hence it is safe to ignore version here
-        return pickle.loads(value)
-
-    elif encoding_format is dcm.EncodingFormat.JSON:
+    if encoding_format is dcm.EncodingFormat.JSON:
         return json.loads(value)
 
     elif encoding_format is dcm.EncodingFormat.YAML:
