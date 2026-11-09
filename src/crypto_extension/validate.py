@@ -587,7 +587,17 @@ def validate_certificate(
     summary = ''
 
     if not certificate_kind_matches:
-        summary += f'Certificates of kind "{certificate_kind}" are not allowed in {standard.name}.'
+        if relying_party_validation:
+            summary += (
+                f'{standard.name} defines rules neither for certificates of kind '
+                f'"{odg.model.CertificateKind.TRUST_ANCHOR}" nor for those of kind '
+                f'"{odg.model.CertificateKind.ROOT_CA}", which trust anchors are validated '
+                'against otherwise.'
+            )
+        else:
+            summary += (
+                f'Certificates of kind "{certificate_kind}" are not allowed in {standard.name}.'
+            )
 
     if best_unmet_requirements:
         if summary:
@@ -849,10 +859,11 @@ def validate_against_standard(
                 crypto_extension.model.is_trust_store_location(location)
                 for location in crypto_asset.locations
             ):
-                # algorithms only found in trust stores stem from trust anchors: their key type is
-                # validated with the public key in the context of the respective certificate (see
-                # `validate_certificate()`), their self-signature algorithm is never verified
-                # (RFC 5280 §6.1) and must therefore not be rated standalone either
+                # algorithms only found in trust stores stem from the certificates stored there: key
+                # types and signature algorithms of chain certificates are validated in the context
+                # of the respective certificate (see `validate_certificate()`), the self-signature
+                # algorithm of trust anchors is never verified (RFC 5280 §6.1), hence neither must
+                # be rated standalone
                 continue
 
             if finding := validate_algorithm(

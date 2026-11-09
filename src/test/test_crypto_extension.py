@@ -561,3 +561,54 @@ def test_trust_anchors_are_validated_with_rules(
     assert [finding.asset.asset_type for finding in findings] == [
         odg.model.CryptoAssetTypes.CERTIFICATE,
     ]
+
+
+@pytest.mark.parametrize(
+    ('location', 'expected'),
+    [
+        pytest.param('etc/ssl/certs/ca-certificates.crt', True, id='relative-to-scan-root'),
+        pytest.param('/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem', True, id='absolute'),
+        pytest.param('/usr/lib/jvm/java-21/lib/security/cacerts', True, id='jdk'),
+        pytest.param('opt/java/openjdk/lib/security/cacerts', True, id='jdk-anywhere'),
+        pytest.param('opt/app/etc/ssl/certs/server.crt', False, id='application-directory'),
+        pytest.param('etc/ssl/openssl.cnf', False, id='openssl-config'),
+    ],
+)
+def test_is_trust_store_location(
+    location: str,
+    expected: bool,
+):
+    assert crypto_extension.model.is_trust_store_location(location) is expected
+
+
+@pytest.mark.parametrize(
+    ('subject_name', 'issuer_name', 'expected'),
+    [
+        pytest.param('ISRG Root X1', 'ISRG Root X1', odg.model.CertificateKind.TRUST_ANCHOR),
+        pytest.param(None, None, odg.model.CertificateKind.TRUST_ANCHOR, id='without-cn'),
+        pytest.param(
+            'Example Intermediate CA',
+            'ISRG Root X1',
+            odg.model.CertificateKind.INTERMEDIATE_CA,
+            id='chain-certificate',
+        ),
+    ],
+)
+def test_trust_store_certificate_kind(
+    subject_name: str | None,
+    issuer_name: str | None,
+    expected: odg.model.CertificateKind,
+):
+    certificate_properties = {
+        key: value
+        for key, value in (('subjectName', subject_name), ('issuerName', issuer_name))
+        if value
+    }
+
+    certificate = crypto_extension.model.deserialise_certificate(
+        certificate_properties=certificate_properties,
+        crypto_assets_raw=[],
+        locations=['etc/ssl/certs/ca-certificates.crt'],
+    )
+
+    assert certificate.kind is expected
