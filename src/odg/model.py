@@ -1825,7 +1825,7 @@ class ArtefactMetadata:
 
         try:
             rescoring = _decode_custom_rescoring.decode(raw['data'])
-        except mashumaro.exceptions.MissingField, mashumaro.exceptions.InvalidFieldValue:
+        except mashumaro.exceptions.MissingField, mashumaro.exceptions.InvalidFieldValue, ValueError:
             envelope = _decode_artefact_metadata.decode({**raw, 'data': {}})
             return dataclasses.replace(envelope, data=raw['data'])
         finding_dict = raw['data'].get('finding')

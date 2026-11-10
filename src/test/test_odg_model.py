@@ -538,6 +538,25 @@ class TestFromDictRescoring:
         )
         assert isinstance(result.data, dict)
 
+    def test_malformed_due_date_rescoring_falls_back_to_dict(self):
+        # A due_date string containing 'T' triggers __pre_deserialize__, which calls
+        # datetime.fromisoformat(). A malformed value raises ValueError — not wrapped
+        # as mashumaro.exceptions.InvalidFieldValue — so ValueError must be in the
+        # except clause, or one bad row aborts the entire streaming metadata query.
+        result = odg.model.ArtefactMetadata.from_dict(
+            _artefact_envelope(
+                odg.model.Datatype.RESCORING,
+                {
+                    'finding': _RESCORING_VULN,
+                    'referenced_type': 'finding/vulnerability',
+                    'severity': 'LOW',
+                    'user': _GITHUB_USER,
+                    'due_date': 'not-a-dateT00:00:00',
+                },
+            ),
+        )
+        assert isinstance(result.data, dict)
+
     def test_oidc_user_decoded_and_id_stable(self):
         # DELIBERATE IMPROVEMENT over dacite: the old union `user: BDBAUser | GitHubUser | User`
         # had no OidcUser. With dacite strict=True, an oidc-user payload raised UnionMatchError —
