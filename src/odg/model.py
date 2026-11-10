@@ -1828,6 +1828,17 @@ class ArtefactMetadata:
         except mashumaro.exceptions.MissingField, mashumaro.exceptions.InvalidFieldValue:
             envelope = _decode_artefact_metadata.decode({**raw, 'data': {}})
             return dataclasses.replace(envelope, data=raw['data'])
+        finding_dict = raw['data'].get('finding')
+        if (
+            isinstance(rescoring.finding, RescoringIPFinding)
+            and isinstance(finding_dict, dict)
+            and 'labels' not in finding_dict
+            and rescoring.finding.license is not None
+        ):
+            rescoring = dataclasses.replace(
+                rescoring,
+                finding=_decode_rescoring_license_finding.decode(finding_dict),
+            )
         envelope = _decode_artefact_metadata.decode({**raw, 'data': {}})
         return dataclasses.replace(envelope, data=rescoring)
 
@@ -1875,6 +1886,7 @@ class ArtefactMetadata:
 
 _decode_artefact_metadata = mashumaro.codecs.BasicDecoder(ArtefactMetadata)
 _decode_custom_rescoring = mashumaro.codecs.BasicDecoder(CustomRescoring)
+_decode_rescoring_license_finding = mashumaro.codecs.BasicDecoder(RescoringLicenseFinding)
 
 artefact_metadata_encoder = mashumaro.codecs.orjson.ORJSONEncoder(ArtefactMetadata)
 artefact_metadata_basic_encoder = mashumaro.codecs.BasicEncoder(ArtefactMetadata)

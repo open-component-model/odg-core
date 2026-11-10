@@ -450,10 +450,11 @@ class TestFromDictRescoring:
                 odg.model.RescoringIPFinding,
             ),
             (
-                # RescoringIPFinding.labels defaults to [] so it matches even without labels;
-                # matches convention (legacy dacite)
+                # No 'labels' key → license rescoring; upstream dacite resolved as
+                # RescoringLicenseFinding (it appeared first in the union and strict=True
+                # rejected extra keys).
                 {'package_name': 'openssl', 'license': {'name': 'MIT'}},
-                odg.model.RescoringIPFinding,
+                odg.model.RescoringLicenseFinding,
             ),
             (
                 {
@@ -488,7 +489,22 @@ class TestFromDictRescoring:
         assert result.data.finding.labels == ['label-a', 'label-b']
         assert result.data.finding.license.name == 'OpenSSL'
 
-    def test_generic_decoder_resolves_correctly(self):
+    def test_license_finding_without_labels_id_stable(self):
+        # Regression: a label-free {package_name, license} payload must decode as
+        # RescoringLicenseFinding (matching upstream dacite union order + strict=True),
+        # not RescoringIPFinding. The IDs differ: RescoringLicenseFinding.key = "pkg|lic"
+        # while RescoringIPFinding.key (empty labels) = "pkg|lic|". Any mismatch would
+        # cause update/delete to target the wrong DB row.
+        result = odg.model.ArtefactMetadata.from_dict(
+            _rescoring_envelope(
+                finding={'package_name': 'openssl', 'license': {'name': 'OpenSSL'}},
+                user=_GITHUB_USER,
+            ),
+        )
+        assert type(result.data.finding) is odg.model.RescoringLicenseFinding
+        assert result.data.finding.key == 'openssl|OpenSSL'
+        assert result.id == '57d210aa6fbd7b766c4208616d50f3b1'
+
         # BasicDecoder (no RESCORING branch) must also resolve to CustomRescoring,
         # because MetaModels lists CustomRescoring before InformationalModels.
         generic = mashumaro.codecs.BasicDecoder(odg.model.ArtefactMetadata)
