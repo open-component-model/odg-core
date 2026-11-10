@@ -5,7 +5,10 @@ import features
 import util
 
 
-def retrieve_version(version_cfg, component_id: str) -> str | None:
+def retrieve_version(
+    version_cfg: odg.extensions_cfg.CurrentVersion | None,
+    component_id: str,
+) -> str | None:
     if not version_cfg:
         return None
     try:
