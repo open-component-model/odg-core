@@ -511,6 +511,35 @@ class TestFromDictRescoring:
         result = generic.decode(_rescoring_envelope(finding=_RESCORING_VULN, user=_GITHUB_USER))
         assert isinstance(result.data, odg.model.CustomRescoring)
 
+    def test_license_finding_without_labels_id_stable_after_db_roundtrip(self):
+        # Regression: update/delete match rows by id. A label-free {package_name, license}
+        # rescoring must decode as RescoringLicenseFinding on both write and read-back so
+        # the id is stable across the DB roundtrip.
+        raw = _rescoring_envelope(
+            finding={'package_name': 'openssl', 'license': {'name': 'OpenSSL'}},
+            user=_GITHUB_USER,
+        )
+        original = odg.model.ArtefactMetadata.from_dict(raw)
+        assert type(original.data.finding) is odg.model.RescoringLicenseFinding
+
+        db_row = du.to_db_artefact_metadata(original)
+        assert db_row.id == original.id
+
+        readback = odg.model.ArtefactMetadata.from_dict(du.db_artefact_metadata_to_dict(db_row))
+        assert type(readback.data.finding) is odg.model.RescoringLicenseFinding
+        assert readback.id == db_row.id
+
+    def test_ip_finding_without_license_falls_back_to_dict(self):
+        # A finding with only package_name (no license, no labels) cannot satisfy any
+        # known finding type — the whole rescoring falls back to dict rather than raising.
+        result = odg.model.ArtefactMetadata.from_dict(
+            _rescoring_envelope(
+                finding={'package_name': 'openssl'},
+                user=_GITHUB_USER,
+            ),
+        )
+        assert isinstance(result.data, dict)
+
     def test_incomplete_rescoring_falls_back_to_dict(self):
         # A stored rescoring row that pre-dates required fields (e.g. missing finding/severity/user)
         # must not raise during decode — one bad row would abort a streaming metadata query.
