@@ -32,7 +32,7 @@ class TestRetrieveVersion:
                 'my-component',
             )
         assert 'my-component' in exc_info.value.reason
-        assert 'misconfigured' in exc_info.value.reason
+        assert 'GitHub app permissions' in exc_info.value.reason
 
     def test_not_found_raises_422(self):
         with pytest.raises(aiohttp.web.HTTPUnprocessableEntity):

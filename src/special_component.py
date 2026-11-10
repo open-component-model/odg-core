@@ -12,8 +12,8 @@ def retrieve_version(version_cfg, component_id: str) -> str | None:
         return version_cfg.retrieve()
     except (ValueError, github3.exceptions.NotFoundError) as e:
         raise aiohttp.web.HTTPUnprocessableEntity(
-            reason=f'special component {component_id!r} has a misconfigured '
-            f'currentVersion.source.repo: {e}',
+            reason=f'failed to retrieve version for special component {component_id!r}, '
+            f'check GitHub app permissions for currentVersion.source.repo: {e}',
         )
 
 
