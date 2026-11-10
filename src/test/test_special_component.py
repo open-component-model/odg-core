@@ -35,11 +35,12 @@ class TestRetrieveVersion:
         assert 'GitHub app permissions' in exc_info.value.reason
 
     def test_not_found_raises_422(self):
-        with pytest.raises(aiohttp.web.HTTPUnprocessableEntity):
+        with pytest.raises(aiohttp.web.HTTPUnprocessableEntity) as exc_info:
             special_component.retrieve_version(
                 self._version_cfg(github3.exceptions.NotFoundError(unittest.mock.MagicMock())),
                 'my-component',
             )
+        assert 'my-component' in exc_info.value.reason
 
     def test_unexpected_error_propagates(self):
         with pytest.raises(ConnectionError):

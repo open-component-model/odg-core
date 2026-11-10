@@ -1,8 +1,11 @@
 import aiohttp.web
 import github3.exceptions
+import structlog
 
 import features
 import util
+
+logger = structlog.get_logger(__name__)
 
 
 def retrieve_version(version_cfg, component_id: str) -> str | None:
@@ -11,6 +14,11 @@ def retrieve_version(version_cfg, component_id: str) -> str | None:
     try:
         return version_cfg.retrieve()
     except (ValueError, github3.exceptions.NotFoundError) as e:
+        logger.warning(
+            'cannot retrieve current version of special component',
+            component_id=component_id,
+            error=str(e),
+        )
         raise aiohttp.web.HTTPUnprocessableEntity(
             reason=f'failed to retrieve version for special component {component_id!r}, '
             f'check GitHub app permissions for currentVersion.source.repo: {e}',
@@ -38,6 +46,8 @@ class CurrentDependencies(aiohttp.web.View):
               application/json:
                 schema:
                   type: object
+          "422":
+            description: Misconfigured currentVersion source
         """
         params = self.request.rel_url.query
 
