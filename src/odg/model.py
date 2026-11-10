@@ -9,7 +9,8 @@ import typing
 
 import mashumaro.codecs
 import mashumaro.codecs.orjson
-import mashumaro.types
+import mashumaro.config
+import mashumaro.exceptions
 import ocm
 import ocm.iter
 import structlog
@@ -180,15 +181,7 @@ class UserIdentity:
     Collection of identities that refer to the same user
     """
 
-    identifiers: list[
-        typing.Annotated[
-            EmailAddress | GithubUser | MetaOrigin | PersonalName | UserIdentifierBase,
-            mashumaro.types.Discriminator(
-                field='type',
-                include_supertypes=True,
-            ),
-        ]
-    ]
+    identifiers: list[EmailAddress | GithubUser | MetaOrigin | PersonalName | UserIdentifierBase]
 
 
 class SastStatus(enum.StrEnum):
@@ -1791,6 +1784,9 @@ MetaModels = (
 
 @dataclasses.dataclass
 class ArtefactMetadata:
+    class Config(mashumaro.config.BaseConfig):
+        forbid_extra_keys = True
+
     """
     Model class to interact with entries of the delivery-db. In the first place, these entries are
     being identified via `ComponentArtefactId` (`artefact` property) as well as their `Datatype`
@@ -1814,17 +1810,10 @@ class ArtefactMetadata:
 
     @staticmethod
     def from_dict(raw: dict):
-        # mashumaro silently ignores unknown keys (dacite strict=True would reject them);
-        # acceptable since payloads come from the delivery-db, not untrusted input.
-        #
-        # RESCORING needs a dedicated branch: ResponsibleInfo and CustomRescoring both have a
-        # `referenced_type` field, so mashumaro's union resolution hits ResponsibleInfo first
-        # and returns the wrong type. All other Datatypes are unambiguous in the union and go
-        # through the generic decoder directly.
-        #
-        # Unknown meta.type: keep data as a plain dict so any 'key' field is preserved for ID
-        # computation — structural union resolution would match vulnerability-shaped data to
-        # VulnerabilityFinding and produce a wrong key.
+        # Unknown envelope keys raise ExtraKeysError (Config.forbid_extra_keys). Structural
+        # union resolution for `data` is unaffected — forbid_extra_keys is not inherited.
+        # RESCORING: incomplete legacy rows fall back to dict instead of raising mid-stream.
+        # Unknown meta.type: dict preserves any 'key' field for correct ID computation.
         try:
             meta_type = Datatype(raw['meta']['type'])
         except ValueError:
@@ -1834,7 +1823,11 @@ class ArtefactMetadata:
         if meta_type != Datatype.RESCORING:
             return _decode_artefact_metadata.decode(raw)
 
-        rescoring = _decode_custom_rescoring.decode(raw['data'])
+        try:
+            rescoring = _decode_custom_rescoring.decode(raw['data'])
+        except mashumaro.exceptions.MissingField, mashumaro.exceptions.InvalidFieldValue:
+            envelope = _decode_artefact_metadata.decode({**raw, 'data': {}})
+            return dataclasses.replace(envelope, data=raw['data'])
         envelope = _decode_artefact_metadata.decode({**raw, 'data': {}})
         return dataclasses.replace(envelope, data=rescoring)
 

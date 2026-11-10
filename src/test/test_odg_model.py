@@ -45,6 +45,7 @@ def _rescoring_envelope(finding: dict, user: dict, **kwargs) -> dict:
 
 
 _GITHUB_USER = {'username': 'jdoe', 'type': 'github-user', 'github_hostname': 'github.com'}
+_OIDC_USER = {'username': 'alice', 'type': 'oidc-user', 'issuer': 'https://idp.example.com'}
 _RESCORING_VULN = {'package_name': 'openssl', 'cve': 'CVE-2023-0286'}
 _UTC = datetime.timezone.utc
 
@@ -469,6 +470,51 @@ class TestFromDictRescoring:
         result = generic.decode(_rescoring_envelope(finding=_RESCORING_VULN, user=_GITHUB_USER))
         assert isinstance(result.data, odg.model.CustomRescoring)
 
+    def test_incomplete_rescoring_falls_back_to_dict(self):
+        # A stored rescoring row that pre-dates required fields (e.g. missing finding/severity/user)
+        # must not raise during decode — one bad row would abort a streaming metadata query.
+        result = odg.model.ArtefactMetadata.from_dict(
+            _artefact_envelope(
+                odg.model.Datatype.RESCORING,
+                {'referenced_type': 'finding/vulnerability'},
+            ),
+        )
+        assert isinstance(result.data, dict)
+
+    def test_oidc_user_legacy_id_differs_from_new_id(self):
+        # The old dacite decoder resolved `user: BDBAUser | GitHubUser | User` — OidcUser was not
+        # in that union, so an oidc-user payload decoded as plain User (issuer dropped).
+        # The mashumaro decoder now resolves OidcUser (issuer preserved), producing a different key
+        # and id. A legacy row stored by the old decoder cannot be matched by the new id in
+        # update/delete WHERE clauses until the DB is migrated.
+        legacy_am = odg.model.ArtefactMetadata(
+            artefact=odg.model.ComponentArtefactId(
+                component_name='example.org/component',
+                component_version='1.0.0',
+                artefact_kind=odg.model.ArtefactKind.RESOURCE,
+                artefact=odg.model.LocalArtefactId(
+                    artefact_name='my-image',
+                    artefact_type='ociImage',
+                    artefact_version='1.0.0',
+                    artefact_extra_id={},
+                ),
+            ),
+            meta=odg.model.Metadata(datasource='bdba', type=odg.model.Datatype.RESCORING),
+            data=odg.model.CustomRescoring(
+                finding=odg.model.RescoringVulnerabilityFinding(**_RESCORING_VULN),
+                referenced_type='finding/vulnerability',
+                severity='LOW',
+                user=odg.model.User(username='alice', type='oidc-user'),  # issuer dropped by dacite
+            ),
+        )
+        assert legacy_am.id == '7506a060d75f8c55f1c4a0131558ac8b'
+
+        result = odg.model.ArtefactMetadata.from_dict(
+            _rescoring_envelope(finding=_RESCORING_VULN, user=_OIDC_USER),
+        )
+        assert type(result.data.user) is odg.model.OidcUser
+        assert result.id != legacy_am.id
+
 
 class TestFromDictMetaFields:
     def test_optional_meta_fields(self):
@@ -513,11 +559,26 @@ class TestFromDictMetaFields:
         ]
         result = odg.model.ArtefactMetadata.from_dict(raw)
         assert len(result.meta.responsibles) == 1
-        identity = result.meta.responsibles[0]
-        assert isinstance(identity, odg.model.UserIdentity)
-        assert len(identity.identifiers) == 1
-        assert isinstance(identity.identifiers[0], odg.model.GithubUser)
-        assert identity.identifiers[0].username == 'jdoe'
+
+    def test_meta_responsibles_bare_identifier_falls_back_to_base(self):
+        # A stored identifier with only source+type (subtype fields absent) must not raise —
+        # one legacy row in responsibles would abort a streaming metadata query.
+        raw = _artefact_envelope(
+            odg.model.Datatype.VULNERABILITY_FINDING,
+            {
+                'package_name': 'curl',
+                'package_version': '8.0.0',
+                'severity': 'MEDIUM',
+                'cve': 'CVE-2025-9999',
+                'cvss_score': 5.3,
+            },
+        )
+        raw['meta']['responsibles'] = [
+            {'identifiers': [{'source': 'codeowners', 'type': 'githubUser'}]},
+        ]
+        result = odg.model.ArtefactMetadata.from_dict(raw)
+        assert len(result.meta.responsibles) == 1
+        assert isinstance(result.meta.responsibles[0].identifiers[0], odg.model.UserIdentifierBase)
 
     def test_all_meta_fields_vulnerability(self):
         raw = _artefact_envelope(
@@ -569,6 +630,43 @@ class TestFromDictMetaFields:
             _artefact_envelope('custom/unknown-type', {'key': 'my-key', 'extra': 'value'}),
         )
         assert result.data == {'key': 'my-key', 'extra': 'value'}
+
+    def test_unknown_envelope_key_raises(self):
+        # Matches dacite strict=True: unknown keys at the ArtefactMetadata envelope level raise.
+        raw = _artefact_envelope(
+            odg.model.Datatype.VULNERABILITY_FINDING,
+            {
+                'package_name': 'curl',
+                'package_version': '8.0.0',
+                'severity': 'LOW',
+                'cve': 'CVE-2025-0001',
+                'cvss_score': 5.0,
+            },
+        )
+        raw['unexpected'] = 'bad'
+        with pytest.raises(Exception):
+            odg.model.ArtefactMetadata.from_dict(raw)
+
+    def test_unknown_data_keys_do_not_raise(self):
+        # Extra keys inside `data` must be silently ignored — structural union resolution
+        # relies on extra fields being present to pick the more-specific BDBA subtype.
+        raw = _artefact_envelope(
+            odg.model.Datatype.VULNERABILITY_FINDING,
+            {
+                'package_name': 'curl',
+                'package_version': '8.0.0',
+                'severity': 'LOW',
+                'cve': 'CVE-2025-0001',
+                'cvss_score': 5.0,
+                'base_url': 'https://bdba.example.com',
+                'report_url': 'https://bdba.example.com/products/1/',
+                'product_id': 1,
+                'group_id': 1,
+                'extra_unknown_field': 'ignored',
+            },
+        )
+        result = odg.model.ArtefactMetadata.from_dict(raw)
+        assert type(result.data) is odg.model.BDBAVulnerabilityFinding
 
 
 class TestDateDecoding:
