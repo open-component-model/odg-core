@@ -404,6 +404,24 @@ class TestFromDictRescoring:
                 odg.model.User,
                 'alice|oidc-user',
             ),
+            (
+                # shape beats tag: BDBA fields + wrong type tag → BDBAUser (first in union)
+                {
+                    'username': 'alice',
+                    'type': 'github-user',
+                    'email': 'a@b.com',
+                    'firstname': 'A',
+                    'lastname': 'B',
+                },
+                odg.model.BDBAUser,
+                'alice|github-user',
+            ),
+            (
+                # shape beats tag: only username + bdba-user tag → User (BDBA required fields absent)
+                {'username': 'alice', 'type': 'bdba-user'},
+                odg.model.User,
+                'alice|bdba-user',
+            ),
         ],
     )
     def test_user_type_and_key(self, user_raw, expected_type, expected_key):
@@ -481,39 +499,35 @@ class TestFromDictRescoring:
         )
         assert isinstance(result.data, dict)
 
-    def test_oidc_user_legacy_id_differs_from_new_id(self):
-        # The old dacite decoder resolved `user: BDBAUser | GitHubUser | User` — OidcUser was not
-        # in that union, so an oidc-user payload decoded as plain User (issuer dropped).
-        # The mashumaro decoder now resolves OidcUser (issuer preserved), producing a different key
-        # and id. A legacy row stored by the old decoder cannot be matched by the new id in
-        # update/delete WHERE clauses until the DB is migrated.
-        legacy_am = odg.model.ArtefactMetadata(
-            artefact=odg.model.ComponentArtefactId(
-                component_name='example.org/component',
-                component_version='1.0.0',
-                artefact_kind=odg.model.ArtefactKind.RESOURCE,
-                artefact=odg.model.LocalArtefactId(
-                    artefact_name='my-image',
-                    artefact_type='ociImage',
-                    artefact_version='1.0.0',
-                    artefact_extra_id={},
-                ),
-            ),
-            meta=odg.model.Metadata(datasource='bdba', type=odg.model.Datatype.RESCORING),
-            data=odg.model.CustomRescoring(
-                finding=odg.model.RescoringVulnerabilityFinding(**_RESCORING_VULN),
-                referenced_type='finding/vulnerability',
-                severity='LOW',
-                user=odg.model.User(username='alice', type='oidc-user'),  # issuer dropped by dacite
+    def test_invalid_field_value_rescoring_falls_back_to_dict(self):
+        # InvalidFieldValue (structurally wrong type, not just missing field) must also fall back
+        # to dict — the except clause covers both MissingField and InvalidFieldValue.
+        result = odg.model.ArtefactMetadata.from_dict(
+            _artefact_envelope(
+                odg.model.Datatype.RESCORING,
+                {
+                    'finding': 'not-a-dict',  # str instead of a finding dict → InvalidFieldValue
+                    'referenced_type': 'finding/vulnerability',
+                    'severity': 'LOW',
+                    'user': _GITHUB_USER,
+                },
             ),
         )
-        assert legacy_am.id == '7506a060d75f8c55f1c4a0131558ac8b'
+        assert isinstance(result.data, dict)
 
+    def test_oidc_user_decoded_and_id_stable(self):
+        # DELIBERATE IMPROVEMENT over dacite: the old union `user: BDBAUser | GitHubUser | User`
+        # had no OidcUser. With dacite strict=True, an oidc-user payload raised UnionMatchError —
+        # oidc-user rescoring rows were stored (write path used live OidcUser) but could not be
+        # read back. This PR adds OidcUser to the union, making those rows decodable for the
+        # first time. The id is stable because the write path always hashed from OidcUser.key
+        # (with issuer), so no migration is needed.
         result = odg.model.ArtefactMetadata.from_dict(
             _rescoring_envelope(finding=_RESCORING_VULN, user=_OIDC_USER),
         )
         assert type(result.data.user) is odg.model.OidcUser
-        assert result.id != legacy_am.id
+        assert result.data.user.issuer == 'https://idp.example.com'
+        assert result.id == 'b3af5ba78bf735ddd1d23bb0b085b1bc'
 
 
 class TestFromDictMetaFields:
@@ -631,6 +645,40 @@ class TestFromDictMetaFields:
         )
         assert result.data == {'key': 'my-key', 'extra': 'value'}
 
+    def test_unknown_nested_artefact_key_does_not_raise(self):
+        # dacite strict=True rejected unknown keys at every nested level; mashumaro
+        # forbid_extra_keys only fires at the ArtefactMetadata envelope level — nested
+        # structs (ComponentArtefactId, Metadata, finding types, etc.) silently ignore them.
+        raw = _artefact_envelope(
+            odg.model.Datatype.VULNERABILITY_FINDING,
+            {
+                'package_name': 'curl',
+                'package_version': '8.0.0',
+                'severity': 'LOW',
+                'cve': 'CVE-2025-0001',
+                'cvss_score': 5.0,
+            },
+        )
+        raw['artefact']['bogus_nested_key'] = 'ignored'
+        result = odg.model.ArtefactMetadata.from_dict(raw)
+        assert result.artefact.component_name == 'example.org/component'
+
+    def test_unknown_nested_meta_key_does_not_raise(self):
+        # Same as above but for the Metadata nested struct.
+        raw = _artefact_envelope(
+            odg.model.Datatype.VULNERABILITY_FINDING,
+            {
+                'package_name': 'curl',
+                'package_version': '8.0.0',
+                'severity': 'LOW',
+                'cve': 'CVE-2025-0001',
+                'cvss_score': 5.0,
+            },
+        )
+        raw['meta']['bogus_nested_key'] = 'ignored'
+        result = odg.model.ArtefactMetadata.from_dict(raw)
+        assert result.meta.datasource == 'bdba'
+
     def test_unknown_envelope_key_raises(self):
         # Matches dacite strict=True: unknown keys at the ArtefactMetadata envelope level raise.
         raw = _artefact_envelope(
@@ -686,11 +734,31 @@ class TestDateDecoding:
         assert result.discovery_date == datetime.date(2025, 1, 1)
         assert type(result.discovery_date) is datetime.date
 
+    def test_discovery_date_datetime_string_raises(self):
+        # mashumaro's date decoder rejects full datetime strings — unlike dacite's type_hook
+        # which called fromisoformat().date(). discovery_date has no __pre_deserialize__ guard
+        # (unlike CustomRescoring.due_date). This is safe because the write path serializes
+        # from a date object via .isoformat(), always producing plain date strings.
+        raw = _artefact_envelope(
+            odg.model.Datatype.VULNERABILITY_FINDING,
+            {
+                'package_name': 'curl',
+                'package_version': '8.0.0',
+                'severity': 'LOW',
+                'cve': 'CVE-1',
+                'cvss_score': 1.0,
+            },
+        )
+        raw['discovery_date'] = '2025-01-01T00:00:00+00:00'
+        with pytest.raises(Exception):
+            odg.model.ArtefactMetadata.from_dict(raw)
+
     @pytest.mark.parametrize(
         'date_str,expected',
         [
             ('2024-01-15', datetime.date(2024, 1, 15)),
             ('2024-01-15T00:00:00+00:00', datetime.date(2024, 1, 15)),
+            ('2024-01-15T00:00:00', datetime.date(2024, 1, 15)),  # naive datetime string
         ],
     )
     def test_rescoring_due_date(self, date_str, expected):
@@ -699,3 +767,68 @@ class TestDateDecoding:
         )
         assert result.data.due_date == expected
         assert type(result.data.due_date) is datetime.date
+
+
+class TestEncoder:
+    _UTC = datetime.timezone.utc
+    _AM = odg.model.ArtefactMetadata(
+        artefact=odg.model.ComponentArtefactId(
+            component_name='example.org/comp',
+            component_version='1.0.0',
+            artefact_kind=odg.model.ArtefactKind.RESOURCE,
+            artefact=odg.model.LocalArtefactId(
+                artefact_name='img',
+                artefact_type='ociImage',
+                artefact_version='1.0.0',
+                artefact_extra_id={},
+            ),
+        ),
+        meta=odg.model.Metadata(
+            datasource='bdba',
+            type=odg.model.Datatype.VULNERABILITY_FINDING,
+            creation_date=datetime.datetime(2025, 1, 1, tzinfo=datetime.timezone.utc),
+        ),
+        data=odg.model.VulnerabilityFinding(
+            severity='HIGH',
+            package_name='curl',
+            package_version='8.0.0',
+            cve='CVE-2025-1234',
+            cvss_score=7.5,
+        ),
+        discovery_date=datetime.date(2025, 1, 15),
+    )
+
+    def test_basic_encoder_wire_format(self):
+        # BasicEncoder is used by ArtefactMetadataQueryBySearchExpression (json_response path).
+        # StrEnum values must serialise as strings (StrEnum IS str, so json.dumps handles it);
+        # datetime fields must serialise as ISO strings compatible with from_dict.
+        import json
+
+        wire = json.loads(json.dumps(odg.model.artefact_metadata_basic_encoder.encode(self._AM)))
+        assert wire['meta']['type'] == 'finding/vulnerability'
+        assert wire['meta']['datasource'] == 'bdba'
+        assert wire['artefact']['artefact_kind'] == 'resource'
+        assert wire['meta']['creation_date'] == '2025-01-01T00:00:00+00:00'
+        assert wire['discovery_date'] == '2025-01-15'
+
+    def test_orjson_encoder_wire_format(self):
+        # ORJSONEncoder is used by ArtefactMetadataQuery (streaming write path, returns bytes).
+        import json
+
+        wire = json.loads(odg.model.artefact_metadata_encoder.encode(self._AM))
+        assert wire['meta']['type'] == 'finding/vulnerability'
+        assert wire['meta']['datasource'] == 'bdba'
+        assert wire['artefact']['artefact_kind'] == 'resource'
+        assert wire['meta']['creation_date'] == '2025-01-01T00:00:00+00:00'
+        assert wire['discovery_date'] == '2025-01-15'
+
+    def test_encoder_decode_roundtrip(self):
+        # A value encoded by BasicEncoder must decode back to an identical object via from_dict.
+        import json
+
+        wire = json.loads(json.dumps(odg.model.artefact_metadata_basic_encoder.encode(self._AM)))
+        result = odg.model.ArtefactMetadata.from_dict(wire)
+        assert result.meta.type == odg.model.Datatype.VULNERABILITY_FINDING
+        assert result.discovery_date == datetime.date(2025, 1, 15)
+        assert result.artefact.artefact_kind is odg.model.ArtefactKind.RESOURCE
+        assert result.id == self._AM.id
