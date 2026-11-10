@@ -13,6 +13,7 @@ import oci.client_async
 import oci.model as om
 import ocm
 import ocm.diff
+import ocm.gardener
 import ocm.iter
 import ocm.iter_async
 import ocm.retrieve
@@ -106,7 +107,11 @@ async def _component_descriptor(
 ) -> ocm.ComponentDescriptor:
     component_name = util.param(params, 'component_name', required=True)
 
-    ocm_repo_url = util.param(params, 'ocm_repo_url')
+    ocm_repo_url = util.param(
+        params,
+        'ocm_repo_url',
+        validator=lambda url: not url or lookups.is_allowlisted_ocm_repo(url),
+    )
     ocm_repo = ocm.OciOcmRepository(baseUrl=ocm_repo_url) if ocm_repo_url else None
 
     version = util.param(params, 'version', default='greatest')
@@ -312,7 +317,11 @@ class ComponentDependencies(aiohttp.web.View):
         populate = util.param(params, 'populate', default='all')
         ignore_missing = util.param_as_bool(params, 'ignore_missing')
 
-        ocm_repo_url = util.param(params, 'ocm_repo_url')
+        ocm_repo_url = util.param(
+            params,
+            'ocm_repo_url',
+            validator=lambda url: not url or lookups.is_allowlisted_ocm_repo(url),
+        )
         ocm_repo = ocm.OciOcmRepository(baseUrl=ocm_repo_url) if ocm_repo_url else None
 
         version = util.param(params, 'version', default='greatest')
@@ -562,7 +571,7 @@ async def component_versions(
     version_filter: lookups.VersionFilter | str | None = None,
     oci_client: oci.client_async.Client = None,
     db_session: sqlasync.session.AsyncSession = None,  # required for db-cache
-) -> set[str]:
+) -> list[str]:
     if not oci_client:
         oci_client = lookups.semver_sanitising_oci_client_async()
 
@@ -605,7 +614,7 @@ async def component_versions(
             reason=f'Component {component_name!r} not found (upstream access denied)',
         )
 
-    return included_versions
+    return list(included_versions)
 
 
 async def greatest_component_version(
@@ -748,7 +757,11 @@ class GreatestComponentVersions(aiohttp.web.View):
         end_date = util.param(params, 'end_date')
         version = util.param(params, 'version')
 
-        ocm_repo_url = util.param(params, 'ocm_repo_url')
+        ocm_repo_url = util.param(
+            params,
+            'ocm_repo_url',
+            validator=lambda url: not url or lookups.is_allowlisted_ocm_repo(url),
+        )
         ocm_repo = ocm.OciOcmRepository(baseUrl=ocm_repo_url) if ocm_repo_url else None
 
         version_filter = util.param(params, 'version_filter')
@@ -859,6 +872,29 @@ async def iter_component_dependencies(
         ):
             yield component_node
 
+    if not (
+        extra_crefs_label := component.find_label(
+            name=ocm.gardener.ExtraComponentReferencesLabel.name,
+        )
+    ):
+        return
+
+    for extra_cref in extra_crefs_label.value:
+        extra_cref_id = ocm.ComponentIdentity(
+            name=extra_cref['component_reference']['name'],
+            version=extra_cref['component_reference']['version'],
+        )
+
+        async for component_node in iter_component_dependencies(
+            component_id=extra_cref_id,
+            component_descriptor_lookup=component_descriptor_lookup,
+            ocm_repository_lookup=ocm_repository_lookup,
+            recursion_depth=recursion_depth,
+            ignore_missing=ignore_missing,
+            path=path,
+        ):
+            yield component_node
+
 
 class UpgradePRs(aiohttp.web.View):
     required_features = (features.FeatureUpgradePRs,)
@@ -916,7 +952,11 @@ class UpgradePRs(aiohttp.web.View):
         repo_url = util.param(params, 'repoUrl')
         pr_state = util.param(params, 'state', default='open')
 
-        ocm_repo_url = util.param(params, 'ocmRepo')
+        ocm_repo_url = util.param(
+            params,
+            'ocmRepo',
+            validator=lambda url: not url or lookups.is_allowlisted_ocm_repo(url),
+        )
         ocm_repo = ocm.OciOcmRepository(baseUrl=ocm_repo_url) if ocm_repo_url else None
 
         if not (bool(component_name) ^ bool(repo_url)):
@@ -1242,7 +1282,11 @@ class ComplianceSummary(aiohttp.web.View):
 
         component_name = util.param(params, 'component_name', required=True)
 
-        ocm_repo_url = util.param(params, 'ocm_repo_url')
+        ocm_repo_url = util.param(
+            params,
+            'ocm_repo_url',
+            validator=lambda url: not url or lookups.is_allowlisted_ocm_repo(url),
+        )
         ocm_repo = ocm.OciOcmRepository(baseUrl=ocm_repo_url) if ocm_repo_url else None
 
         version = util.param(params, 'version', required=True)
@@ -1367,7 +1411,11 @@ class DownloadSBOM(aiohttp.web.View):
 
         component_name = util.param(params, 'component_name', required=True)
 
-        ocm_repo_url = util.param(params, 'ocm_repo_url')
+        ocm_repo_url = util.param(
+            params,
+            'ocm_repo_url',
+            validator=lambda url: not url or lookups.is_allowlisted_ocm_repo(url),
+        )
         ocm_repo = ocm.OciOcmRepository(baseUrl=ocm_repo_url) if ocm_repo_url else None
 
         version = util.param(params, 'version', required=True)

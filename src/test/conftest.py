@@ -1,11 +1,14 @@
+import collections.abc
 import itertools
 import logging
 import os
 import uuid
-from collections.abc import Generator
 
 import pytest
+import pytest_asyncio
 import sqlalchemy
+import sqlalchemy.ext.asyncio as sqlasync
+import sqlalchemy.orm.session
 
 import migrations
 
@@ -47,7 +50,7 @@ def _admin_connection(admin_dsn: str):
 
 
 @pytest.fixture(scope='session')
-def postgres_container_dsn() -> Generator[str, None, None]:
+def postgres_container_dsn() -> collections.abc.Generator[str, None, None]:
     """
     Session-scoped throwaway PostgreSQL (testcontainers). Yields the server-level
     SQLAlchemy DSN (`postgresql+psycopg://.../postgres`). One container per test
@@ -87,7 +90,7 @@ def postgres_container_dsn() -> Generator[str, None, None]:
 
 
 @pytest.fixture
-def _db_dsn(postgres_container_dsn: str) -> Generator[str, None, None]:
+def _db_dsn(postgres_container_dsn: str) -> collections.abc.Generator[str, None, None]:
     """
     Per-test fresh, empty database on the session's container. Yields its
     SQLAlchemy DSN; no schema is created (see `db_dsn` for a migrated one).
@@ -122,7 +125,7 @@ def db_dsn(_db_dsn: str) -> str:
 
 
 @pytest.fixture
-def db_session(db_dsn: str) -> Generator[sqlalchemy.orm.Session, None, None]:
+def db_session(db_dsn: str) -> collections.abc.Generator[sqlalchemy.orm.Session, None, None]:
     """
     Productive `sqlalchemy.orm.Session` against the per-test migrated database.
     Handles session close + engine disposal; the engine cache (see above) is
@@ -140,3 +143,27 @@ def db_session(db_dsn: str) -> Generator[sqlalchemy.orm.Session, None, None]:
     finally:
         session.close()
         session.get_bind().dispose()
+
+
+@pytest_asyncio.fixture
+async def db_session_async(
+    db_dsn: str,
+) -> collections.abc.AsyncGenerator[sqlasync.session.AsyncSession, None, None]:
+    """
+    Productive `sqlasync.session.AsyncSession` against the per-test migrated database.
+    Handles session close + engine disposal; the engine cache (see above) is
+    sidestepped with a unique per-test pool size.
+    """
+    import deliverydb
+
+    session = await deliverydb.sqlalchemy_session_async(
+        db_url=db_dsn,
+        pool_size=next(_pool_size_counter),
+        max_overflow=0,
+    )
+    try:
+        yield session
+    finally:
+        engine = session.bind
+        await session.close()
+        await engine.dispose()

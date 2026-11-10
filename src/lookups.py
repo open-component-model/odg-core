@@ -392,6 +392,79 @@ def extended_ocm_repository_lookup(
     return _ocm_repository_lookup
 
 
+_ALLOWLISTED_OCM_REPO_NETLOCS: tuple[str, ...] = (
+    'cgr.dev',
+    'docker.io',
+    'gcr.io',
+    'ghcr.io',
+    'index.docker.io',
+    'mcr.microsoft.com',
+    'public.ecr.aws',
+    'quay.io',
+    'registry-1.docker.io',
+    'registry.k8s.io',
+    '*.amazonaws.com',
+    '*.azurecr.io',
+    '*.gcr.io',
+    '*.pkg.dev',
+)
+
+
+_HOSTNAME_RE = re.compile(r'^[a-z0-9.-]+$')
+
+
+def _iter_allowlisted_ocm_repo_netlocs() -> collections.abc.Generator[str, None, None]:
+    secret_factory = ctx_util.secret_factory()
+
+    yield from _ALLOWLISTED_OCM_REPO_NETLOCS
+
+    try:
+        for oci_registry_cfg in secret_factory.oci_registry():
+            yield from (
+                util.urlparse(image_reference_prefix).netloc
+                for image_reference_prefix in oci_registry_cfg.image_reference_prefixes
+            )
+    except secret_mgmt.SecretTypeNotFound:
+        pass
+
+    for ocm_repository_cfg in parse_ocm_repository_cfgs():
+        if isinstance(ocm_repository_cfg, OciOcmRepositoryCfg):
+            yield util.urlparse(ocm_repository_cfg.repository).netloc
+
+
+def _iter_allowlisted_virtual_ocm_repos() -> collections.abc.Generator[str, None, None]:
+    for ocm_repository_cfg in parse_ocm_repository_cfgs():
+        if isinstance(ocm_repository_cfg, VirtualOcmRepositoryCfg):
+            yield ocm_repository_cfg.name
+
+
+def is_allowlisted_ocm_repo(
+    ocm_repo_url: str,
+) -> bool:
+    if ocm_repo_url in set(_iter_allowlisted_virtual_ocm_repos()):
+        return True
+
+    try:
+        parsed_url = util.urlparse(ocm_repo_url)
+    except ValueError:
+        return False
+
+    if not parsed_url.hostname or not _HOSTNAME_RE.match(parsed_url.hostname):
+        return False
+    if '\\' in parsed_url.netloc:
+        return False
+
+    for allowlisted_netloc in _iter_allowlisted_ocm_repo_netlocs():
+        if allowlisted_netloc.startswith('*.'):
+            if parsed_url.netloc.endswith(allowlisted_netloc.removeprefix('*')):
+                return True
+        else:
+            if parsed_url.netloc == allowlisted_netloc:
+                return True
+
+    return False
+
+
 @functools.cache
 def semver_sanitising_oci_client(
     http_connection_pool_size: int = 16,
@@ -447,7 +520,7 @@ def semver_sanitising_oci_client_async(
 def db_cache_component_descriptor_lookup_async(
     db_url_callback: collections.abc.Callable[[], str | None],
     ocm_repository_lookup: ocm.OcmRepositoryLookup = None,
-    encoding_format: dcm.EncodingFormat = dcm.EncodingFormat.PICKLE,
+    encoding_format: dcm.EncodingFormat = dcm.EncodingFormat.JSON,
     ttl_seconds: int = 0,
     keep_at_least_seconds: int = 0,
     max_size_octets: int = 0,

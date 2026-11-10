@@ -163,14 +163,22 @@ async def prefill_compliance_summary_caches(
             # if an explicit version is specified, use it without any further implict lookup
             versions = [resolved_version]
         else:
-            versions = await components_module.greatest_component_versions(
-                component_name=component.component_name,
-                component_descriptor_lookup=component_descriptor_lookup,
-                ocm_repo=component.ocm_repo,
-                max_versions=component.max_versions_limit,
-                oci_client=oci_client,
-                db_session=db_session,
-            )
+            try:
+                versions = await components_module.greatest_component_versions(
+                    component_name=component.component_name,
+                    component_descriptor_lookup=component_descriptor_lookup,
+                    ocm_repo=component.ocm_repo,
+                    max_versions=component.max_versions_limit,
+                    oci_client=oci_client,
+                    db_session=db_session,
+                )
+            except Exception as e:
+                logger.warning(
+                    'failed to retrieve versions for component, skipping',
+                    component_name=component.component_name,
+                    error=str(e),
+                )
+                continue
 
         for version in versions:
             component_descriptor = await component_descriptor_lookup(
@@ -204,11 +212,19 @@ async def prefill_component_versions_caches(
     db_session: sqlasync.session.AsyncSession,
 ):
     for component in components:
-        await components_module.component_versions(
-            component_name=component.component_name,
-            ocm_repo=component.ocm_repo,
-            db_session=db_session,
-        )
+        try:
+            await components_module.component_versions(
+                component_name=component.component_name,
+                ocm_repo=component.ocm_repo,
+                db_session=db_session,
+            )
+        except Exception as e:
+            logger.warning(
+                'failed to retrieve versions for component, skipping',
+                component_name=component.component_name,
+                error=str(e),
+            )
+            continue
 
 
 async def prefill_function_caches(

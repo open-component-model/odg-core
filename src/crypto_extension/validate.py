@@ -8,6 +8,7 @@ import typing
 import structlog
 
 import crypto_extension.config as cc
+import crypto_extension.model
 import odg.findings
 import odg.model
 
@@ -440,6 +441,17 @@ def validate_algorithm(
         logger.warning(f'missing validation for {algorithm_properties.primitive=}')
 
 
+TRUST_ANCHOR_REASONING = (
+    'This certificate is a trust anchor, i.e. it is located in a system trust store and trusted by '
+    'the software rather than used or issued by it. According to RFC 5280 (section 6.1), only its '
+    'name and public key are used for certificate path validation, the public key verifying the '
+    'next certificate in the path. Hence, only the public key is validated against the root CA '
+    'requirements, whereas the self-signature (never verified) and the validity (a concern of the '
+    'CA operator) are not. To resolve this finding, remove the root CA from the trust store of the '
+    'image if it is not required, or assess the finding if it is.'
+)
+
+
 def validate_certificate(
     certificate_asset: odg.model.CryptoAsset,
     standard: cc.Standard,
@@ -457,22 +469,46 @@ def validate_certificate(
     and `validity_years` are actually allowed for the detected certificate kind. If either one of
     the used algorithms is not valid or the certificate properties are not sufficient for the
     detected certificate kind, a finding with the rating `not-compliant` will be created.
+
+    Trust anchors (certificates in a system trust store) are validated with the rules a `standard`
+    defines for `kind: trust-anchor`. Without such rules, only their public key is validated against
+    the root CA rules: According to RFC 5280 (section 6.1), path validation solely uses the trust
+    anchor's name and public key, which verifies the next certificate in the path. Its self-signature
+    is never verified and its validity is not part of the trust anchor information, both are
+    concerns of the CA operator (see `TRUST_ANCHOR_REASONING`).
     """
     if certificate_asset.asset_type is not odg.model.CryptoAssetTypes.CERTIFICATE:
         raise ValueError(certificate_asset.asset_type)
 
     certificate_properties: odg.model.CertificateProperties = certificate_asset.properties
 
-    signature_algorithm = find_crypto_asset_by_key(
-        data_key=certificate_properties.signature_algorithm_ref,
-        crypto_assets=crypto_assets,
+    relying_party_validation = (
+        certificate_properties.kind is odg.model.CertificateKind.TRUST_ANCHOR
+        and not any(
+            certificate_property.kind is odg.model.CertificateKind.TRUST_ANCHOR
+            for certificate_definition in standard.public_key_infrastructure.certificates
+            for certificate_property in certificate_definition.properties
+        )
     )
-    signature_algorithm_finding = validate_signature_algorithm(
-        algorithm_name=signature_algorithm.properties.name,
-        algorithm_asset=signature_algorithm,
-        standard=standard,
-        crypto_finding_cfg=crypto_finding_cfg,
+    certificate_kind = (
+        odg.model.CertificateKind.ROOT_CA
+        if relying_party_validation
+        else certificate_properties.kind
     )
+
+    if relying_party_validation:
+        signature_algorithm_finding = None
+    else:
+        signature_algorithm = find_crypto_asset_by_key(
+            data_key=certificate_properties.signature_algorithm_ref,
+            crypto_assets=crypto_assets,
+        )
+        signature_algorithm_finding = validate_signature_algorithm(
+            algorithm_name=signature_algorithm.properties.name,
+            algorithm_asset=signature_algorithm,
+            standard=standard,
+            crypto_finding_cfg=crypto_finding_cfg,
+        )
 
     public_key = find_crypto_asset_by_key(
         data_key=certificate_properties.subject_public_key_ref,
@@ -522,7 +558,7 @@ def validate_certificate(
                             required_value=certificate_property.key_length,
                             actual_value=key_length,
                         )
-                    if certificate_property.validity_years:
+                    if certificate_property.validity_years and not relying_party_validation:
                         yield Requirement(
                             name='Required validity (years)',
                             required_value=certificate_property.validity_years,
@@ -541,7 +577,7 @@ def validate_certificate(
         return certificate_kind_matches, best_unmet_requirements
 
     certificate_kind_matches, best_unmet_requirements = check_unmet_requirements(
-        certificate_kind=certificate_properties.kind,
+        certificate_kind=certificate_kind,
         key_length=key_length,
         curve=public_key.properties.curve,
         validity_years=certificate_properties.validity_years,
@@ -551,10 +587,17 @@ def validate_certificate(
     summary = ''
 
     if not certificate_kind_matches:
-        summary += (
-            f'Certificates of kind "{certificate_properties.kind}" '
-            f'are not allowed in {standard.name}.'
-        )
+        if relying_party_validation:
+            summary += (
+                f'{standard.name} defines rules neither for certificates of kind '
+                f'"{odg.model.CertificateKind.TRUST_ANCHOR}" nor for those of kind '
+                f'"{odg.model.CertificateKind.ROOT_CA}", which trust anchors are validated '
+                'against otherwise.'
+            )
+        else:
+            summary += (
+                f'Certificates of kind "{certificate_kind}" are not allowed in {standard.name}.'
+            )
 
     if best_unmet_requirements:
         if summary:
@@ -576,6 +619,9 @@ def validate_certificate(
         # all requirements are fulfilled, no need to create a finding
         return
 
+    if relying_party_validation:
+        summary = f'{TRUST_ANCHOR_REASONING}\n{summary}'
+
     if not (
         categorisation := odg.findings.categorise_finding(
             finding_cfg=crypto_finding_cfg,
@@ -592,6 +638,72 @@ def validate_certificate(
     )
 
 
+# `GOFIPS140` is recorded with a source hash suffix for some module versions (e.g.
+# `v1.0.0-c2097c7c`), and as `latest` if the non-frozen (hence never validated) module is used
+GO_FIPS140_MODULE_REGEX = re.compile(r'^(?P<version>v\d+\.\d+\.\d+)(?:-[0-9a-f]+)?$')
+GO_FIPS140_MODES = ['on', 'only']
+
+
+def rate_go_fips140_module(
+    crypto_settings: collections.abc.Iterable[str],
+    validated_module_versions: list[str],
+    standard: cc.Standard,
+) -> tuple[FindingRatings, str]:
+    """
+    Rates a Go binary based on its crypto build settings. It is compliant if it links one of the
+    `validated_module_versions` of the Go Cryptographic Module (`GOFIPS140`) and enables FIPS 140-3
+    mode by default (`GODEBUG=fips140=on|only`), see https://go.dev/doc/security/fips140.
+    """
+    module_version = None
+    fips140_mode = None
+
+    for crypto_setting in crypto_settings:
+        name, _, value = crypto_setting.partition('=')
+
+        if name == 'GOFIPS140':
+            if match := GO_FIPS140_MODULE_REGEX.fullmatch(value):
+                module_version = match.group('version')
+            else:
+                module_version = value
+
+        elif name == 'GODEBUG':
+            godebug_name, _, godebug_value = value.partition('=')
+            if godebug_name == 'fips140':
+                fips140_mode = godebug_value
+
+    unmet_requirements = list(
+        iter_unmet_requirements(
+            [
+                Requirement(
+                    name='Go Cryptographic Module (GOFIPS140)',
+                    required_value=validated_module_versions,
+                    actual_value=module_version,
+                ),
+                Requirement(
+                    name='FIPS 140-3 mode (GODEBUG=fips140)',
+                    required_value=GO_FIPS140_MODES,
+                    actual_value=fips140_mode,
+                ),
+            ],
+        ),
+    )
+
+    if unmet_requirements:
+        summary = (
+            f'The Go binary does not use a {standard.name} validated Go Cryptographic Module in '
+            'FIPS 140-3 mode (build it with `GOFIPS140=certified`):\n'
+        )
+        summary += '\n'.join(str(requirement) for requirement in unmet_requirements)
+        return FindingRatings.NOT_COMPLIANT, summary
+
+    summary = (
+        f'The Go binary uses the {standard.name} validated Go Cryptographic Module '
+        f'"{module_version}" and enables FIPS 140-3 mode by default. Note that the mode can still '
+        'be disabled at runtime via the `GODEBUG` environment variable.'
+    )
+    return FindingRatings.COMPLIANT, summary
+
+
 def validate_library(
     library_asset: odg.model.CryptoAsset,
     standard: cc.Standard,
@@ -602,17 +714,28 @@ def validate_library(
     validated libraries defined in the `standard`. If the libary matches one of the validated
     libraries (`name` or `name` and `version` matches), a finding with the rating `maybe-compliant`
     will be created. Otherwise, a finding with the rating `not-compliant` will be created.
+    Validated libraries specifying `go_fips140_modules` are rated according to
+    `rate_go_fips140_module()` instead.
     """
     if library_asset.asset_type is not odg.model.CryptoAssetTypes.LIBRARY:
         raise ValueError(library_asset.asset_type)
 
     library_properties: odg.model.LibraryProperties = library_asset.properties
+    go_fips140_rating = None
     provides_validated_variant = False
     may_be_validated_variant = False
 
     for validated_crypto_library in standard.libraries.validated_crypto_libraries:
         if validated_crypto_library.name != library_properties.name:
             continue
+
+        if validated_crypto_library.go_fips140_modules is not None:
+            go_fips140_rating = rate_go_fips140_module(
+                crypto_settings=library_properties.crypto_settings,
+                validated_module_versions=validated_crypto_library.go_fips140_modules,
+                standard=standard,
+            )
+            break
 
         provides_validated_variant = True
 
@@ -622,7 +745,10 @@ def validate_library(
         may_be_validated_variant = True
         break
 
-    if may_be_validated_variant:
+    if go_fips140_rating:
+        finding_rating, summary = go_fips140_rating
+
+    elif may_be_validated_variant:
         finding_rating = FindingRatings.MAYBE_COMPLIANT
 
         summary = textwrap.dedent(f'''\
@@ -697,13 +823,49 @@ def validate_related_crypto_material(
     return
 
 
+def iter_certificate_key_algorithm_keys(
+    crypto_assets: collections.abc.Sequence[odg.model.CryptoAsset],
+) -> collections.abc.Generator[str, None, None]:
+    """
+    Yields the keys of those algorithms which describe the type of a certificate's public key
+    (e.g. `ECDSA` for `id-ecPublicKey`, `RSA` for `rsaEncryption`). They carry neither a hash
+    function nor key length/curve by themselves, as these are properties of the public key. Hence,
+    they are validated in the context of the certificate (see `validate_certificate()`).
+    """
+    for certificate in crypto_assets:
+        if certificate.asset_type is not odg.model.CryptoAssetTypes.CERTIFICATE:
+            continue
+
+        public_key = find_crypto_asset_by_key(
+            data_key=certificate.properties.subject_public_key_ref,
+            crypto_assets=crypto_assets,
+        )
+        yield public_key.properties.algorithm_ref
+
+
 def validate_against_standard(
     crypto_assets: collections.abc.Sequence[odg.model.CryptoAsset],
     standard: cc.Standard,
     crypto_finding_cfg: odg.findings.Finding,
 ) -> collections.abc.Generator[odg.model.CryptoFinding, None, None]:
+    certificate_key_algorithm_keys = set(iter_certificate_key_algorithm_keys(crypto_assets))
+
     for crypto_asset in crypto_assets:
         if crypto_asset.asset_type is odg.model.CryptoAssetTypes.ALGORITHM:
+            if crypto_asset.key in certificate_key_algorithm_keys:
+                continue
+
+            if crypto_asset.locations and all(
+                crypto_extension.model.is_trust_store_location(location)
+                for location in crypto_asset.locations
+            ):
+                # algorithms only found in trust stores stem from the certificates stored there: key
+                # types and signature algorithms of chain certificates are validated in the context
+                # of the respective certificate (see `validate_certificate()`), the self-signature
+                # algorithm of trust anchors is never verified (RFC 5280 §6.1), hence neither must
+                # be rated standalone
+                continue
+
             if finding := validate_algorithm(
                 algorithm_asset=crypto_asset,
                 standard=standard,

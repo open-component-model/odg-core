@@ -826,9 +826,11 @@ class AlgorithmProperties:
 
 
 class CertificateKind(enum.StrEnum):
-    ROOT_CA = 'root-ca'
-    INTERMEDIATE_CA = 'intermediate-ca'
     END_USER = 'end-user'
+    INTERMEDIATE_CA = 'intermediate-ca'
+    ROOT_CA = 'root-ca'
+    # certificate found in a system trust store, i.e. trusted by the software rather than used by it
+    TRUST_ANCHOR = 'trust-anchor'
 
 
 @dataclasses.dataclass
@@ -850,12 +852,20 @@ class CertificateProperties:
 
 @dataclasses.dataclass
 class LibraryProperties:
+    """
+    :param list[str] crypto_settings:
+        Build settings affecting the library's cryptography, e.g. `GOFIPS140=v1.0.0-c2097c7c`
+        and `GODEBUG=fips140=on` for the Go standard library (which contains the Go Cryptographic
+        Module).
+    """
+
     name: str
     version: str | None
+    crypto_settings: list[str] = dataclasses.field(default_factory=list)
 
     @property
     def key(self) -> str:
-        return _as_key(self.name, self.version)
+        return _as_key(self.name, self.version, *sorted(self.crypto_settings))
 
 
 @dataclasses.dataclass

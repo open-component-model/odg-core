@@ -5,6 +5,7 @@ import dataclasses
 import enum
 import functools
 
+import dacite
 import ocm
 import ocm.retrieve_async
 import sqlalchemy.ext.asyncio as sqlasync
@@ -55,7 +56,7 @@ def rescored_severity_if_any(
     return most_specific_rescoring.data.severity
 
 
-class ComplianceScanStatus:
+class ComplianceScanStatus(enum.StrEnum):
     NO_DATA = 'no_data'
     OK = 'ok'
 
@@ -265,7 +266,11 @@ async def component_datatype_summaries(
     component_descriptor_lookup: ocm.retrieve_async.ComponentDescriptorLookupById,
     ocm_repo: ocm.OciOcmRepository | None = None,
     shortcut_cache: bool = False,
-) -> list[tuple[odg.model.ComponentArtefactId, ComplianceSummaryEntry]]:
+) -> list[list[dict]]:
+    """
+    Returns a list of [component_artefact-Id, summary_entry] dictionary pairs, JSON-serialisable for
+    the db cache. Use `_parse_summary_pair` to reconstruct typed objects from each pair.
+    """
     component = (
         await component_descriptor_lookup(
             component,
@@ -326,10 +331,10 @@ async def component_datatype_summaries(
         )
 
         summaries.append(
-            (
-                artefact,
-                artefact_summary,
-            ),
+            [
+                dataclasses.asdict(artefact),
+                dataclasses.asdict(artefact_summary),
+            ],
         )
 
     if not summaries:
@@ -337,22 +342,41 @@ async def component_datatype_summaries(
 
     component_summary = None
     for _, artefact_summary in summaries:
-        if not component_summary or artefact_summary.value > component_summary.value:
+        if not component_summary or artefact_summary['value'] > component_summary['value']:
             component_summary = artefact_summary
 
     summaries.insert(
         0,
-        (
-            odg.model.ComponentArtefactId(
-                component_name=component.name,
-                component_version=component.version,
-                artefact=None,
-            ),
+        [
+            {
+                'component_name': component.name,
+                'component_version': component.version,
+            },
             component_summary,
-        ),
+        ],
     )
 
     return summaries
+
+
+def _parse_summary_pair(
+    pair: list[dict],
+) -> tuple[odg.model.ComponentArtefactId, ComplianceSummaryEntry]:
+    artefact = dacite.from_dict(
+        odg.model.ComponentArtefactId,
+        pair[0],
+        config=dacite.Config(
+            cast=[enum.Enum],
+        ),
+    )
+    entry = dacite.from_dict(
+        ComplianceSummaryEntry,
+        pair[1],
+        config=dacite.Config(
+            cast=[enum.Enum],
+        ),
+    )
+    return artefact, entry
 
 
 async def component_compliance_summary(
@@ -382,9 +406,11 @@ async def component_compliance_summary(
             continue
 
         # first entry is always the component summary
-        component_entries.append(summary_entries_by_artefact[0][1])
+        _, component_summary = _parse_summary_pair(summary_entries_by_artefact[0])
+        component_entries.append(component_summary)
 
-        for component_artefact_id, summary_entry in summary_entries_by_artefact[1:]:
+        for pair in summary_entries_by_artefact[1:]:
+            component_artefact_id, summary_entry = _parse_summary_pair(pair)
             artefacts_entries_by_artefact[component_artefact_id].append(summary_entry)
 
     return ComponentComplianceSummary(

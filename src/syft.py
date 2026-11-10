@@ -15,7 +15,8 @@ own_dir = os.path.abspath(os.path.dirname(__file__))
 
 
 class SyftSbomFormat(enum.StrEnum):
-    CYCLONEDX = 'cyclonedx-json'
+    # pinned to 1.6, as newer syft versions default to 1.7 which cbomkit-theia rejects
+    CYCLONEDX = 'cyclonedx-json@1.6'
     SPDX = 'spdx-json'
 
 
