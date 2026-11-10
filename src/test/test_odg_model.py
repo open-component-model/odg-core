@@ -1,8 +1,15 @@
+import copy
+import dataclasses
 import datetime
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import mashumaro.codecs
 import pytest
+import sqlalchemy.dialects.sqlite
 
+import consts
+import deliverydb.util as du
+import metadata
 import odg.cvss
 import odg.model
 
@@ -528,6 +535,82 @@ class TestFromDictRescoring:
         assert type(result.data.user) is odg.model.OidcUser
         assert result.data.user.issuer == 'https://idp.example.com'
         assert result.id == 'b3af5ba78bf735ddd1d23bb0b085b1bc'
+
+    def test_oidc_user_id_stable_after_db_roundtrip(self):
+        # Regression: update/delete match rows by id. Verify that the id produced by from_dict
+        # for an oidc-user rescoring row equals the id stored in the DB row, so that a subsequent
+        # update or delete finds the correct row and does not create a duplicate.
+        raw = _rescoring_envelope(finding=_RESCORING_VULN, user=_OIDC_USER)
+        original = odg.model.ArtefactMetadata.from_dict(raw)
+
+        db_row = du.to_db_artefact_metadata(original)
+        assert db_row.id == original.id
+
+        # Simulate the read-back path used by the update loop (db_artefact_metadata_to_dict ->
+        # from_dict). The re-decoded id must equal the stored db_row.id so the update matcher
+        # hits the row rather than inserting a duplicate.
+        readback = odg.model.ArtefactMetadata.from_dict(du.db_artefact_metadata_to_dict(db_row))
+        assert readback.id == db_row.id
+
+    def test_legacy_dict_fallback_id_stable_after_db_roundtrip(self):
+        # Regression: rows stored via the dict-fallback path (MissingField/InvalidFieldValue on
+        # decode) have data_key=None. Verify that re-reading such a row produces the same id so
+        # that update does not create a duplicate and delete targets the correct row.
+        raw = _artefact_envelope(
+            odg.model.Datatype.RESCORING,
+            {'referenced_type': 'finding/vulnerability'},  # missing finding/severity/user
+        )
+        original = odg.model.ArtefactMetadata.from_dict(raw)
+        assert isinstance(original.data, dict)
+
+        db_row = du.to_db_artefact_metadata(original)
+        assert db_row.id == original.id
+
+        readback = odg.model.ArtefactMetadata.from_dict(du.db_artefact_metadata_to_dict(db_row))
+        assert isinstance(readback.data, dict)
+        assert readback.id == db_row.id
+
+
+class TestDeletePath:
+    @pytest.mark.asyncio
+    async def test_delete_unknown_type_with_issuer_uses_oidc_user_id(self):
+        # An unknown user type with an `issuer` field is decoded as OidcUser (issuer presence
+        # drives the selection). The old dacite strict=True decoder raised UnionMatchError on
+        # this payload on both read and write — so no row was ever stored under a legacy dict
+        # ID via the HTTP path. Extension write paths used live OidcUser objects directly,
+        # so the stored ID already matches OidcUser.key. The delete path must use the
+        # OidcUser-based ID only.
+        raw = _rescoring_envelope(
+            finding=_RESCORING_VULN,
+            user={'username': 'alice', 'type': 'extension-user', 'issuer': 'https://example.com'},
+        )
+        decoded = odg.model.ArtefactMetadata.from_dict(raw)
+        assert type(decoded.data.user) is odg.model.OidcUser
+
+        dict_fallback_id = dataclasses.replace(decoded, data=raw['data']).id
+        assert dict_fallback_id != decoded.id
+
+        session = AsyncMock()
+        request = MagicMock()
+        request.json = AsyncMock(return_value={'entries': [copy.deepcopy(raw)]})
+        request.__getitem__ = MagicMock(
+            side_effect=lambda k: (
+                session if k == consts.REQUEST_DB_SESSION else (_ for _ in ()).throw(KeyError(k))
+            ),
+        )
+
+        with patch.object(metadata, '_collect_compliance_summary_cache_ids'):
+            await metadata.ArtefactMetadata(request).delete()
+
+        dialect = sqlalchemy.dialects.sqlite.dialect()
+        delete_ids = [
+            value
+            for call in session.execute.await_args_list
+            if call.args[0].__visit_name__ == 'delete'
+            for value in call.args[0].compile(dialect=dialect).params.values()
+        ]
+        assert decoded.id in delete_ids
+        assert dict_fallback_id not in delete_ids
 
 
 class TestFromDictMetaFields:
