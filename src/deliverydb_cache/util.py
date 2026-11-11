@@ -2,6 +2,7 @@ import collections.abc
 import dataclasses
 import datetime
 import enum
+import json
 
 import orjson
 import structlog
@@ -108,8 +109,11 @@ def deserialise_cache_value(
         try:
             return orjson.loads(value)
         except orjson.JSONDecodeError:
-            logger.warning('erroneous cache entry, treating as cache miss', exc_info=True)
-            return None
+            # legacy entries (e.g. containing NaN/Infinity, rejected by orjson) remain
+            # readable via the lenient stdlib decoder; if that also fails, the error
+            # propagates instead of fabricating a cached `None`
+            logger.info('cache entry rejected by orjson, falling back to stdlib json')
+            return json.loads(value)
 
     elif encoding_format is dcm.EncodingFormat.YAML:
         return yaml.safe_load(value)
