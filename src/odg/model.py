@@ -751,7 +751,7 @@ class GitHubSecretFinding(Finding):
 @dataclasses.dataclass
 class RescoreGitHubSecretFinding:
     html_url: str
-    resolution: str
+    resolution: str | None  # null for auto-rescored closed alerts
 
     @property
     def key(self) -> str:
@@ -1747,10 +1747,10 @@ class ArtefactMetadataSpecificity(enum.Enum):
         return self._asint(self) >= self._asint(other)
 
 
-# `Datatype` -> single payload class. Rescorings, vulnerability findings and scanner writebacks
-# (two classes each) have dedicated functions in `_decode_payload_by_type` instead.
+# `Datatype` -> single payload class. Rescorings, vulnerability findings, scanner writebacks and
+# artefact scan infos (several classes or mixed rows) have dedicated functions in
+# `_decode_payload_by_type` instead.
 _payload_model_by_type: dict[Datatype, type] = {
-    Datatype.ARTEFACT_SCAN_INFO: ResponsibleInfo,
     Datatype.CODEQL_FINDING: CodeqlFinding,
     Datatype.COMPLIANCE_SNAPSHOTS: ComplianceSnapshot,
     Datatype.CRYPTO_ASSET: CryptoAsset,
@@ -1954,6 +1954,16 @@ def _decode_vulnerability(data: dict) -> VulnerabilityFinding:
     return _decode_vulnerability_finding.decode(data)
 
 
+_decode_responsible_info = _basic_decoder(ResponsibleInfo)
+
+
+def _decode_artefact_scan_info(data: dict) -> ResponsibleInfo | dict:
+    # most rows of this `meta.type` are payloads without class (`{}`, `{'report_url': ...}`)
+    if 'referenced_type' in data:
+        return _decode_responsible_info.decode(data)
+    return data
+
+
 _decode_package_version_scanner_writeback = _basic_decoder(PackageVersionScannerWriteback)
 _decode_license_scanner_writeback = _basic_decoder(LicenseScannerWriteback)
 
@@ -1972,6 +1982,7 @@ def _decode_scanner_writeback(
 _decode_payload_by_type: dict[str, typing.Callable[[dict], object]] = {
     datatype: _basic_decoder(model).decode for datatype, model in _payload_model_by_type.items()
 } | {
+    Datatype.ARTEFACT_SCAN_INFO: _decode_artefact_scan_info,
     Datatype.RESCORING: _decode_rescoring,
     Datatype.SCANNER_WRITEBACK: _decode_scanner_writeback,
     Datatype.VULNERABILITY_FINDING: _decode_vulnerability,

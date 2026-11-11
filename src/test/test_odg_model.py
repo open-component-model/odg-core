@@ -259,6 +259,7 @@ class TestFromDictDataTypeResolution:
             odg.model.BDBAVulnerabilityFinding,
             odg.model.CustomRescoring,
             odg.model.LicenseScannerWriteback,
+            odg.model.ResponsibleInfo,
             odg.model.PackageVersionScannerWriteback,
             odg.model.VulnerabilityFinding,
         }
@@ -893,7 +894,7 @@ class TestStrictStr:
 
     def test_null_for_required_str_is_rejected(self):
         raw = _rescoring_envelope(
-            finding={'html_url': 'https://github.example.org/org/repo/alerts/1', 'resolution': None},
+            finding={'html_url': None, 'resolution': 'revoked'},
             user={'username': 'ghas-extension-auto-rescoring', 'type': 'ghas-extension-user'},
             referenced_type='finding/ghas',
             severity='secret-found',
