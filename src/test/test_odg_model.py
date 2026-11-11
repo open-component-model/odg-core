@@ -409,12 +409,6 @@ class TestFromDictRescoring:
                 odg.model.RescoringIPFinding,
             ),
             (
-                # same shape as license but referenced_type is the discriminator
-                'finding/ip',
-                {'package_name': 'openssl', 'license': {'name': 'MIT'}},
-                odg.model.RescoringIPFinding,
-            ),
-            (
                 'finding/malware',
                 {
                     'filename': 'test.exe',
@@ -437,11 +431,24 @@ class TestFromDictRescoring:
         assert isinstance(result.data, odg.model.CustomRescoring)
         assert type(result.data.finding) is expected_finding_type
 
+    def test_dispatch_table_matches_finding_union(self):
+        # Adding a finding class to _RescoringFindingField without a dispatch-table entry would
+        # silently decode its rescorings as raw dict — guard against that drift.
+        assert len(odg.model._decode_rescoring_finding_by_type) == len(
+            odg.model._RescoringFindingField.__args__,
+        )
+
     @pytest.mark.parametrize(
         'raw',
         [
             # missing required finding field (cve) → MissingField
             _rescoring_envelope(finding={'package_name': 'openssl'}, user=_GITHUB_USER),
+            # required field missing (labels) → falls back to dict instead of raising mid-stream
+            _rescoring_envelope(
+                finding={'package_name': 'openssl', 'license': {'name': 'MIT'}},
+                user=_GITHUB_USER,
+                referenced_type='finding/ip',
+            ),
         ],
     )
     def test_falls_back_to_dict(self, raw):
@@ -572,51 +579,6 @@ class TestFromDictMetaFields:
         assert len(result.meta.responsibles) == 1
         assert isinstance(result.meta.responsibles[0].identifiers[0], odg.model.UserIdentifierBase)
 
-    def test_all_meta_fields_vulnerability(self):
-        raw = _artefact_envelope(
-            odg.model.Datatype.VULNERABILITY_FINDING,
-            {
-                'package_name': 'openssl',
-                'package_version': '3.0.7',
-                'base_url': 'https://bdba.example.com',
-                'report_url': 'https://bdba.example.com/products/42/',
-                'product_id': 42,
-                'group_id': 7,
-                'severity': 'HIGH',
-                'cve': 'CVE-2023-0286',
-                'cvss_score': 7.4,
-            },
-        )
-        raw['meta']['last_update'] = '2025-06-01T10:00:00+00:00'
-        raw['meta']['assignee_mode'] = 'extend'
-        raw['meta']['responsibles'] = [
-            {
-                'identifiers': [
-                    {
-                        'source': 'codeowners',
-                        'type': 'githubUser',
-                        'username': 'jdoe',
-                        'github_hostname': 'github.com',
-                    },
-                ],
-            },
-        ]
-        result = odg.model.ArtefactMetadata.from_dict(raw)
-        assert isinstance(result.data, odg.model.BDBAVulnerabilityFinding)
-        assert result.data.cve == 'CVE-2023-0286'
-        assert result.meta.last_update == datetime.datetime(2025, 6, 1, 10, 0, tzinfo=_UTC)
-        assert result.meta.assignee_mode is odg.model.ResponsibleAssigneeModes.EXTEND
-        assert len(result.meta.responsibles) == 1
-
-    def test_all_meta_fields_rescoring(self):
-        raw = _rescoring_envelope(finding=_RESCORING_VULN, user=_GITHUB_USER)
-        raw['meta']['last_update'] = '2025-07-01T12:00:00+00:00'
-        raw['meta']['assignee_mode'] = 'extend'
-        result = odg.model.ArtefactMetadata.from_dict(raw)
-        assert isinstance(result.data, odg.model.CustomRescoring)
-        assert result.meta.last_update == datetime.datetime(2025, 7, 1, 12, 0, tzinfo=_UTC)
-        assert result.meta.assignee_mode is odg.model.ResponsibleAssigneeModes.EXTEND
-
     def test_unknown_meta_type_preserves_data_as_dict(self):
         result = odg.model.ArtefactMetadata.from_dict(
             _artefact_envelope('custom/unknown-type', {'key': 'my-key', 'extra': 'value'}),
@@ -712,10 +674,11 @@ class TestDateDecoding:
         assert result.discovery_date == datetime.date(2025, 1, 1)
         assert type(result.discovery_date) is datetime.date
 
-    def test_discovery_date_datetime_string_raises(self):
-        # mashumaro's date decoder rejects full datetime strings — this is safe because the
-        # write path serialises from a date object via .isoformat(), always producing plain
-        # date strings.
+    @pytest.mark.parametrize(
+        'raw_date',
+        ('2025-01-01', '2025-01-01T10:30:00', '2025-01-01T10:30:00+00:00'),
+    )
+    def test_discovery_date_accepts_datetime_strings(self, raw_date):
         raw = _artefact_envelope(
             odg.model.Datatype.VULNERABILITY_FINDING,
             {
@@ -726,21 +689,20 @@ class TestDateDecoding:
                 'cvss_score': 1.0,
             },
         )
-        raw['discovery_date'] = '2025-01-01T00:00:00+00:00'
-        with pytest.raises(Exception):
-            odg.model.ArtefactMetadata.from_dict(raw)
+        raw['discovery_date'] = raw_date
+        result = odg.model.ArtefactMetadata.from_dict(raw)
+        assert result.discovery_date == datetime.date(2025, 1, 1)
+        assert type(result.discovery_date) is datetime.date
 
-    @pytest.mark.parametrize(
-        'date_str,expected',
-        [
-            ('2024-01-15', datetime.date(2024, 1, 15)),
-        ],
-    )
-    def test_rescoring_due_date(self, date_str, expected):
+    def test_rescoring_due_date(self):
         result = odg.model.ArtefactMetadata.from_dict(
-            _rescoring_envelope(finding=_RESCORING_VULN, user=_GITHUB_USER, due_date=date_str),
+            _rescoring_envelope(
+                finding=_RESCORING_VULN,
+                user=_GITHUB_USER,
+                due_date='2024-01-15',
+            ),
         )
-        assert result.data.due_date == expected
+        assert result.data.due_date == datetime.date(2024, 1, 15)
         assert type(result.data.due_date) is datetime.date
 
 

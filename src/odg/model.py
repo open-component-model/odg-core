@@ -546,7 +546,7 @@ class BDBAVulnerabilityFinding(VulnerabilityFinding, BDBAMixin):
 class RescoringIPFinding:
     package_name: str
     license: License | None
-    labels: list[str] = dataclasses.field(default_factory=list)
+    labels: list[str]
 
     @property
     def key(self) -> str:
@@ -1774,9 +1774,6 @@ MetaModels = (
 
 @dataclasses.dataclass
 class ArtefactMetadata:
-    class Config(mashumaro.config.BaseConfig):
-        forbid_extra_keys = True
-
     """
     Model class to interact with entries of the delivery-db. In the first place, these entries are
     being identified via `ComponentArtefactId` (`artefact` property) as well as their `Datatype`
@@ -1792,61 +1789,72 @@ class ArtefactMetadata:
     `data` object may have an arbitrary structure.
     """
 
+    class Config(mashumaro.config.BaseConfig):
+        forbid_extra_keys = True
+
     artefact: ComponentArtefactId
     meta: Metadata
+    # MetaModels must precede InformationalModels: ResponsibleInfo only requires `referenced_type`
+    # and, as extra keys are ignored, would otherwise swallow e.g. rescorings
     data: FindingModels | MetaModels | InformationalModels | dict
-    discovery_date: datetime.date | None = None  # required for finding specific SLA tracking
+    # required for finding specific SLA tracking; also accepts datetime strings (as dacite did)
+    discovery_date: datetime.date | None = dataclasses.field(
+        default=None,
+        metadata={
+            'deserialize': lambda value: (
+                datetime.datetime.fromisoformat(value).date() if value else None
+            ),
+        },
+    )
     allowed_processing_time: str | None = None
 
     @staticmethod
     def from_dict(raw: dict):
-        # Unknown envelope keys raise ExtraKeysError (Config.forbid_extra_keys). Structural
-        # union resolution for `data` is unaffected — forbid_extra_keys is not inherited.
-        # RESCORING: incomplete legacy rows fall back to dict instead of raising mid-stream.
-        # Unknown meta.type: dict preserves any 'key' field for correct ID computation.
-        try:
-            meta_type = Datatype(raw['meta']['type'])
-        except ValueError:
-            envelope = _decode_artefact_metadata.decode({**raw, 'data': {}})
-            return dataclasses.replace(envelope, data=raw['data'])
-
-        if meta_type != Datatype.RESCORING:
-            return _decode_artefact_metadata.decode(raw)
-
-        # RESCORING: select the finding type via the `referenced_type` discriminator (unambiguous,
-        # consistent with the finding shape) rather than resolving the finding union structurally.
-        # Unknown `referenced_type` or decode failure (e.g. missing required field) falls back to
-        # dict instead of raising mid-stream.
+        # `raw` is the envelope (artefact, meta, data, ...); `data` is the payload, typed by
+        # `meta.type`. A rescoring payload embeds a reduced finding (just its identifying fields),
+        # whose class is picked via `data.referenced_type`, as the union can't tell them apart.
         data = raw['data']
-        try:
-            referenced_type = Datatype(data.get('referenced_type'))
-        except ValueError:
-            referenced_type = None
+        is_rescoring = raw['meta']['type'] == Datatype.RESCORING
 
-        finding_decoder = _decode_rescoring_finding_by_type.get(referenced_type)
-        if finding_decoder is None:
-            envelope = _decode_artefact_metadata.decode({**raw, 'data': {}})
+        finding = None
+        if is_rescoring and isinstance(data, dict):
+            referenced_type_raw = data.get('referenced_type')
+            try:
+                finding_decoder = _decode_rescoring_finding_by_type.get(
+                    Datatype(referenced_type_raw),
+                )
+            except ValueError:
+                finding_decoder = None
+                logger.warning(
+                    'rescoring with unknown referenced_type falls back to dict',
+                    referenced_type=referenced_type_raw,
+                    meta_type=raw['meta'].get('type'),
+                )
+            if finding_decoder is not None:
+                try:
+                    finding = finding_decoder.decode(data.get('finding'))
+                except (
+                    mashumaro.exceptions.MissingField,
+                    mashumaro.exceptions.InvalidFieldValue,
+                    mashumaro.exceptions.UnserializableField,
+                ) as error:
+                    logger.warning(
+                        'rescoring finding failed to decode, falls back to dict',
+                        referenced_type=referenced_type_raw,
+                        meta_type=raw['meta'].get('type'),
+                        error=str(error),
+                    )
+
+        envelope = _decode_artefact_metadata.decode(raw)
+        if not is_rescoring:
+            return envelope
+        # rescoring rows: fall back to raw dict unless the finding decoded cleanly
+        if finding is None or not isinstance(envelope.data, CustomRescoring):
             return dataclasses.replace(envelope, data=data)
-
-        try:
-            finding = finding_decoder.decode(data.get('finding'))
-            # Decode the rest of the envelope with a placeholder finding, then replace it with the
-            # type-dispatched result. `finding` is union-typed and does not accept a plain dict, so
-            # a shape satisfying the union's first member is passed here and discarded afterwards —
-            # the envelope decode must never depend on the real (type-dispatched) finding shape.
-            rescoring = _decode_custom_rescoring.decode(
-                {**data, 'finding': {'package_name': '', 'cve': ''}},
-            )
-            rescoring = dataclasses.replace(rescoring, finding=finding)
-        except (
-            mashumaro.exceptions.MissingField,
-            mashumaro.exceptions.InvalidFieldValue,
-        ):
-            envelope = _decode_artefact_metadata.decode({**raw, 'data': {}})
-            return dataclasses.replace(envelope, data=data)
-
-        envelope = _decode_artefact_metadata.decode({**raw, 'data': {}})
-        return dataclasses.replace(envelope, data=rescoring)
+        return dataclasses.replace(
+            envelope,
+            data=dataclasses.replace(envelope.data, finding=finding),
+        )
 
     @property
     def key(self) -> str:
@@ -1891,7 +1899,6 @@ class ArtefactMetadata:
 
 
 _decode_artefact_metadata = mashumaro.codecs.BasicDecoder(ArtefactMetadata)
-_decode_custom_rescoring = mashumaro.codecs.BasicDecoder(CustomRescoring)
 
 # Dispatch table: the `referenced_type` stored in every rescoring `data` blob maps 1:1 to the
 # concrete rescoring finding class. Selecting the finding type by this discriminator (instead of
