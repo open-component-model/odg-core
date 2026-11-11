@@ -34,7 +34,7 @@ def encode_request(
         raise ValueError('`data` of type `dict` is not supported for gzip encoding')
 
     if json is not None:
-        data = js.dumps(json).encode()
+        data = js.dumps(json)
 
     def _encode(obj, encoding: str = 'utf-8') -> bytes:
         if isinstance(obj, bytes):
