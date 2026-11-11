@@ -552,6 +552,7 @@ class RescoringIPFinding:
     def key(self) -> str:
         labels_key = ','.join(sorted(self.labels))
 
+        # new rescorings won't have the license set anymore -> keep for backwards compatibility
         if self.license:
             return _as_key(self.package_name, self.license.name, labels_key)
         return _as_key(self.package_name, labels_key)
