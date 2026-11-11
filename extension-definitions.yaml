@@ -39,6 +39,11 @@ installation:
     helm_chart_name: delivery-service
     value: ${deliveryServiceMaxReplicas}
     value_type: python-string-template
+  - default: ''
+    helm_attribute: global.otlpEndpoint
+    helm_chart_name: delivery-service
+    value: ${otlp_endpoint}
+    value_type: python-string-template
 name: delivery-service
 outputs:
 - name: delivery-service-url
@@ -104,6 +109,11 @@ installation:
     helm_chart_name: postgresql
     value: delivery-db-password
     value_type: literal
+  - default: ''
+    helm_attribute: global.otlpEndpoint
+    helm_chart_name: postgresql
+    value: ${otlp_endpoint}
+    value_type: python-string-template
 name: delivery-db
 outputs: []
 ---
@@ -135,6 +145,11 @@ installation:
     helm_chart_name: extensions
     value: '"true"'
     value_type: literal
+  - default: ''
+    helm_attribute: global.otlpEndpoint
+    helm_chart_name: extensions
+    value: ${otlp_endpoint}
+    value_type: python-string-template
 name: malware-scanner
 outputs: []
 ---
@@ -160,6 +175,11 @@ installation:
     helm_chart_name: extensions
     value: true
     value_type: literal
+  - default: ''
+    helm_attribute: global.otlpEndpoint
+    helm_chart_name: extensions
+    value: ${otlp_endpoint}
+    value_type: python-string-template
 name: backlog-controller
 outputs: []
 ---
@@ -190,6 +210,11 @@ installation:
     helm_attribute: artefact-enumerator.schedule
     helm_chart_name: extensions
     value: ${artefact_enumerator}
+    value_type: python-string-template
+  - default: ''
+    helm_attribute: global.otlpEndpoint
+    helm_chart_name: extensions
+    value: ${otlp_endpoint}
     value_type: python-string-template
 name: artefact-enumerator
 outputs: []
@@ -222,6 +247,11 @@ installation:
     helm_chart_name: extensions
     value: ${cache_manager}
     value_type: python-string-template
+  - default: ''
+    helm_attribute: global.otlpEndpoint
+    helm_chart_name: extensions
+    value: ${otlp_endpoint}
+    value_type: python-string-template
 name: cache-manager
 outputs: []
 ---
@@ -252,6 +282,11 @@ installation:
     helm_attribute: access-manager.schedule
     helm_chart_name: extensions
     value: ${access_manager}
+    value_type: python-string-template
+  - default: ''
+    helm_attribute: global.otlpEndpoint
+    helm_chart_name: extensions
+    value: ${otlp_endpoint}
     value_type: python-string-template
 name: access-manager
 outputs: []
@@ -284,6 +319,11 @@ installation:
     helm_chart_name: extensions
     value: '"true"'
     value_type: literal
+  - default: ''
+    helm_attribute: global.otlpEndpoint
+    helm_chart_name: extensions
+    value: ${otlp_endpoint}
+    value_type: python-string-template
 name: bdba
 outputs: []
 ---
@@ -315,6 +355,11 @@ installation:
     helm_chart_name: extensions
     value: '"true"'
     value_type: literal
+  - default: ''
+    helm_attribute: global.otlpEndpoint
+    helm_chart_name: extensions
+    value: ${otlp_endpoint}
+    value_type: python-string-template
 name: crypto
 outputs: []
 ---
@@ -345,6 +390,11 @@ installation:
     helm_chart_name: extensions
     value: '"true"'
     value_type: literal
+  - default: ''
+    helm_attribute: global.otlpEndpoint
+    helm_chart_name: extensions
+    value: ${otlp_endpoint}
+    value_type: python-string-template
 name: issue-replicator
 outputs: []
 ---
@@ -376,6 +426,11 @@ installation:
     helm_chart_name: extensions
     value: '"true"'
     value_type: literal
+  - default: ''
+    helm_attribute: global.otlpEndpoint
+    helm_chart_name: extensions
+    value: ${otlp_endpoint}
+    value_type: python-string-template
 name: osid
 outputs: []
 ---
@@ -407,6 +462,11 @@ installation:
     helm_chart_name: extensions
     value: '"true"'
     value_type: literal
+  - default: ''
+    helm_attribute: global.otlpEndpoint
+    helm_chart_name: extensions
+    value: ${otlp_endpoint}
+    value_type: python-string-template
 name: responsibles
 outputs: []
 ---
@@ -438,6 +498,11 @@ installation:
     helm_chart_name: extensions
     value: '"true"'
     value_type: literal
+  - default: ''
+    helm_attribute: global.otlpEndpoint
+    helm_chart_name: extensions
+    value: ${otlp_endpoint}
+    value_type: python-string-template
 name: sast
 outputs: []
 ---
@@ -468,6 +533,11 @@ installation:
     helm_attribute: delivery-db-backup.schedule
     helm_chart_name: extensions
     value: ${delivery_db_backup}
+    value_type: python-string-template
+  - default: ''
+    helm_attribute: global.otlpEndpoint
+    helm_chart_name: extensions
+    value: ${otlp_endpoint}
     value_type: python-string-template
 name: delivery-db-backup
 outputs: []
@@ -500,6 +570,11 @@ installation:
     helm_chart_name: extensions
     value: ${ghas}
     value_type: python-string-template
+  - default: ''
+    helm_attribute: global.otlpEndpoint
+    helm_chart_name: extensions
+    value: ${otlp_endpoint}
+    value_type: python-string-template
 name: ghas
 outputs: []
 ---
@@ -530,6 +605,11 @@ installation:
     helm_chart_name: extensions
     value: '"true"'
     value_type: literal
+  - default: ''
+    helm_attribute: global.otlpEndpoint
+    helm_chart_name: extensions
+    value: ${otlp_endpoint}
+    value_type: python-string-template
 name: codeql
 outputs: []
 ---
@@ -561,6 +641,11 @@ installation:
     helm_chart_name: extensions
     value: '"true"'
     value_type: literal
+  - default: ''
+    helm_attribute: global.otlpEndpoint
+    helm_chart_name: extensions
+    value: ${otlp_endpoint}
+    value_type: python-string-template
 name: trivy
 outputs: []
 ---
@@ -591,6 +676,11 @@ installation:
     helm_chart_name: extensions
     value: '"true"'
     value_type: literal
+  - default: ''
+    helm_attribute: global.otlpEndpoint
+    helm_chart_name: extensions
+    value: ${otlp_endpoint}
+    value_type: python-string-template
 name: sbom-generator
 outputs: []
 ---
@@ -626,6 +716,11 @@ installation:
     helm_attribute: sla-violation-profiler.scheduleReport
     helm_chart_name: extensions
     value: ${sla_report}
+    value_type: python-string-template
+  - default: ''
+    helm_attribute: global.otlpEndpoint
+    helm_chart_name: extensions
+    value: ${otlp_endpoint}
     value_type: python-string-template
 name: sla-violation-profiler
 outputs: []

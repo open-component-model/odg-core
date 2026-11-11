@@ -3,6 +3,7 @@ import sqlalchemy
 import sqlalchemy.dialects.postgresql as sap
 import sqlalchemy.ext.asyncio as sqlasync
 import sqlalchemy.orm.session
+from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from psycopg.types.json import set_json_dumps, set_json_loads
 
 set_json_loads(orjson.loads)
@@ -56,6 +57,9 @@ async def _sqlalchemy_sessionmaker_async(
         },
     )
 
+    # unwrap the AsyncEngine to instrument the underlying sync Engine
+    SQLAlchemyInstrumentor().instrument(engine=engine.sync_engine)
+
     sessionmaker = sqlasync.async_sessionmaker(bind=engine)
     sessionmakers_async[(pool_size, max_overflow, pool_timeout)] = sessionmaker
 
@@ -105,6 +109,8 @@ def _sqlalchemy_sessionmaker(
             'options': '-c idle_in_transaction_session_timeout=1800000',
         },
     )
+
+    SQLAlchemyInstrumentor().instrument(engine=engine)
 
     sessionmaker = sqlalchemy.orm.sessionmaker(bind=engine)
     sessionmakers[(pool_size, max_overflow, pool_timeout)] = sessionmaker

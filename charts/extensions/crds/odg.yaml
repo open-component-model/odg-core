@@ -71,6 +71,12 @@ spec:
                       type: string
                     btp_endpoint:
                       type: string
+                    otlp_endpoint:
+                      type: string
+                      description: |
+                        OTLP gRPC endpoint ODG workloads push traces to (e.g.
+                        http://telemetry-opentelemetry-collector.odg-system:4317).
+                        Empty/omitted disables OTel instrumentation in all pods.
                   required:
                     - base_url
                     - target_namespace

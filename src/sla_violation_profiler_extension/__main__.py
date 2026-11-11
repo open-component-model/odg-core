@@ -10,6 +10,7 @@ import k8s.logging
 import lookups
 import odg.extensions_cfg
 import odg.logging_cfg
+import odg.telemetry
 import odg.model
 import odg.util
 import odg_client
@@ -20,6 +21,7 @@ import util
 logger = structlog.get_logger(__name__)
 k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging(service_name='sla-violation-profiler')
+odg.telemetry.configure_telemetry()
 
 
 def filter_rescorings_before_release_date(

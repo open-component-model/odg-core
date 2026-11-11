@@ -44,6 +44,11 @@ dependencies = [
     "alembic==1.20.1",
     "orjson==3.13.0",
     "structlog==26.1.0",
+    "opentelemetry-sdk==1.45.2",
+    "opentelemetry-exporter-otlp-proto-grpc==1.45.2",
+    "opentelemetry-instrumentation-aiohttp-server==0.66b2",
+    "opentelemetry-instrumentation-aiohttp-client==0.66b2",
+    "opentelemetry-instrumentation-sqlalchemy==0.66b2",
 ]
 
 [tool.uv.workspace]

@@ -50,6 +50,8 @@ spec:
               value: {{ .Values.target_namespace | default .Release.Namespace }}
             - name: ODG_LOG_LEVEL
               value: {{ .Values.logLevel | default "INFO" | quote }}
+            {{- include "odg.otelEnv" . | nindent 12 }}
+            {{- include "odg.otelResourceAttrs" . | nindent 12 }}
             volumeMounts:
             - name: github
               mountPath: /secrets/github

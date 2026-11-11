@@ -22,6 +22,7 @@ import k8s.util
 import ocm_util
 import odg.extensions_cfg
 import odg.logging_cfg
+import odg.telemetry
 import odg.model
 import odg.util
 import odg_client
@@ -32,6 +33,7 @@ import syft
 logger = structlog.get_logger(__name__)
 k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging(service_name='sbom-generator')
+odg.telemetry.configure_telemetry()
 own_dir = os.path.abspath(os.path.dirname(__file__))
 
 

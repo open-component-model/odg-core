@@ -26,6 +26,7 @@ import middleware.errors
 import middleware.prometheus
 import middleware.route_feature_check as rfc
 import odg.logging_cfg
+import odg.telemetry
 import paths
 import rescore.artefacts
 import service_extensions
@@ -345,6 +346,8 @@ async def initialise_app():
         json_logs=parsed_arguments.json_logs,
         service_name='delivery-service',
     )
+    # before `aiohttp.web.Application(...)` — instrumentation patches Application.__init__
+    odg.telemetry.configure_telemetry()
 
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=parsed_arguments.max_workers)
     loop = asyncio.get_running_loop()
@@ -355,13 +358,16 @@ async def initialise_app():
     else:
         default_auth = middleware.auth.AuthType.BEARER
 
-    middlewares = (
+    # list, not tuple: opentelemetry.instrumentation.aiohttp_server
+    # (patched into Application.__init__ by configure_telemetry) prepends its
+    # middleware via middlewares.insert(0, ...) and fails on tuples
+    middlewares = [
         middleware.cors.cors_middleware(),
         middleware.errors.errors_middleware(),
         middleware.auth.auth_middleware(default_auth=default_auth),
         middleware.db_session.db_session_middleware(db_url=parsed_arguments.delivery_db_url),
         rfc.feature_check_middleware(),
-    )
+    ]
 
     await features.init_features(parsed_arguments)
 

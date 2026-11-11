@@ -32,6 +32,7 @@ import lookups
 import ocm_util
 import odg.extensions_cfg
 import odg.logging_cfg
+import odg.telemetry
 import odg.util
 import odg_operator.odg_model as odgm
 import odg_operator.odg_util as odgu
@@ -39,6 +40,7 @@ import paths
 import util
 
 odg.logging_cfg.configure_logging(service_name='odg-operator')
+odg.telemetry.configure_telemetry()
 logger = structlog.get_logger(__name__)
 
 ODG_CLEAN_UP_FINALISER = 'open-delivery-gear.ocm.software/odg-clean-up'
@@ -103,6 +105,29 @@ def iter_missing_dependencies(
 
     for extension_definition in requested:
         yield from resolve(extension_definition.dependencies)
+
+
+def resolve_otlp_endpoint(
+    odg_context: dict,
+    requested_extension_definitions: collections.abc.Iterable[odgm.ExtensionDefinition],
+) -> str | None:
+    """
+    derive the OTLP endpoint for this ODG if the telemetry extension is being deployed and
+    the user has not set `otlp_endpoint` explicitly. The collector service name is pinned
+    via fullnameOverride and both sides deploy into `target_namespace`, so the endpoint is
+    derivable, not config.
+
+    Returns `None` when no endpoint should be set (an explicit `otlp_endpoint` already in
+    the context always wins, or telemetry is not being deployed) — in that case templates
+    default `${otlp_endpoint}` to '' and `configure_telemetry()` stays a no-op.
+    """
+    if 'otlp_endpoint' in odg_context:
+        return None
+
+    if not any(e.name == 'telemetry' for e in requested_extension_definitions):
+        return None
+
+    return f'http://telemetry-opentelemetry-collector.{odg_context["target_namespace"]}:4317'
 
 
 def outputs_as_jsonpath(
@@ -779,6 +804,12 @@ def reconcile(
 
                     # make sure there are no duplicates
                     requested_extension_definitions = set(requested_extension_definitions)
+
+                    if otlp_endpoint := resolve_otlp_endpoint(
+                        odg_context=odg.context,
+                        requested_extension_definitions=requested_extension_definitions,
+                    ):
+                        odg.context['otlp_endpoint'] = otlp_endpoint
 
                     status_for_extension, has_error = create_or_update_odg(
                         odg=odg,

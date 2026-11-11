@@ -5,6 +5,12 @@ global:
     repository: null
     tag: null
   imagePullSecrets: []
+  # OTLP gRPC endpoint for trace export. Empty = derive from target_namespace
+  # (telemetry chart's collector Service ships into the same namespace).
+  # Set via the ODG CR's spec.context.otlp_endpoint; an explicitly empty
+  # string must disable tracing, see charts/extensions/templates/helpers.tpl
+  # (odg.otelEnv). Leave commented-out to use namespace derivation.
+  # otlpEndpoint: ""
 
 access-manager:
   cronjob:
