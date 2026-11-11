@@ -1823,22 +1823,39 @@ class ArtefactMetadata:
         if meta_type != Datatype.RESCORING:
             return _decode_artefact_metadata.decode(raw)
 
+        # RESCORING: select the finding type via the `referenced_type` discriminator (unambiguous,
+        # consistent with the finding shape) rather than resolving the finding union structurally.
+        # Unknown/missing `referenced_type` or any decode failure (incomplete legacy rows, wrong
+        # field types, malformed due_date) falls back to dict instead of raising mid-stream.
+        data = raw['data']
         try:
-            rescoring = _decode_custom_rescoring.decode(raw['data'])
-        except mashumaro.exceptions.MissingField, mashumaro.exceptions.InvalidFieldValue, ValueError:
+            referenced_type = Datatype(data.get('referenced_type'))
+        except ValueError:
+            referenced_type = None
+
+        finding_decoder = _decode_rescoring_finding_by_type.get(referenced_type)
+        if finding_decoder is None:
             envelope = _decode_artefact_metadata.decode({**raw, 'data': {}})
-            return dataclasses.replace(envelope, data=raw['data'])
-        finding_dict = raw['data'].get('finding')
-        if (
-            isinstance(rescoring.finding, RescoringIPFinding)
-            and isinstance(finding_dict, dict)
-            and 'labels' not in finding_dict
-            and rescoring.finding.license is not None
-        ):
-            rescoring = dataclasses.replace(
-                rescoring,
-                finding=_decode_rescoring_license_finding.decode(finding_dict),
+            return dataclasses.replace(envelope, data=data)
+
+        try:
+            finding = finding_decoder.decode(data.get('finding'))
+            # Decode the rest of the envelope with a placeholder finding, then replace it with the
+            # type-dispatched result. `finding` is union-typed and does not accept a plain dict, so
+            # a shape satisfying the union's first member is passed here and discarded afterwards —
+            # the envelope decode must never depend on the real (type-dispatched) finding shape.
+            rescoring = _decode_custom_rescoring.decode(
+                {**data, 'finding': {'package_name': '', 'cve': ''}},
             )
+            rescoring = dataclasses.replace(rescoring, finding=finding)
+        except (
+            mashumaro.exceptions.MissingField,
+            mashumaro.exceptions.InvalidFieldValue,
+            ValueError,
+        ):
+            envelope = _decode_artefact_metadata.decode({**raw, 'data': {}})
+            return dataclasses.replace(envelope, data=data)
+
         envelope = _decode_artefact_metadata.decode({**raw, 'data': {}})
         return dataclasses.replace(envelope, data=rescoring)
 
@@ -1886,7 +1903,25 @@ class ArtefactMetadata:
 
 _decode_artefact_metadata = mashumaro.codecs.BasicDecoder(ArtefactMetadata)
 _decode_custom_rescoring = mashumaro.codecs.BasicDecoder(CustomRescoring)
-_decode_rescoring_license_finding = mashumaro.codecs.BasicDecoder(RescoringLicenseFinding)
+
+# Dispatch table: the `referenced_type` stored in every rescoring `data` blob maps 1:1 to the
+# concrete rescoring finding class. Selecting the finding type by this discriminator (instead of
+# relying on mashumaro to resolve the `_RescoringFindingField` union structurally) is unambiguous
+# and consistent with the finding shape.
+_decode_rescoring_finding_by_type: dict[Datatype, mashumaro.codecs.BasicDecoder] = {
+    Datatype.CODEQL_FINDING: mashumaro.codecs.BasicDecoder(RescoreCodeqlFinding),
+    Datatype.CRYPTO_FINDING: mashumaro.codecs.BasicDecoder(RescoringCryptoFinding),
+    Datatype.DIKI_FINDING: mashumaro.codecs.BasicDecoder(RescoringDikiFinding),
+    Datatype.FALCO_FINDING: mashumaro.codecs.BasicDecoder(RescoringFalcoFinding),
+    Datatype.GHAS_FINDING: mashumaro.codecs.BasicDecoder(RescoreGitHubSecretFinding),
+    Datatype.IP_FINDING: mashumaro.codecs.BasicDecoder(RescoringIPFinding),
+    Datatype.KYVERNO_FINDING: mashumaro.codecs.BasicDecoder(RescoringKyvernoFinding),
+    Datatype.LICENSE_FINDING: mashumaro.codecs.BasicDecoder(RescoringLicenseFinding),
+    Datatype.MALWARE_FINDING: mashumaro.codecs.BasicDecoder(MalwareFindingDetails),
+    Datatype.OSID_FINDING: mashumaro.codecs.BasicDecoder(RescoreOsIdFinding),
+    Datatype.SAST_FINDING: mashumaro.codecs.BasicDecoder(RescoreSastFinding),
+    Datatype.VULNERABILITY_FINDING: mashumaro.codecs.BasicDecoder(RescoringVulnerabilityFinding),
+}
 
 artefact_metadata_encoder = mashumaro.codecs.orjson.ORJSONEncoder(ArtefactMetadata)
 artefact_metadata_basic_encoder = mashumaro.codecs.BasicEncoder(ArtefactMetadata)

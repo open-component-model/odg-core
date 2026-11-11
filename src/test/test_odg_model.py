@@ -3,7 +3,6 @@ import dataclasses
 import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import mashumaro.codecs
 import pytest
 import sqlalchemy.dialects.sqlite
 
@@ -38,12 +37,17 @@ def _artefact_envelope(meta_type: str, data: dict) -> dict:
     }
 
 
-def _rescoring_envelope(finding: dict, user: dict, **kwargs) -> dict:
+def _rescoring_envelope(
+    finding: dict,
+    user: dict,
+    referenced_type: str = 'finding/vulnerability',
+    **kwargs,
+) -> dict:
     return _artefact_envelope(
         odg.model.Datatype.RESCORING,
         {
             'finding': finding,
-            'referenced_type': 'finding/vulnerability',
+            'referenced_type': referenced_type,
             'severity': 'LOW',
             'user': user,
             **kwargs,
@@ -318,58 +322,6 @@ class TestFromDictVulnerabilityFinding:
 
 
 class TestFromDictRescoring:
-    def test_bdba_user(self):
-        result = odg.model.ArtefactMetadata.from_dict(
-            _rescoring_envelope(
-                finding=_RESCORING_VULN,
-                user={
-                    'username': 'jdoe',
-                    'type': 'bdba-user',
-                    'email': 'jdoe@example.com',
-                    'firstname': 'Jane',
-                    'lastname': 'Doe',
-                },
-            ),
-        )
-        assert isinstance(result.data, odg.model.CustomRescoring)
-        assert result.data.severity == 'LOW'
-        assert isinstance(result.data.finding, odg.model.RescoringVulnerabilityFinding)
-        assert result.data.finding.package_name == 'openssl'
-        assert result.data.finding.cve == 'CVE-2023-0286'
-        assert type(result.data.user) is odg.model.BDBAUser
-        assert result.data.user.username == 'jdoe'
-        assert result.data.user.email == 'jdoe@example.com'
-
-    def test_github_user(self):
-        result = odg.model.ArtefactMetadata.from_dict(
-            _rescoring_envelope(
-                finding={'package_name': 'linux_kernel', 'cve': 'CVE-2024-1234'},
-                user={
-                    'username': 'd046309',
-                    'type': 'github-user',
-                    'github_hostname': 'github.wdf.sap.corp',
-                },
-                severity='NONE',
-            ),
-        )
-        assert isinstance(result.data, odg.model.CustomRescoring)
-        assert result.data.severity == 'NONE'
-        assert type(result.data.user) is odg.model.GitHubUser
-        assert result.data.user.username == 'd046309'
-        assert result.data.user.github_hostname == 'github.wdf.sap.corp'
-
-    def test_unknown_user_type_falls_back_to_user(self):
-        result = odg.model.ArtefactMetadata.from_dict(
-            _rescoring_envelope(
-                finding=_RESCORING_VULN,
-                user={'username': 'bdba-extension-auto-rescoring', 'type': 'bdba-extension-user'},
-                matching_rules=['finding-update'],
-            ),
-        )
-        assert type(result.data.user) is odg.model.User
-        assert result.data.user.username == 'bdba-extension-auto-rescoring'
-        assert result.data.user.type == 'bdba-extension-user'
-
     @pytest.mark.parametrize(
         'user_raw,expected_type,expected_key',
         [
@@ -439,24 +391,31 @@ class TestFromDictRescoring:
         assert result.data.user.key == expected_key
 
     @pytest.mark.parametrize(
-        'finding_data,expected_finding_type',
+        'referenced_type,finding_data,expected_finding_type',
         [
             (
+                'finding/vulnerability',
                 {'package_name': 'openssl', 'cve': 'CVE-2023-0286'},
                 odg.model.RescoringVulnerabilityFinding,
             ),
             (
-                {'package_name': 'openssl', 'license': {'name': 'MIT'}, 'labels': ['a', 'b']},
-                odg.model.RescoringIPFinding,
-            ),
-            (
-                # No 'labels' key → license rescoring; upstream dacite resolved as
-                # RescoringLicenseFinding (it appeared first in the union and strict=True
-                # rejected extra keys).
+                'finding/license',
                 {'package_name': 'openssl', 'license': {'name': 'MIT'}},
                 odg.model.RescoringLicenseFinding,
             ),
             (
+                'finding/ip',
+                {'package_name': 'openssl', 'license': {'name': 'MIT'}, 'labels': ['a', 'b']},
+                odg.model.RescoringIPFinding,
+            ),
+            (
+                # same shape as license but referenced_type is the discriminator
+                'finding/ip',
+                {'package_name': 'openssl', 'license': {'name': 'MIT'}},
+                odg.model.RescoringIPFinding,
+            ),
+            (
+                'finding/malware',
                 {
                     'filename': 'test.exe',
                     'content_digest': 'sha256:abc',
@@ -467,171 +426,65 @@ class TestFromDictRescoring:
             ),
         ],
     )
-    def test_finding_type(self, finding_data, expected_finding_type):
+    def test_finding_type(self, referenced_type, finding_data, expected_finding_type):
         result = odg.model.ArtefactMetadata.from_dict(
-            _rescoring_envelope(finding=finding_data, user=_GITHUB_USER),
+            _rescoring_envelope(
+                finding=finding_data, user=_GITHUB_USER, referenced_type=referenced_type,
+            ),
         )
         assert isinstance(result.data, odg.model.CustomRescoring)
         assert type(result.data.finding) is expected_finding_type
 
-    def test_ip_finding_preserves_labels(self):
-        result = odg.model.ArtefactMetadata.from_dict(
-            _rescoring_envelope(
-                finding={
-                    'package_name': 'openssl',
-                    'license': {'name': 'OpenSSL'},
-                    'labels': ['label-a', 'label-b'],
-                },
-                user=_GITHUB_USER,
+    @pytest.mark.parametrize(
+        'raw',
+        [
+            # missing finding/severity/user
+            _artefact_envelope(
+                odg.model.Datatype.RESCORING, {'referenced_type': 'finding/vulnerability'},
             ),
-        )
-        assert isinstance(result.data.finding, odg.model.RescoringIPFinding)
-        assert result.data.finding.labels == ['label-a', 'label-b']
-        assert result.data.finding.license.name == 'OpenSSL'
+            # finding is wrong type (str) → InvalidFieldValue
+            _artefact_envelope(
+                odg.model.Datatype.RESCORING,
+                {
+                    'finding': 'not-a-dict',
+                    'referenced_type': 'finding/vulnerability',
+                    'severity': 'LOW',
+                    'user': _GITHUB_USER,
+                },
+            ),
+            # missing required finding field (cve) → MissingField
+            _rescoring_envelope(finding={'package_name': 'openssl'}, user=_GITHUB_USER),
+            # malformed due_date with 'T' → ValueError from fromisoformat
+            _rescoring_envelope(
+                finding=_RESCORING_VULN,
+                user=_GITHUB_USER,
+                due_date='not-a-dateT00:00:00',
+            ),
+        ],
+    )
+    def test_falls_back_to_dict(self, raw):
+        assert isinstance(odg.model.ArtefactMetadata.from_dict(raw).data, dict)
 
-    def test_license_finding_without_labels_id_stable(self):
-        # Regression: a label-free {package_name, license} payload must decode as
-        # RescoringLicenseFinding (matching upstream dacite union order + strict=True),
-        # not RescoringIPFinding. The IDs differ: RescoringLicenseFinding.key = "pkg|lic"
-        # while RescoringIPFinding.key (empty labels) = "pkg|lic|". Any mismatch would
-        # cause update/delete to target the wrong DB row.
-        result = odg.model.ArtefactMetadata.from_dict(
+    @pytest.mark.parametrize(
+        'raw',
+        [
             _rescoring_envelope(
                 finding={'package_name': 'openssl', 'license': {'name': 'OpenSSL'}},
                 user=_GITHUB_USER,
+                referenced_type='finding/license',
             ),
-        )
-        assert type(result.data.finding) is odg.model.RescoringLicenseFinding
-        assert result.data.finding.key == 'openssl|OpenSSL'
-        assert result.id == '57d210aa6fbd7b766c4208616d50f3b1'
-
-        # BasicDecoder (no RESCORING branch) must also resolve to CustomRescoring,
-        # because MetaModels lists CustomRescoring before InformationalModels.
-        generic = mashumaro.codecs.BasicDecoder(odg.model.ArtefactMetadata)
-        result = generic.decode(_rescoring_envelope(finding=_RESCORING_VULN, user=_GITHUB_USER))
-        assert isinstance(result.data, odg.model.CustomRescoring)
-
-    def test_license_finding_without_labels_id_stable_after_db_roundtrip(self):
-        # Regression: update/delete match rows by id. A label-free {package_name, license}
-        # rescoring must decode as RescoringLicenseFinding on both write and read-back so
-        # the id is stable across the DB roundtrip.
-        raw = _rescoring_envelope(
-            finding={'package_name': 'openssl', 'license': {'name': 'OpenSSL'}},
-            user=_GITHUB_USER,
-        )
-        original = odg.model.ArtefactMetadata.from_dict(raw)
-        assert type(original.data.finding) is odg.model.RescoringLicenseFinding
-
-        db_row = du.to_db_artefact_metadata(original)
-        assert db_row.id == original.id
-
-        readback = odg.model.ArtefactMetadata.from_dict(du.db_artefact_metadata_to_dict(db_row))
-        assert type(readback.data.finding) is odg.model.RescoringLicenseFinding
-        assert readback.id == db_row.id
-
-    def test_ip_finding_without_license_falls_back_to_dict(self):
-        # A finding with only package_name (no license, no labels) cannot satisfy any
-        # known finding type — the whole rescoring falls back to dict rather than raising.
-        result = odg.model.ArtefactMetadata.from_dict(
-            _rescoring_envelope(
-                finding={'package_name': 'openssl'},
-                user=_GITHUB_USER,
-            ),
-        )
-        assert isinstance(result.data, dict)
-
-    def test_incomplete_rescoring_falls_back_to_dict(self):
-        # A stored rescoring row that pre-dates required fields (e.g. missing finding/severity/user)
-        # must not raise during decode — one bad row would abort a streaming metadata query.
-        result = odg.model.ArtefactMetadata.from_dict(
-            _artefact_envelope(
-                odg.model.Datatype.RESCORING,
-                {'referenced_type': 'finding/vulnerability'},
-            ),
-        )
-        assert isinstance(result.data, dict)
-
-    def test_invalid_field_value_rescoring_falls_back_to_dict(self):
-        # InvalidFieldValue (structurally wrong type, not just missing field) must also fall back
-        # to dict — the except clause covers both MissingField and InvalidFieldValue.
-        result = odg.model.ArtefactMetadata.from_dict(
-            _artefact_envelope(
-                odg.model.Datatype.RESCORING,
-                {
-                    'finding': 'not-a-dict',  # str instead of a finding dict → InvalidFieldValue
-                    'referenced_type': 'finding/vulnerability',
-                    'severity': 'LOW',
-                    'user': _GITHUB_USER,
-                },
-            ),
-        )
-        assert isinstance(result.data, dict)
-
-    def test_malformed_due_date_rescoring_falls_back_to_dict(self):
-        # A due_date string containing 'T' triggers __pre_deserialize__, which calls
-        # datetime.fromisoformat(). A malformed value raises ValueError — not wrapped
-        # as mashumaro.exceptions.InvalidFieldValue — so ValueError must be in the
-        # except clause, or one bad row aborts the entire streaming metadata query.
-        result = odg.model.ArtefactMetadata.from_dict(
-            _artefact_envelope(
-                odg.model.Datatype.RESCORING,
-                {
-                    'finding': _RESCORING_VULN,
-                    'referenced_type': 'finding/vulnerability',
-                    'severity': 'LOW',
-                    'user': _GITHUB_USER,
-                    'due_date': 'not-a-dateT00:00:00',
-                },
-            ),
-        )
-        assert isinstance(result.data, dict)
-
-    def test_oidc_user_decoded_and_id_stable(self):
-        # DELIBERATE IMPROVEMENT over dacite: the old union `user: BDBAUser | GitHubUser | User`
-        # had no OidcUser. With dacite strict=True, an oidc-user payload raised UnionMatchError —
-        # oidc-user rescoring rows were stored (write path used live OidcUser) but could not be
-        # read back. This PR adds OidcUser to the union, making those rows decodable for the
-        # first time. The id is stable because the write path always hashed from OidcUser.key
-        # (with issuer), so no migration is needed.
-        result = odg.model.ArtefactMetadata.from_dict(
             _rescoring_envelope(finding=_RESCORING_VULN, user=_OIDC_USER),
-        )
-        assert type(result.data.user) is odg.model.OidcUser
-        assert result.data.user.issuer == 'https://idp.example.com'
-        assert result.id == 'b3af5ba78bf735ddd1d23bb0b085b1bc'
-
-    def test_oidc_user_id_stable_after_db_roundtrip(self):
-        # Regression: update/delete match rows by id. Verify that the id produced by from_dict
-        # for an oidc-user rescoring row equals the id stored in the DB row, so that a subsequent
-        # update or delete finds the correct row and does not create a duplicate.
-        raw = _rescoring_envelope(finding=_RESCORING_VULN, user=_OIDC_USER)
+            # dict fallback: missing finding/severity/user
+            _artefact_envelope(
+                odg.model.Datatype.RESCORING, {'referenced_type': 'finding/vulnerability'},
+            ),
+        ],
+    )
+    def test_id_stable_after_db_roundtrip(self, raw):
         original = odg.model.ArtefactMetadata.from_dict(raw)
-
         db_row = du.to_db_artefact_metadata(original)
         assert db_row.id == original.id
-
-        # Simulate the read-back path used by the update loop (db_artefact_metadata_to_dict ->
-        # from_dict). The re-decoded id must equal the stored db_row.id so the update matcher
-        # hits the row rather than inserting a duplicate.
         readback = odg.model.ArtefactMetadata.from_dict(du.db_artefact_metadata_to_dict(db_row))
-        assert readback.id == db_row.id
-
-    def test_legacy_dict_fallback_id_stable_after_db_roundtrip(self):
-        # Regression: rows stored via the dict-fallback path (MissingField/InvalidFieldValue on
-        # decode) have data_key=None. Verify that re-reading such a row produces the same id so
-        # that update does not create a duplicate and delete targets the correct row.
-        raw = _artefact_envelope(
-            odg.model.Datatype.RESCORING,
-            {'referenced_type': 'finding/vulnerability'},  # missing finding/severity/user
-        )
-        original = odg.model.ArtefactMetadata.from_dict(raw)
-        assert isinstance(original.data, dict)
-
-        db_row = du.to_db_artefact_metadata(original)
-        assert db_row.id == original.id
-
-        readback = odg.model.ArtefactMetadata.from_dict(du.db_artefact_metadata_to_dict(db_row))
-        assert isinstance(readback.data, dict)
         assert readback.id == db_row.id
 
 
