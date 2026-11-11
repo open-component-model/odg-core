@@ -546,14 +546,12 @@ class BDBAVulnerabilityFinding(VulnerabilityFinding, BDBAMixin):
 class RescoringIPFinding:
     package_name: str
     license: License | None
-    # keep for backwards compatibility — old rows may not have labels
     labels: list[str] = dataclasses.field(default_factory=list)
 
     @property
     def key(self) -> str:
         labels_key = ','.join(sorted(self.labels))
 
-        # new rescorings won't have the license set anymore -> keep for backwards compatibility
         if self.license:
             return _as_key(self.package_name, self.license.name, labels_key)
         return _as_key(self.package_name, labels_key)
