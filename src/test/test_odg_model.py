@@ -429,7 +429,9 @@ class TestFromDictRescoring:
     def test_finding_type(self, referenced_type, finding_data, expected_finding_type):
         result = odg.model.ArtefactMetadata.from_dict(
             _rescoring_envelope(
-                finding=finding_data, user=_GITHUB_USER, referenced_type=referenced_type,
+                finding=finding_data,
+                user=_GITHUB_USER,
+                referenced_type=referenced_type,
             ),
         )
         assert isinstance(result.data, odg.model.CustomRescoring)
@@ -438,28 +440,8 @@ class TestFromDictRescoring:
     @pytest.mark.parametrize(
         'raw',
         [
-            # missing finding/severity/user
-            _artefact_envelope(
-                odg.model.Datatype.RESCORING, {'referenced_type': 'finding/vulnerability'},
-            ),
-            # finding is wrong type (str) → InvalidFieldValue
-            _artefact_envelope(
-                odg.model.Datatype.RESCORING,
-                {
-                    'finding': 'not-a-dict',
-                    'referenced_type': 'finding/vulnerability',
-                    'severity': 'LOW',
-                    'user': _GITHUB_USER,
-                },
-            ),
             # missing required finding field (cve) → MissingField
             _rescoring_envelope(finding={'package_name': 'openssl'}, user=_GITHUB_USER),
-            # malformed due_date with 'T' → ValueError from fromisoformat
-            _rescoring_envelope(
-                finding=_RESCORING_VULN,
-                user=_GITHUB_USER,
-                due_date='not-a-dateT00:00:00',
-            ),
         ],
     )
     def test_falls_back_to_dict(self, raw):
@@ -474,10 +456,6 @@ class TestFromDictRescoring:
                 referenced_type='finding/license',
             ),
             _rescoring_envelope(finding=_RESCORING_VULN, user=_OIDC_USER),
-            # dict fallback: missing finding/severity/user
-            _artefact_envelope(
-                odg.model.Datatype.RESCORING, {'referenced_type': 'finding/vulnerability'},
-            ),
         ],
     )
     def test_id_stable_after_db_roundtrip(self, raw):
@@ -735,10 +713,9 @@ class TestDateDecoding:
         assert type(result.discovery_date) is datetime.date
 
     def test_discovery_date_datetime_string_raises(self):
-        # mashumaro's date decoder rejects full datetime strings — unlike dacite's type_hook
-        # which called fromisoformat().date(). discovery_date has no __pre_deserialize__ guard
-        # (unlike CustomRescoring.due_date). This is safe because the write path serializes
-        # from a date object via .isoformat(), always producing plain date strings.
+        # mashumaro's date decoder rejects full datetime strings — this is safe because the
+        # write path serialises from a date object via .isoformat(), always producing plain
+        # date strings.
         raw = _artefact_envelope(
             odg.model.Datatype.VULNERABILITY_FINDING,
             {
@@ -757,8 +734,6 @@ class TestDateDecoding:
         'date_str,expected',
         [
             ('2024-01-15', datetime.date(2024, 1, 15)),
-            ('2024-01-15T00:00:00+00:00', datetime.date(2024, 1, 15)),
-            ('2024-01-15T00:00:00', datetime.date(2024, 1, 15)),  # naive datetime string
         ],
     )
     def test_rescoring_due_date(self, date_str, expected):

@@ -1041,14 +1041,6 @@ class CustomRescoring:
     allowed_processing_time: str | None = None
     due_date: datetime.date | None = None
 
-    @classmethod
-    def __pre_deserialize__(cls, d: dict) -> dict:
-        # Normalise ISO datetime strings (legacy DB rows) to plain date strings for due_date.
-        if isinstance(d.get('due_date'), str) and 'T' in d['due_date']:
-            due = datetime.datetime.fromisoformat(d['due_date']).strftime('%Y-%m-%d')
-            d = {**d, 'due_date': due}
-        return d
-
     @property
     def key(self) -> str:
         return _as_key(
@@ -1825,8 +1817,8 @@ class ArtefactMetadata:
 
         # RESCORING: select the finding type via the `referenced_type` discriminator (unambiguous,
         # consistent with the finding shape) rather than resolving the finding union structurally.
-        # Unknown/missing `referenced_type` or any decode failure (incomplete legacy rows, wrong
-        # field types, malformed due_date) falls back to dict instead of raising mid-stream.
+        # Unknown `referenced_type` or decode failure (e.g. missing required field) falls back to
+        # dict instead of raising mid-stream.
         data = raw['data']
         try:
             referenced_type = Datatype(data.get('referenced_type'))
@@ -1851,7 +1843,6 @@ class ArtefactMetadata:
         except (
             mashumaro.exceptions.MissingField,
             mashumaro.exceptions.InvalidFieldValue,
-            ValueError,
         ):
             envelope = _decode_artefact_metadata.decode({**raw, 'data': {}})
             return dataclasses.replace(envelope, data=data)
