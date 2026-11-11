@@ -1,9 +1,9 @@
 import copy
 import dataclasses
 import datetime
-import typing
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import mashumaro.exceptions
 import pytest
 import sqlalchemy.dialects.sqlite
 
@@ -12,6 +12,8 @@ import deliverydb.util as du
 import metadata
 import odg.cvss
 import odg.model
+
+_DECODE_ERRORS = (mashumaro.exceptions.InvalidFieldValue, mashumaro.exceptions.MissingField)
 
 
 def _artefact_envelope(meta_type: str, data: dict) -> dict:
@@ -136,16 +138,6 @@ class TestFromDictDataTypeResolution:
                 odg.model.VulnerabilityFinding,
             ),
             (
-                odg.model.Datatype.LICENSE_FINDING,
-                {
-                    'package_name': 'openssl',
-                    'package_version': '3.0',
-                    'license': {'name': 'OpenSSL'},
-                    'severity': 'MEDIUM',
-                },
-                dict,  # LicenseFinding requires BDBAMixin fields; matches convention (legacy dacite)
-            ),
-            (
                 odg.model.Datatype.IP_FINDING,
                 {
                     'package_name': 'openssl',
@@ -259,14 +251,18 @@ class TestFromDictDataTypeResolution:
         assert type(result.data) is expected_data_type
 
     def test_all_payload_classes_are_dispatched(self):
-        # A payload class missing from `_artefact_metadata_data_model_by_type` (or the inline
+        # A payload class missing from `_payload_model_by_type` (or the inline
         # extras) would silently decode as raw dict — guard against that drift.
         data_union_args = set(odg.model.ArtefactMetadata.__annotations__['data'].__args__) - {dict}
-        dispatched = {
-            model
-            for payload in odg.model._artefact_metadata_data_model_by_type.values()
-            for model in (typing.get_args(payload) or (payload,))
-        } | set(odg.model._extra_artefact_metadata_data_models)
+        dispatched = set(odg.model._payload_model_by_type.values()) | {
+            # two classes sharing one `meta.type` (+ rescorings), see `_decode_payload_by_type`
+            odg.model.BDBAVulnerabilityFinding,
+            odg.model.CustomRescoring,
+            odg.model.LicenseScannerWriteback,
+            odg.model.PackageVersionScannerWriteback,
+            odg.model.VulnerabilityFinding,
+        }
+
         assert data_union_args == dispatched
 
     def test_extra_keys_resolution_examples(self):
@@ -478,8 +474,9 @@ class TestFromDictRescoring:
             ),
         ],
     )
-    def test_falls_back_to_dict(self, raw):
-        assert isinstance(odg.model.ArtefactMetadata.from_dict(raw).data, dict)
+    def test_mismatch_raises(self, raw):
+        with pytest.raises(_DECODE_ERRORS):
+            odg.model.ArtefactMetadata.from_dict(raw)
 
     @pytest.mark.parametrize(
         'raw',
@@ -891,30 +888,18 @@ def test_vulnerability_cvss_stays_dict_when_decoded():
 class TestStrictStr:
     """
     mashumaro would coerce e.g. `None` to `'None'` for `str` fields (dacite rejected it). Such rows
-    must stay on the dict fallback: their stored row id is derived from the dict-fallback key.
+    must raise instead.
     """
 
-    def test_null_for_required_str_falls_back_to_dict(self):
+    def test_null_for_required_str_is_rejected(self):
         raw = _rescoring_envelope(
             finding={'html_url': 'https://github.example.org/org/repo/alerts/1', 'resolution': None},
             user={'username': 'ghas-extension-auto-rescoring', 'type': 'ghas-extension-user'},
             referenced_type='finding/ghas',
             severity='secret-found',
         )
-        result = odg.model.ArtefactMetadata.from_dict(raw)
-        assert isinstance(result.data, dict)
-        assert result.data['finding']['resolution'] is None
-
-    def test_id_of_dict_fallback_rescoring_is_stable(self):
-        # id as stored in the db for such rows == id derived from the dict-fallback key
-        raw = _rescoring_envelope(
-            finding={'html_url': 'https://github.example.org/org/repo/alerts/1', 'resolution': None},
-            user={'username': 'ghas-extension-auto-rescoring', 'type': 'ghas-extension-user'},
-            referenced_type='finding/ghas',
-            severity='secret-found',
-        )
-        decoded = odg.model.ArtefactMetadata.from_dict(raw)
-        assert decoded.key.endswith('|rescorings|None')
+        with pytest.raises(_DECODE_ERRORS):
+            odg.model.ArtefactMetadata.from_dict(raw)
 
     def test_non_str_value_for_required_str_is_rejected(self):
         raw = _artefact_envelope(
@@ -927,7 +912,8 @@ class TestStrictStr:
                 'cvss_score': 1.0,
             },
         )
-        assert isinstance(odg.model.ArtefactMetadata.from_dict(raw).data, dict)
+        with pytest.raises(_DECODE_ERRORS):
+            odg.model.ArtefactMetadata.from_dict(raw)
 
     def test_null_for_optional_str_still_decodes(self):
         raw = _artefact_envelope(
