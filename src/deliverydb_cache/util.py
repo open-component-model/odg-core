@@ -2,12 +2,14 @@ import collections.abc
 import dataclasses
 import datetime
 import enum
-import json as js
 
 import orjson
+import structlog
 import yaml
 
 import deliverydb_cache.model as dcm
+
+logger = structlog.get_logger(__name__)
 
 
 def normalise_and_serialise_object(
@@ -106,9 +108,8 @@ def deserialise_cache_value(
         try:
             return orjson.loads(value)
         except orjson.JSONDecodeError:
-            # fallback for legacy cache entries that may contain NaN/Infinity,
-            # which orjson rejects but stdlib json accepts
-            return js.loads(value)
+            logger.warning('erroneous cache entry, treating as cache miss', exc_info=True)
+            return None
 
     elif encoding_format is dcm.EncodingFormat.YAML:
         return yaml.safe_load(value)
