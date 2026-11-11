@@ -71,9 +71,11 @@ spec:
                 claimed_by:
                   type: string
                 claimed_at:
-                  type: date-time
+                  format: datetime
+                  type: string
                 last_updated:
-                  type: date-time
+                  format: datetime
+                  type: string
                 error:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
