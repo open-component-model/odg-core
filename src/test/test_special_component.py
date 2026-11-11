@@ -9,8 +9,9 @@ import special_component
 
 class TestRetrieveVersion:
     @staticmethod
-    def _version_cfg(exc_or_value):
+    def _version_cfg(exc_or_value, repo: str = 'github.com/my-org/my-repo'):
         cfg = unittest.mock.MagicMock()
+        cfg.source.repo = repo
         if isinstance(exc_or_value, BaseException):
             cfg.retrieve.side_effect = exc_or_value
         else:
@@ -32,7 +33,8 @@ class TestRetrieveVersion:
                 'my-component',
             )
         assert 'my-component' in exc_info.value.reason
-        assert 'GitHub app permissions' in exc_info.value.reason
+        assert 'GitHub app permissions' in exc_info.value.text
+        assert 'github.com/my-org/my-repo' in exc_info.value.text
 
     def test_not_found_raises_422(self):
         with pytest.raises(aiohttp.web.HTTPUnprocessableEntity) as exc_info:
