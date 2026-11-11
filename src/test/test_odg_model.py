@@ -297,8 +297,7 @@ class TestFromDictVulnerabilityFinding:
         assert result.data.product_id == 42
         assert result.data.group_id == 7
         assert result.data.summary == 'Type confusion in X.400 address processing.'
-        assert isinstance(result.data.cvss, odg.cvss.CVSSV3)
-        assert result.data.cvss.access_vector is odg.cvss.AccessVector.NETWORK
+        assert result.data.cvss['access_vector'] == 'N'  # stays a dict, see test below
 
     def test_generic_vulnerability_without_bdba_fields(self):
         result = odg.model.ArtefactMetadata.from_dict(
@@ -769,3 +768,150 @@ class TestEncoder:
         assert result.discovery_date == datetime.date(2025, 1, 15)
         assert result.artefact.artefact_kind is odg.model.ArtefactKind.RESOURCE
         assert result.id == self._AM.id
+
+
+_DIKI_ROW_WITHOUT_OPTIONALS = {
+    # shape of older prod rows: `ruleset_name` and `rule_name` keys are absent
+    'severity': 'HIGH',
+    'provider_id': 'gardener',
+    'ruleset_id': 'disa-kubernetes-stig',
+    'ruleset_version': 'v1r11',
+    'rule_id': '242415',
+    'checks': [
+        {
+            'message': 'Pod uses environment to inject secret.',
+            'targets': {'gcp': [{'cluster': 'seed', 'kind': 'pod', 'name': 'etcd-main-0'}]},
+        },
+    ],
+}
+_GHAS_ROW_WITHOUT_OPTIONALS = {
+    # shape of older prod rows: `locations` is absent, deprecated `path`/`line` are set
+    'severity': 'secret-found',
+    'html_url': 'https://github.example.org/org/repo/security/secret-scanning/18',
+    'secret': 'redacted',
+    'secret_type': 'github_oauth_access_token',
+    'secret_type_display_name': 'GitHub OAuth Access Token',
+    'resolution': None,
+    'path': 'github.yaml',
+    'line': 28,
+    'location_type': 'commit',
+    'url': 'https://github.example.org/api/v3/repos/org/repo/secret-scanning/alerts/18',
+}
+
+
+class TestMissingOptionalKeys:
+    """
+    `dacite` treated an absent key of an `X | None` field as `None`; `mashumaro` only does so if the
+    field has a default. Older prod rows lack such keys and must still decode to their class.
+    """
+
+    @pytest.mark.parametrize(
+        ('meta_type', 'data', 'expected_type', 'none_fields'),
+        [
+            (
+                odg.model.Datatype.DIKI_FINDING,
+                _DIKI_ROW_WITHOUT_OPTIONALS,
+                odg.model.DikiFinding,
+                ('ruleset_name', 'rule_name'),
+            ),
+            (
+                odg.model.Datatype.GHAS_FINDING,
+                _GHAS_ROW_WITHOUT_OPTIONALS,
+                odg.model.GitHubSecretFinding,
+                ('locations',),
+            ),
+        ],
+    )
+    def test_prod_row_shapes_decode_to_class(self, meta_type, data, expected_type, none_fields):
+        result = odg.model.ArtefactMetadata.from_dict(_artefact_envelope(meta_type, data))
+        assert type(result.data) is expected_type
+        for field_name in none_fields:
+            assert getattr(result.data, field_name) is None
+
+
+def test_vulnerability_cvss_stays_dict_when_decoded():
+    # rescore.artefacts calls CVSSV3.from_dict(am.data.cvss), which needs a dict, not a CVSSV3
+    cvss = {
+        'access_vector': 'L',
+        'attack_complexity': 'L',
+        'user_interaction': 'N',
+        'privileges_required': 'L',
+        'scope': 'U',
+        'confidentiality': 'N',
+        'integrity': 'N',
+        'availability': 'H',
+    }
+    result = odg.model.ArtefactMetadata.from_dict(
+        _artefact_envelope(
+            odg.model.Datatype.VULNERABILITY_FINDING,
+            {
+                'package_name': 'curl',
+                'package_version': '8.0.0',
+                'severity': 'LOW',
+                'cve': 'CVE-1',
+                'cvss_score': 1.0,
+                'cvss': cvss,
+            },
+        ),
+    )
+    assert result.data.cvss == cvss
+    assert (
+        odg.cvss.CVSSV3.from_dict(cvss=result.data.cvss).access_vector is odg.cvss.AccessVector.LOCAL
+    )
+
+
+class TestStrictStr:
+    """
+    mashumaro would coerce e.g. `None` to `'None'` for `str` fields (dacite rejected it). Such rows
+    must stay on the dict fallback: their stored row id is derived from the dict-fallback key.
+    """
+
+    def test_null_for_required_str_falls_back_to_dict(self):
+        raw = _rescoring_envelope(
+            finding={'html_url': 'https://github.example.org/org/repo/alerts/1', 'resolution': None},
+            user={'username': 'ghas-extension-auto-rescoring', 'type': 'ghas-extension-user'},
+            referenced_type='finding/ghas',
+            severity='secret-found',
+        )
+        result = odg.model.ArtefactMetadata.from_dict(raw)
+        assert isinstance(result.data, dict)
+        assert result.data['finding']['resolution'] is None
+
+    def test_id_of_dict_fallback_rescoring_is_stable(self):
+        # id as stored in the db for such rows == id derived from the dict-fallback key
+        raw = _rescoring_envelope(
+            finding={'html_url': 'https://github.example.org/org/repo/alerts/1', 'resolution': None},
+            user={'username': 'ghas-extension-auto-rescoring', 'type': 'ghas-extension-user'},
+            referenced_type='finding/ghas',
+            severity='secret-found',
+        )
+        decoded = odg.model.ArtefactMetadata.from_dict(raw)
+        assert decoded.key.endswith('|rescorings|None')
+
+    def test_non_str_value_for_required_str_is_rejected(self):
+        raw = _artefact_envelope(
+            odg.model.Datatype.VULNERABILITY_FINDING,
+            {
+                'package_name': 12345,
+                'package_version': '1.0',
+                'severity': 'LOW',
+                'cve': 'CVE-1',
+                'cvss_score': 1.0,
+            },
+        )
+        assert isinstance(odg.model.ArtefactMetadata.from_dict(raw).data, dict)
+
+    def test_null_for_optional_str_still_decodes(self):
+        raw = _artefact_envelope(
+            odg.model.Datatype.VULNERABILITY_FINDING,
+            {
+                'package_name': 'curl',
+                'package_version': None,
+                'severity': 'LOW',
+                'cve': 'CVE-1',
+                'cvss_score': 1.0,
+            },
+        )
+        result = odg.model.ArtefactMetadata.from_dict(raw)
+        assert isinstance(result.data, odg.model.VulnerabilityFinding)
+        assert result.data.package_version is None

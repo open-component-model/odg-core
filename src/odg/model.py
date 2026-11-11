@@ -511,7 +511,8 @@ class VulnerabilityFinding(Finding):
     cve: str
     purl: str | None = None
     cvss_score: float | None = None  # allow fallback to cvss_v3_score for compatibility
-    cvss: odg.cvss.CVSSV3 | dict | None = None
+    # `dict` first: decoded rows keep a plain dict (as before; rescore.artefacts expects that)
+    cvss: dict | odg.cvss.CVSSV3 | None = None
     rating_source: str | None = None  # name of the CVSS rating source, e.g. 'NVD', 'redhat', 'alma'
     summary: str | None = None
     recommendation: str | None = None
@@ -738,7 +739,7 @@ class GitHubSecretFinding(Finding):
     secret_type_display_name: str
     resolution: str | None
     url: str
-    locations: list[GitHubSecretFindingLocation] | None
+    locations: list[GitHubSecretFindingLocation] | None = None  # key is absent in older rows
     path: str | None = None  # has been replaced by `locations` -> keep for backwards compatibility
     line: int | None = None  # has been replaced by `locations`
     location_type: str | None = None  # has been replaced by `locations`
@@ -768,11 +769,12 @@ class DikiCheck:
 class DikiFinding(Finding):
     provider_id: str
     ruleset_id: str
-    ruleset_name: str | None
     ruleset_version: str
     rule_id: str
-    rule_name: str | None
     checks: list[DikiCheck]
+    # keys are absent in older delivery-db rows
+    ruleset_name: str | None = None
+    rule_name: str | None = None
 
     @property
     def key(self) -> str:
