@@ -2,10 +2,12 @@ import argparse
 import atexit
 import collections.abc
 import dataclasses
+import datetime
 import os
 import signal
 import sys
 import time
+import traceback
 import uuid
 
 import oci.client
@@ -219,6 +221,7 @@ def process_backlog_items(
                 namespace=namespace,
                 kubernetes_api=_kubernetes_api,
             )
+            claimed_at = datetime.datetime.now(tz=datetime.timezone.utc)
 
         if not backlog_crd:
             ready_to_terminate = True
@@ -236,14 +239,37 @@ def process_backlog_items(
 
         secret_factory = ctx_util.secret_factory()
 
-        callback(
-            artefact=backlog_item.artefact,
-            extension_cfg=extension_cfg,
-            component_descriptor_lookup=component_descriptor_lookup,
-            delivery_service_client=delivery_service_client,
-            oci_client=oci_client,
-            secret_factory=secret_factory,
-        )
+        try:
+            callback(
+                artefact=backlog_item.artefact,
+                extension_cfg=extension_cfg,
+                component_descriptor_lookup=component_descriptor_lookup,
+                delivery_service_client=delivery_service_client,
+                oci_client=oci_client,
+                secret_factory=secret_factory,
+            )
+        except Exception as e:
+            # ponytail: truncate to 4KB; raise limit if etcd bloat matters
+            tb = traceback.format_exc()[-4096:]
+            logger.exception(
+                'backlog item processing failed',
+                name=name,
+                artefact=backlog_item.artefact,
+            )
+
+            if local_debug_artefact:
+                return
+
+            k8s.backlog.set_backlog_item_status(
+                namespace=namespace,
+                kubernetes_api=_kubernetes_api,
+                backlog_crd=backlog_crd,
+                phase=k8s.backlog.BacklogItemPhase.FAILED,
+                claimed_by=os.environ.get('HOSTNAME', 'local'),
+                claimed_at=claimed_at,
+                error={'message': str(e)[:1024], 'traceback': tb},
+            )
+            continue
 
         if local_debug_artefact:
             logger.info(f'processed local backlog item {name}')
