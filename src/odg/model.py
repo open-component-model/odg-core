@@ -1748,6 +1748,60 @@ class ArtefactMetadataSpecificity(enum.Enum):
         return self._asint(self) >= self._asint(other)
 
 
+# Every payload dataclass listed here must be dispatched from exactly one `Datatype` value via
+# `_decode_artefact_metadata_data_by_type`, or it would silently decode as raw dict (checked by a
+# test). A type-union value (two members) means: try the first member, then the second, then fall
+# back to raw dict — the first member must be the more specific class (its extra required fields
+# make base-class rows fail over to the second).
+_artefact_metadata_data_model_by_type: dict[Datatype, type] = {
+    Datatype.CODEQL_FINDING: CodeqlFinding,
+    Datatype.CRYPTO_ASSET: CryptoAsset,
+    Datatype.CRYPTO_FINDING: CryptoFinding,
+    Datatype.DIKI_FINDING: DikiFinding,
+    Datatype.FALCO_FINDING: FalcoFinding,
+    Datatype.GHAS_FINDING: GitHubSecretFinding,
+    Datatype.INVENTORY_FINDING: InventoryFinding,
+    Datatype.IP_FINDING: IPFinding,
+    Datatype.KYVERNO_FINDING: KyvernoFinding,
+    Datatype.LICENSE_FINDING: LicenseFinding,
+    Datatype.MALWARE_FINDING: ClamAVMalwareFinding,
+    # Datatype.OSID is not dispatched on purpose: its rows are operating-system identification
+    # payloads (all fields optional, `OperatingSystemId` isn't in the envelope union), which the
+    # union resolves structurally to OsIdFinding or dict
+    Datatype.OSID_FINDING: OsIdFinding,
+    Datatype.RESCORING: CustomRescoring,
+    Datatype.RESPONSIBLES: ResponsibleInfo,
+    Datatype.SAST_FINDING: SastFinding,
+    Datatype.SCANNER_WRITEBACK: PackageVersionScannerWriteback | LicenseScannerWriteback,
+    Datatype.STRUCTURE_INFO: StructureInfo,
+    Datatype.VULNERABILITY_FINDING: BDBAVulnerabilityFinding | VulnerabilityFinding,
+}
+
+
+def _strict_str(value: str) -> str:
+    # mashumaro would silently turn e.g. None into 'None' for `str` fields; dacite rejected it.
+    # Rejecting keeps such rows on the dict fallback, which their stored row ids depend on.
+    if not isinstance(value, str):
+        raise ValueError(f'expected str, got {type(value).__name__}')
+    return value
+
+
+class _StrictDialect(mashumaro.dialect.Dialect):
+    serialization_strategy = {str: {'deserialize': _strict_str}}  # noqa: RUF012
+
+
+def _basic_decoder(model: type) -> mashumaro.codecs.BasicDecoder:
+    return mashumaro.codecs.BasicDecoder(model, default_dialect=_StrictDialect)
+
+
+# classes that decode via the envelope union (their `meta.type` values are not dispatched and
+# resolve structurally, like for unknown types)
+_extra_artefact_metadata_data_models = (
+    ArtefactUUID,
+    ComplianceSnapshot,
+    SlaViolations,
+)
+
 FindingModels = (
     ClamAVMalwareFinding
     | CodeqlFinding
@@ -1848,9 +1902,51 @@ class ArtefactMetadata:
                         error=str(error),
                     )
 
-        envelope = _decode_artefact_metadata.decode(raw)
         if not is_rescoring:
-            return envelope
+            # unknown types (not in the Datatype enum) resolve their data structurally
+            meta_type = raw['meta']['type']
+            data_decoders = _decode_artefact_metadata_data_by_type.get(meta_type)
+            datatype = Datatype._value2member_map_.get(meta_type)
+            if (
+                data_decoders is None
+                # non-mapping data can't produce a dataclass instance; let the envelope union keep
+                # it (e.g. list payloads)
+                or not isinstance(data, dict)
+            ):
+                return _decode_artefact_metadata.decode(raw)
+            # mashumaro requires absent keys for `X | None` fields without defaults; dacite and old
+            # prod rows lack them (checked in tests) — supply them before decoding
+            data = {
+                **{field: None for field in _optional_fields_by_type[datatype] if field not in data},
+                **data,
+            }
+            for data_decoder in data_decoders:
+                try:
+                    decoded_data = data_decoder.decode(data)
+                # payloads lacking the dispatched class's required fields get the next candidate
+                # (the BDBA-variant class binds its mixin fields); failing all, the payload stays
+                # a dict (stored row ids rely on this dict fallback)
+                except (
+                    mashumaro.exceptions.MissingField,
+                    mashumaro.exceptions.InvalidFieldValue,
+                    mashumaro.exceptions.UnserializableField,
+                ):
+                    continue
+                return dataclasses.replace(
+                    _decode_artefact_metadata_dict_data.decode(raw),
+                    data=decoded_data,
+                )
+            # all candidates failed: the payload can only be a dict (any class it could still
+            # match structurally would be a class we just tried or a strict-rescoring class, and
+            # rescoring rows take the envelope path anyway)
+            if len(data_decoders) > 1:
+                return dataclasses.replace(
+                    _decode_artefact_metadata_dict_data.decode(raw),
+                    data=data,
+                )
+            return _decode_artefact_metadata.decode(raw)
+
+        envelope = _decode_artefact_metadata.decode(raw)
         # rescoring rows: fall back to raw dict unless the finding decoded cleanly
         if finding is None or not isinstance(envelope.data, CustomRescoring):
             return dataclasses.replace(envelope, data=data)
@@ -1901,25 +1997,63 @@ class ArtefactMetadata:
         return hash(self.key)
 
 
-_decode_artefact_metadata = mashumaro.codecs.BasicDecoder(ArtefactMetadata)
+_decode_artefact_metadata = _basic_decoder(ArtefactMetadata)
+
+
+# envelope variant with `data` typed as plain `dict`, for decoding envelopes whose payload gets
+# dispatched separately; private — decoding returns this subclass, but `dataclasses.replace` keeps
+# it and the encoders emit it unchanged (they only inspect the declared `data` field type)
+@dataclasses.dataclass
+class _ArtefactMetadataDictData(ArtefactMetadata):
+    data: dict | None = None
+
+
+_decode_artefact_metadata_dict_data = _basic_decoder(_ArtefactMetadataDictData)
+
+# `meta.type` maps to one or more payload decoders as a try-list (BDBA-variant wrappers share the
+# `meta.type` of their base finding, and dispatch alone can't tell their rows apart — the variant
+# is tried first and its mixin fields make it fail for base rows). Decoding one candidate directly
+# is ~10x faster than mashumaro's structural union resolution, which trials every candidate.
+_decode_artefact_metadata_data_by_type: dict[
+    Datatype,
+    tuple[mashumaro.codecs.BasicDecoder, ...],
+] = {
+    datatype: tuple(_basic_decoder(model) for model in (typing.get_args(payload) or (payload,)))
+    for datatype, payload in _artefact_metadata_data_model_by_type.items()
+    if datatype is not Datatype.RESCORING  # envelope path needs CustomRescoring's dict fallback
+}
+
+# `X | None` fields without defaults whose key may be absent in old rows (mashumaro requires the
+# key, dacite defaulted them) — supplied as `None` by `ArtefactMetadata.from_dict` before decoding
+_optional_fields_by_type: dict[Datatype, frozenset[str]] = {
+    datatype: frozenset(
+        field.name
+        for model in (typing.get_args(payload) or (payload,))
+        for field in dataclasses.fields(model)
+        if field.default is dataclasses.MISSING
+        and field.default_factory is dataclasses.MISSING
+        and 'None' in typing.get_args(typing.get_type_hints(model)[field.name])
+    )
+    for datatype, payload in _artefact_metadata_data_model_by_type.items()
+}
 
 # Dispatch table: the `referenced_type` stored in every rescoring `data` blob maps 1:1 to the
 # concrete rescoring finding class. Selecting the finding type by this discriminator (instead of
 # relying on mashumaro to resolve the `_RescoringFindingField` union structurally) is unambiguous
 # and consistent with the finding shape.
 _decode_rescoring_finding_by_type: dict[Datatype, mashumaro.codecs.BasicDecoder] = {
-    Datatype.CODEQL_FINDING: mashumaro.codecs.BasicDecoder(RescoreCodeqlFinding),
-    Datatype.CRYPTO_FINDING: mashumaro.codecs.BasicDecoder(RescoringCryptoFinding),
-    Datatype.DIKI_FINDING: mashumaro.codecs.BasicDecoder(RescoringDikiFinding),
-    Datatype.FALCO_FINDING: mashumaro.codecs.BasicDecoder(RescoringFalcoFinding),
-    Datatype.GHAS_FINDING: mashumaro.codecs.BasicDecoder(RescoreGitHubSecretFinding),
-    Datatype.IP_FINDING: mashumaro.codecs.BasicDecoder(RescoringIPFinding),
-    Datatype.KYVERNO_FINDING: mashumaro.codecs.BasicDecoder(RescoringKyvernoFinding),
-    Datatype.LICENSE_FINDING: mashumaro.codecs.BasicDecoder(RescoringLicenseFinding),
-    Datatype.MALWARE_FINDING: mashumaro.codecs.BasicDecoder(MalwareFindingDetails),
-    Datatype.OSID_FINDING: mashumaro.codecs.BasicDecoder(RescoreOsIdFinding),
-    Datatype.SAST_FINDING: mashumaro.codecs.BasicDecoder(RescoreSastFinding),
-    Datatype.VULNERABILITY_FINDING: mashumaro.codecs.BasicDecoder(RescoringVulnerabilityFinding),
+    Datatype.CODEQL_FINDING: _basic_decoder(RescoreCodeqlFinding),
+    Datatype.CRYPTO_FINDING: _basic_decoder(RescoringCryptoFinding),
+    Datatype.DIKI_FINDING: _basic_decoder(RescoringDikiFinding),
+    Datatype.FALCO_FINDING: _basic_decoder(RescoringFalcoFinding),
+    Datatype.GHAS_FINDING: _basic_decoder(RescoreGitHubSecretFinding),
+    Datatype.IP_FINDING: _basic_decoder(RescoringIPFinding),
+    Datatype.KYVERNO_FINDING: _basic_decoder(RescoringKyvernoFinding),
+    Datatype.LICENSE_FINDING: _basic_decoder(RescoringLicenseFinding),
+    Datatype.MALWARE_FINDING: _basic_decoder(MalwareFindingDetails),
+    Datatype.OSID_FINDING: _basic_decoder(RescoreOsIdFinding),
+    Datatype.SAST_FINDING: _basic_decoder(RescoreSastFinding),
+    Datatype.VULNERABILITY_FINDING: _basic_decoder(RescoringVulnerabilityFinding),
 }
 
 artefact_metadata_encoder = mashumaro.codecs.orjson.ORJSONEncoder(ArtefactMetadata)

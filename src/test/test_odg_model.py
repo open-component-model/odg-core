@@ -1,6 +1,7 @@
 import copy
 import dataclasses
 import datetime
+import typing
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -256,6 +257,33 @@ class TestFromDictDataTypeResolution:
     def test_data_type_resolution(self, meta_type, data, expected_data_type):
         result = odg.model.ArtefactMetadata.from_dict(_artefact_envelope(meta_type, data))
         assert type(result.data) is expected_data_type
+
+    def test_all_payload_classes_are_dispatched(self):
+        # A payload class missing from `_artefact_metadata_data_model_by_type` (or the inline
+        # extras) would silently decode as raw dict — guard against that drift.
+        data_union_args = set(odg.model.ArtefactMetadata.__annotations__['data'].__args__) - {dict}
+        dispatched = {
+            model
+            for payload in odg.model._artefact_metadata_data_model_by_type.values()
+            for model in (typing.get_args(payload) or (payload,))
+        } | set(odg.model._extra_artefact_metadata_data_models)
+        assert data_union_args == dispatched
+
+    def test_extra_keys_resolution_examples(self):
+        # dispatch members ordered variant-first must not outrank the wrong class: a payload
+        # whose keys satisfy the base class is decoded by the second member of the union value
+        raw = _artefact_envelope(
+            odg.model.Datatype.VULNERABILITY_FINDING,
+            {
+                'package_name': 'openssl',
+                'package_version': '3.0.7',
+                'severity': 'HIGH',
+                'cve': 'CVE-2023-0286',
+                'cvss_score': 7.4,
+            },
+        )
+        result = odg.model.ArtefactMetadata.from_dict(raw)
+        assert type(result.data) is odg.model.VulnerabilityFinding
 
 
 class TestFromDictVulnerabilityFinding:
