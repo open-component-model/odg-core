@@ -1,9 +1,9 @@
-import orjson
 import zlib
 
 import aiohttp.web
 import oci.model
 import ocm
+import orjson
 
 import consts
 import lookups

@@ -2,7 +2,7 @@ import collections.abc
 import dataclasses
 import datetime
 import enum
-import pickle
+import json as js
 
 import orjson
 import yaml
@@ -102,12 +102,13 @@ def deserialise_cache_value(
     value: bytes,
     encoding_format: dcm.EncodingFormat,
 ):
-    if encoding_format.startswith('pickle'):
-        # the pickle protocol is automatically detected, hence it is safe to ignore version here
-        return pickle.loads(value)
-
-    elif encoding_format is dcm.EncodingFormat.JSON:
-        return orjson.loads(value)
+    if encoding_format is dcm.EncodingFormat.JSON:
+        try:
+            return orjson.loads(value)
+        except orjson.JSONDecodeError:
+            # fallback for legacy cache entries that may contain NaN/Infinity,
+            # which orjson rejects but stdlib json accepts
+            return js.loads(value)
 
     elif encoding_format is dcm.EncodingFormat.YAML:
         return yaml.safe_load(value)

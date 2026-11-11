@@ -36,7 +36,7 @@ def encode_request(
         raise ValueError('`data` of type `dict` is not supported for gzip encoding')
 
     if json is not None:
-        data = orjson.dumps(json)
+        data = orjson.dumps(json, option=orjson.OPT_NON_STR_KEYS)
 
     def _encode(obj, encoding: str = 'utf-8') -> bytes:
         if isinstance(obj, bytes):
@@ -45,7 +45,7 @@ def encode_request(
             return obj.encode(encoding=encoding)
         elif isinstance(obj, dict):
             if encoding == 'utf-8':
-                return orjson.dumps(obj)
+                return orjson.dumps(obj, option=orjson.OPT_NON_STR_KEYS)
             return js.dumps(obj).encode(encoding=encoding)
         else:
             raise ValueError(f'Encoding of type {type(obj)} is not (yet) supported')
