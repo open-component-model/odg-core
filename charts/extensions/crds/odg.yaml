@@ -76,7 +76,9 @@ spec:
                       description: |
                         OTLP gRPC endpoint ODG workloads push traces to (e.g.
                         http://telemetry-opentelemetry-collector.odg-system:4317).
-                        Empty/omitted disables OTel instrumentation in all pods.
+                        Omitted: derived from the collector service if the `telemetry`
+                        extension is requested, otherwise disabled. Explicit empty
+                        string disables OTel instrumentation in all pods.
                   required:
                     - base_url
                     - target_namespace

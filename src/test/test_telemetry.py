@@ -125,7 +125,39 @@ async def test_configure_with_endpoint_sets_providers(unset_otel, monkeypatch):
         # both instrumentors attach middlewares/meters sharing the global
         # providers — reset them so no scope leaks into metrics tests
         from opentelemetry.instrumentation.aiohttp_client import AioHttpClientInstrumentor
+        from opentelemetry.instrumentation.requests import RequestsInstrumentor
 
-        for instrumentor in (AioHttpServerInstrumentor, AioHttpClientInstrumentor):
+        for instrumentor in (
+            AioHttpServerInstrumentor,
+            AioHttpClientInstrumentor,
+            RequestsInstrumentor,
+        ):
             instrumentor._is_instrumented_by_opentelemetry = False
             instrumentor().uninstrument()
+
+
+def test_scrubbing_span_processor_redacts_credential_attributes():
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+    exporter = InMemorySpanExporter()
+    tracer_provider = TracerProvider()
+    tracer_provider.add_span_processor(odg.telemetry._scrubbing_span_processor())
+    tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
+
+    tracer_provider.get_tracer(__name__).start_span(
+        'POST',
+        attributes={
+            'http.status_code': 200,
+            'http.target': '/auth?code=abc&client_id=xyz',
+            'url.full': 'https://github.com/login/oauth/access_token?client_secret=s3cr3t&code=abc',
+        },
+    ).end()
+
+    (span,) = exporter.get_finished_spans()
+    assert span.attributes['http.status_code'] == 200
+    assert span.attributes['http.target'] == '/auth?code=***&client_id=xyz'
+    assert span.attributes['url.full'] == (
+        'https://github.com/login/oauth/access_token?client_secret=***&code=***'
+    )

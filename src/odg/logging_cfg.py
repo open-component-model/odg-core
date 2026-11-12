@@ -244,7 +244,7 @@ def _scrub_nested(value, redact: bool = False):
     as renderers would serialise their representation.
     """
     if isinstance(value, str):
-        return SENSITIVE_REPLACEMENT if redact else _scrub_string(value)
+        return SENSITIVE_REPLACEMENT if redact else scrub_string(value)
     if isinstance(value, collections.abc.Mapping):
         return {
             key: _scrub_nested(
@@ -279,7 +279,7 @@ def scrub_sensitive_fields(logger, method_name: str, event_dict: dict) -> dict:
     return event_dict
 
 
-def _scrub_string(value: str) -> str:
+def scrub_string(value: str) -> str:
     value = SENSITIVE_QUERY_PARAMS_RE.sub(lambda m: f'{m["name"]}={SENSITIVE_REPLACEMENT}', value)
     value = BEARER_TOKEN_RE.sub(SENSITIVE_REPLACEMENT, value)
     value = BASIC_CREDENTIALS_RE.sub(SENSITIVE_REPLACEMENT, value)
@@ -296,7 +296,7 @@ def scrub_string_values(logger, method_name: str, event_dict: dict) -> dict:
     """
     for key, value in event_dict.items():
         if isinstance(value, str):
-            event_dict[key] = _scrub_string(value)
+            event_dict[key] = scrub_string(value)
 
     return event_dict
 

@@ -32,6 +32,13 @@
       groupName: 'gardener python deps',
     },
     {
+      // sdk/exporter (1.x) and instrumentation-* (0.xbN) are released in
+      // lockstep and pin each other exactly via
+      // opentelemetry-semantic-conventions — separate PRs fail to lock.
+      matchPackageNames: ['opentelemetry-*'],
+      groupName: 'opentelemetry python deps',
+    },
+    {
       // Majors wait as checkboxes in the dependency dashboard ("Pending
       // Approval") instead of occupying prConcurrentLimit slots — tick one
       // there to have its PR created when you're ready to work on it.

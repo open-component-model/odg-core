@@ -32,6 +32,7 @@ import odg.extensions_cfg
 import odg.findings
 import odg.logging_cfg
 import odg.model
+import odg.telemetry
 import odg.util
 import odg_client
 import paths
@@ -39,6 +40,7 @@ import util
 
 k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging(service_name='sla-report')
+odg.telemetry.configure_telemetry(instrument_aiohttp=False)
 logger = structlog.get_logger(__name__)
 
 own_dir = os.path.abspath(os.path.dirname(__file__))

@@ -170,7 +170,7 @@ def test_sensitive_query_param_in_url_is_scrubbed():
     ],
 )
 def test_scrubber_keeps_lookalike_names(value: str):
-    assert lc._scrub_string(value) == value
+    assert lc.scrub_string(value) == value
 
 
 @pytest.mark.parametrize(
@@ -185,7 +185,7 @@ def test_scrubber_keeps_lookalike_names(value: str):
     ],
 )
 def test_scrubber_replaces_sensitive_params(value: str, expected: str):
-    assert lc._scrub_string(value) == expected
+    assert lc.scrub_string(value) == expected
 
 
 def test_structlog_logger_scrubs_string_values():

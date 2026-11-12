@@ -158,6 +158,55 @@ async def test_queue_depth_recorded_for_concurrent_requests(otel_reader):
     assert points[0].sum == 1  # one observation of depth 1
 
 
+async def test_queue_depth_resets_after_out_of_order_completion(otel_reader):
+    """first-in request finishing first must not leave a stale in-flight count"""
+    release_first = asyncio.Event()
+    release_second = asyncio.Event()
+    first_running = asyncio.Event()
+    second_running = asyncio.Event()
+
+    async def slow(request: aiohttp.web.Request) -> aiohttp.web.Response:
+        if not first_running.is_set():
+            first_running.set()
+            await release_first.wait()
+        else:
+            second_running.set()
+            await release_second.wait()
+        return aiohttp.web.Response(text='ok')
+
+    app = aiohttp.web.Application()
+    app.router.add_get('/slow', slow)
+    app = middleware.metrics.add_http_metrics_middleware(app=app)
+
+    observed_depths: list[float] = []
+    histogram = app[middleware.metrics.APP_HTTP_SERVER_QUEUE_DEPTH]
+    queue_record = histogram.record
+
+    def wrapped_record(value, attrs=None):
+        observed_depths.append(value)
+        return queue_record(value, attrs)
+
+    histogram.record = wrapped_record
+
+    async with aiohttp.test_utils.TestClient(aiohttp.test_utils.TestServer(app)) as client:
+        first = asyncio.create_task(client.get('/slow'))
+        await asyncio.wait_for(first_running.wait(), timeout=5)
+        second = asyncio.create_task(client.get('/slow'))
+        await asyncio.wait_for(second_running.wait(), timeout=5)
+
+        release_first.set()
+        await first
+        release_second.set()
+        await second
+
+        # sequential request after both finished: no in-flight requests remain
+        first_running.clear()
+        release_first.set()
+        await client.get('/slow')
+
+    assert observed_depths == [1.0]
+
+
 async def test_excluded_route_is_not_recorded(metrics_client, otel_reader):
     resp = await metrics_client.get('/ready')
     assert resp.status == 200

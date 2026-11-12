@@ -39,8 +39,6 @@ spec:
           env:
             - name: ODG_LOG_LEVEL
               value: {{ .Values.logLevel | default "INFO" | quote }}
-            {{- include "odg.otelEnv" . | nindent 12 }}
-            {{- include "odg.otelResourceAttrs" . | nindent 12 }}
           startupProbe:
             httpGet:
               path: /readiness

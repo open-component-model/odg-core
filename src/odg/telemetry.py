@@ -25,8 +25,10 @@ Instrumented libraries:
   middleware.metrics therefore only adds `http.server.request.count` and
   `http.server.request.queue_depth`
 - aiohttp client: one span per outgoing request; W3C `traceparent` header
-  propagation enables cross-extension traces (extensions call the
-  delivery-service via odg_client, which uses aiohttp)
+  propagation
+- requests: same for the sync client; extensions call the delivery-service
+  via odg_client (requests-based), so this links extension and
+  delivery-service spans into one trace. Remove once odg_client is async
 - aiohttp and the propagators run on contextvars, so manual spans created via
   `opentelemetry.trace.get_tracer(...)` nest under the request span
   automatically
@@ -39,6 +41,12 @@ Probe endpoints (`/healthz`, `/ready`) are excluded via
 uses `re.search`, so bare `metrics` would also match real routes like
 `/dora/dora-metrics`.
 
+Span attributes are scrubbed via `odg.logging_cfg.scrub_string` (same
+credential patterns as logs): instrumentors record full URLs incl. query
+strings, e.g. `/auth?code=…&access_token=…` (server) or the GitHub token
+exchange with `client_secret=…` (client); OTel's built-in redaction only
+covers a few cloud-signature params.
+
 Not instrumented on purpose:
 - logging/trace-correlation: requires a logging handler that formats the
   whole record JSON; ODG's structlog pipeline does that itself, so add a
@@ -47,8 +55,15 @@ Not instrumented on purpose:
 """
 
 import os
+import typing
 
 import structlog
+
+import odg.logging_cfg
+
+if typing.TYPE_CHECKING:
+    import opentelemetry.context
+    import opentelemetry.sdk.trace
 
 logger = structlog.get_logger(__name__)
 
@@ -77,6 +92,31 @@ duration_histogram_buckets_seconds = (
     900.0,
 )
 duration_histogram_buckets_ms = tuple(s * 1000.0 for s in duration_histogram_buckets_seconds)
+
+
+def _scrubbing_span_processor() -> 'opentelemetry.sdk.trace.SpanProcessor':
+    from opentelemetry.sdk.trace import SpanProcessor
+
+    class ScrubbingSpanProcessor(SpanProcessor):
+        """
+        Scrub credentials from string attributes set at span start (where
+        instrumentors put URL/query attributes); attributes are immutable
+        once the span ended, so `on_end` cannot rewrite them.
+        """
+
+        def on_start(
+            self,
+            span: 'opentelemetry.sdk.trace.Span',
+            parent_context: 'opentelemetry.context.Context | None' = None,
+        ) -> None:
+            for key, value in (span.attributes or {}).items():
+                if (
+                    isinstance(value, str)
+                    and (scrubbed := odg.logging_cfg.scrub_string(value)) != value
+                ):
+                    span.set_attribute(key, scrubbed)
+
+    return ScrubbingSpanProcessor()
 
 
 def configure_telemetry(
@@ -118,6 +158,8 @@ def configure_telemetry(
     resource = Resource.create(attributes={'service.name': service_name})
 
     tracer_provider = TracerProvider(resource=resource)
+    # processors run in registration order: scrub before anything can export
+    tracer_provider.add_span_processor(_scrubbing_span_processor())
     tracer_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
     trace.set_tracer_provider(tracer_provider)
 
@@ -160,6 +202,12 @@ def configure_telemetry(
     # must run here, not where engines are built — the instrumentor is a
     # singleton and a second `instrument()` short-circuits with a warning
     SQLAlchemyInstrumentor().instrument()
+
+    from opentelemetry.instrumentation.requests import RequestsInstrumentor
+
+    # independent of `instrument_aiohttp`: batch processes call the
+    # delivery-service via the requests-based odg_client
+    RequestsInstrumentor().instrument()
 
     if instrument_aiohttp:
         from opentelemetry.instrumentation.aiohttp_client import AioHttpClientInstrumentor

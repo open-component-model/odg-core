@@ -103,7 +103,7 @@ def add_http_metrics_middleware(
         # same info derivable from latency), this is a depth *count* (0 = no
         # wait). Real scheduling time is aiohttp-internal and not observable.
         depth = inflight_depths.get(request_key, 0)
-        inflight_depth = inflight_depths[request_key] = depth + 1
+        inflight_depths[request_key] = depth + 1
         if depth > 0:
             request.app[APP_HTTP_SERVER_QUEUE_DEPTH].record(
                 float(depth),
@@ -126,7 +126,8 @@ def add_http_metrics_middleware(
             status = 'error'
             raise
         finally:
-            inflight_depths[request_key] = inflight_depth - 1
+            # decrement the live value: overlapping requests finish in any order
+            inflight_depths[request_key] -= 1
             latency_seconds = (datetime.datetime.now() - start_time).total_seconds()
 
             if status is not None:
