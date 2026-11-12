@@ -8,10 +8,15 @@ on:
           - candidate
           - regular
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   preprocess:
     runs-on: ubuntu-latest
     name: Preprocess
+    environment: release  # require approval to run
     permissions: {}
     outputs:
       release-candidate: ${{ steps.determine-rc.outputs.release-candidate }}
