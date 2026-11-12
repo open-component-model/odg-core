@@ -110,6 +110,8 @@ spec:
             value: {{ ternary ((.Values.global).otlpEndpoint) (printf "http://telemetry-opentelemetry-collector.%s:4317" (.Values.target_namespace | default .Release.Namespace)) (hasKey (.Values.global | default dict) "otlpEndpoint") | quote }}
           - name: OTEL_SERVICE_NAME
             value: delivery-service
+          - name: OTEL_SEMCONV_STABILITY_OPT_IN
+            value: http
           # k8s identity via downward API for resource attrs (collector-side
           # k8sattributes pod_association misses outbound OTLP)
           - name: K8S_POD_NAME

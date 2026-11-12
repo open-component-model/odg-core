@@ -53,7 +53,7 @@ UNMATCHED_ENDPOINT = 'unmatched'
 
 # route canonicals (leading `/` stripped) with no observability value,
 # mirroring odg.telemetry's excluded_urls
-EXCLUDED_ENDPOINTS = frozenset({'healthz', 'ready'})
+EXCLUDED_ENDPOINTS = frozenset({'healthz', 'ready', 'favicon.ico'})
 
 
 def endpoint_label(request: aiohttp.web.Request) -> str:

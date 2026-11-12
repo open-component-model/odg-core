@@ -67,6 +67,8 @@ inside the define renders into pod manifests, so no YAML comments in the body.
   value: {{ ternary (.Values.global.otlpEndpoint) (printf "http://telemetry-opentelemetry-collector.%s:4317" (.Values.target_namespace | default .Release.Namespace)) (hasKey .Values.global "otlpEndpoint") | quote }}
 - name: OTEL_SERVICE_NAME
   value: {{ .Chart.Name | quote }}
+- name: OTEL_SEMCONV_STABILITY_OPT_IN
+  value: http
 {{- end -}}
 
 {{/*

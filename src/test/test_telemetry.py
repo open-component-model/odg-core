@@ -55,6 +55,7 @@ async def test_excluded_urls_match_probes_but_not_dora(unset_otel):
 
     assert excluded.url_disabled('/healthz')
     assert excluded.url_disabled('/ready')
+    assert excluded.url_disabled('/favicon.ico')
     assert not excluded.url_disabled('/dora/dora-metrics')
     assert not excluded.url_disabled('/already-ready')
     assert not excluded.url_disabled('/components')

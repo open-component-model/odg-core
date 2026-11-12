@@ -57,7 +57,7 @@ logger = structlog.get_logger(__name__)
 # (instrument() snapshots that into OTEL_PYTHON_EXCLUDED_URLS while the env
 # parses instrumentation config). Anchored: ExcludeList runs `re.search`, so an
 # unanchored `metrics` would also exclude real routes like `/dora/dora-metrics`
-excluded_urls = '^/healthz$,^/ready$'
+excluded_urls = '^/healthz$,^/ready$,^/favicon.ico$'
 
 # explicit seconds buckets: the OTel SDK default histogram aggregation spans
 # 0 … 10000 (assumes ms scale), so without a View virtually every request

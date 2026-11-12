@@ -444,7 +444,7 @@ async def run_app():
             # do not log query parameters of auth endpoints (may contain secrets)
             masked_query_path_prefixes=('/auth',),
             # suppress successful probe + scrape requests to keep log volume low
-            quiet_path_prefixes=('/healthz', '/metrics', '/ready'),
+            quiet_path_prefixes=('/healthz', '/metrics', '/ready', '/favicon.ico'),
         ),
     )
     await runner.setup()
