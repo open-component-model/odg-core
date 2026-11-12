@@ -87,6 +87,29 @@ def test_extract_rejects_path_traversal_member(tmp_path):
     assert not (tmp_path / 'outside.yaml').exists()
 
 
+@pytest.mark.parametrize('truncate_to', (20, 60))
+def test_extract_raises_tar_error_for_truncated_archive(tmp_path, truncate_to):
+    archive = _tar_gz(_file('chart/values.yaml', b'x' * 5000))[0]
+
+    with pytest.raises(tarfile.TarError):
+        odgc._extract_tar_gz(
+            content=[archive[:truncate_to]],
+            path=str(tmp_path),
+        )
+
+
+def test_resolve_chart_path_rejects_missing_chart(tmp_path):
+    (tmp_path / 'actual').mkdir()
+
+    assert odgc._resolve_chart_path(base_path=str(tmp_path), chart_name='missing') is None
+
+
+def test_resolve_chart_path_rejects_file(tmp_path):
+    (tmp_path / 'chart').write_text('not a directory')
+
+    assert odgc._resolve_chart_path(base_path=str(tmp_path), chart_name='chart') is None
+
+
 def test_resolve_chart_path_valid(tmp_path):
     (tmp_path / 'chart').mkdir()
 

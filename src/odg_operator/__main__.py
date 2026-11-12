@@ -174,15 +174,19 @@ def _extract_tar_gz(
     Extracts a gzipped tar archive into `path`. Members which would end up outside of `path`
     (e.g. absolute or escaping links) raise a `tarfile.TarError`.
     """
-    with tarfile.open(
-        fileobj=io.BytesIO(b''.join(content)),
-        mode='r:gz',
-        bufsize=tarfile.RECORDSIZE,
-    ) as tf:
-        tf.extractall(
-            path=path,
-            filter='data',
-        )
+    try:
+        with tarfile.open(
+            fileobj=io.BytesIO(b''.join(content)),
+            mode='r:gz',
+            bufsize=tarfile.RECORDSIZE,
+        ) as tf:
+            tf.extractall(
+                path=path,
+                filter='data',
+            )
+    except EOFError as eof_error:
+        # truncated gzip streams raise `EOFError`, which is no `tarfile.TarError`
+        raise tarfile.ReadError(f'truncated gzip stream: {eof_error}') from eof_error
 
 
 def _resolve_chart_path(
@@ -191,12 +195,15 @@ def _resolve_chart_path(
 ) -> str | None:
     """
     Returns the real path of `chart_name` below `base_path`, or `None` if it escapes `base_path`
-    (e.g. via `..`, absolute names or symlinks).
+    (e.g. via `..`, absolute names or symlinks) or is no existing directory.
     """
     real_base_path = os.path.realpath(base_path)
     chart_path = os.path.realpath(os.path.join(real_base_path, chart_name))
 
     if os.path.commonpath((real_base_path, chart_path)) != real_base_path:
+        return None
+
+    if not os.path.isdir(chart_path):
         return None
 
     return chart_path
