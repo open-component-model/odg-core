@@ -60,7 +60,7 @@ dev = [
     "pytest==9.2.0",
     "pytest-asyncio==1.4.1.post1",
     "testcontainers[postgres]==4.15.0",
-    "ruff==0.17.3",
+    "ruff==0.17.4",
     "bandit==1.9.4",
     "semver==3.1.0",
     "setuptools==84.2.1",
