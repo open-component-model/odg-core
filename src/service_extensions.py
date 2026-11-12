@@ -229,6 +229,7 @@ def iter_backlog_items(
                 'creationTimestamp': backlog_item.get('metadata').get('creationTimestamp'),
             },
             'spec': backlog_item.get('spec'),
+            'status': backlog_item.get('status'),
         }
 
 

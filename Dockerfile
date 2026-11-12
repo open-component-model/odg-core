@@ -26,7 +26,6 @@ RUN apk add --no-cache \
     git \
     helm \
     postgresql16-client \
-    syft \
  && curl https://aia.pki.co.sap.com/aia/SAP%20Global%20Root%20CA.crt -o \
     /usr/local/share/ca-certificates/SAP_Global_Root_CA.crt \
  && curl https://aia.pki.co.sap.com/aia/SAPNetCA_G2_2.crt -o \
@@ -36,6 +35,8 @@ RUN apk add --no-cache \
  && chown clamav /freshclam
 
 COPY --from=aquasec/trivy:latest@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 /usr/local/bin/trivy /usr/local/bin/trivy
+# Alpine's syft (1.42) predates native Go FIPS 140 detection (`goCryptoSettings`, syft >= 1.51)
+COPY --from=anchore/syft:v1.57.0@sha256:3c70e6d5979364cefdc22b51617a78fd264574d3bd6b4f84a351204147025e2a /syft /usr/local/bin/syft
 
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"

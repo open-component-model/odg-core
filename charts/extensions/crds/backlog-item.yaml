@@ -59,14 +59,38 @@ spec:
                         type: object
                 priority:
                   type: integer
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum:
+                    - Failed
+                    - Pending
+                    - Processing
+                claimed_by:
+                  type: string
+                claimed_at:
+                  format: datetime
+                  type: string
+                last_updated:
+                  format: datetime
+                  type: string
+                error:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
       additionalPrinterColumns:
         - name: Priority
           type: integer
           jsonPath: .spec.priority
           priority: 0
-        - name: Claimed
+        - name: Phase
           type: string
-          jsonPath: '.metadata.labels.delivery-gear\.gardener\.cloud/claimed'
+          jsonPath: .status.phase
+          priority: 0
+        - name: Last Updated
+          type: date
+          jsonPath: .status.last_updated
           priority: 0
         - name: Component
           type: string

@@ -116,7 +116,7 @@ async def find_cached_value(
 
 
 def dbcached_function(
-    encoding_format: dcm.EncodingFormat | str = dcm.EncodingFormat.PICKLE,
+    encoding_format: dcm.EncodingFormat = dcm.EncodingFormat.JSON,
     ttl_seconds: int = 0,
     keep_at_least_seconds: int = 0,
     max_size_octets: int = 0,
@@ -230,17 +230,12 @@ def parse_shortcut_cache(
 
 
 def dbcached_route(
-    encoding_format: dcm.EncodingFormat | str = dcm.EncodingFormat.PICKLE,
+    encoding_format: dcm.EncodingFormat = dcm.EncodingFormat.JSON,
     ttl_seconds: int = 0,
     keep_at_least_seconds: int = 0,
     max_size_octets: int = 0,
     skip_http_status: collections.abc.Sequence[int] = tuple(),
 ):
-    if not encoding_format.startswith('pickle'):
-        raise ValueError(
-            f'Unsupported encoding format for HTTP route cache (must be pickle): {encoding_format}',
-        )
-
     if ttl_seconds and ttl_seconds < keep_at_least_seconds:
         raise ValueError(
             'If time-to-live (`ttl_seconds`) and `keep_at_least_seconds` are both specified, '
@@ -267,17 +262,22 @@ def dbcached_route(
             shortcut_cache = parse_shortcut_cache(request)
 
             if not shortcut_cache and (
-                value := await find_cached_value(
+                raw := await find_cached_value(
                     db_session=db_session,
                     id=descriptor.id,
                 )
             ):
                 loop = asyncio.get_running_loop()
-                return await loop.run_in_executor(
+                cached = await loop.run_in_executor(
                     None,
                     dcu.deserialise_cache_value,
-                    value,
+                    raw,
                     encoding_format,
+                )
+                return aiohttp.web.Response(
+                    status=cached['status'],
+                    body=cached['body'].encode('utf-8'),
+                    content_type=cached.get('content_type', 'application/json'),
                 )
 
             start = datetime.datetime.now()
@@ -288,11 +288,20 @@ def dbcached_route(
                 # don't cache error responses -> those might only be temporarily
                 return result
 
+            if result.body is None:
+                return result
+
+            serialisable = {
+                'status': result.status,
+                'body': result.body.decode('utf-8'),
+                'content_type': result.content_type,
+            }
+
             loop = asyncio.get_running_loop()
             value = await loop.run_in_executor(
                 None,
                 dcu.serialise_cache_value,
-                result,
+                serialisable,
                 encoding_format,
             )
 
@@ -374,7 +383,7 @@ async def mark_for_deletion_task(
 
 
 async def mark_function_cache_for_deletion(
-    encoding_format: dcm.EncodingFormat | str,
+    encoding_format: dcm.EncodingFormat,
     function: collections.abc.Callable | str,
     db_session: sqlasync.session.AsyncSession,
     delete_after: datetime.datetime | None = None,

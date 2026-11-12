@@ -8,6 +8,7 @@ and renders a markdown report per component that maps each artefact (sub-compone
 to the CVEs a team needs to fix.
 """
 
+import atexit
 import collections
 import dataclasses
 import enum
@@ -25,6 +26,7 @@ import structlog
 import version as version_util
 
 import k8s.logging
+import k8s.util
 import lookups
 import odg.extensions_cfg
 import odg.findings
@@ -366,6 +368,21 @@ def _generate_report_for_component(
 def main():
     parsed_arguments = odg.util.parse_args(
         arguments=odg.util.scan_extension_arguments,
+    )
+
+    namespace = parsed_arguments.k8s_namespace
+    kubernetes_api = k8s.util.kubernetes_api(kubeconfig_path=parsed_arguments.kubeconfig)
+
+    k8s.logging.init_logging_thread(
+        service=odg.extensions_cfg.Services.SLA_VIOLATION_PROFILER,
+        namespace=namespace,
+        kubernetes_api=kubernetes_api,
+    )
+    atexit.register(
+        k8s.logging.log_to_crd,
+        service=odg.extensions_cfg.Services.SLA_VIOLATION_PROFILER,
+        namespace=namespace,
+        kubernetes_api=kubernetes_api,
     )
 
     if not (extensions_cfg_path := parsed_arguments.extensions_cfg_path):

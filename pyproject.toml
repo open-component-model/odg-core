@@ -16,24 +16,24 @@ dependencies = [
     "aiohttp==3.14.5",
     "aiohttp-swagger3==0.10.0",
     "awesomeversion==25.8.0",
-    "boto3==1.43.121",
+    "boto3==1.43.124",
     "brotli==1.2.1",
-    "cachetools==7.2.7",
+    "cachetools==7.2.8",
     "cyclonedx-python-lib==11.12.0",
     "dacite==1.9.2",
     "dataclasses-json==0.6.7",
     "gardener-cicd-libs==1.2866.0",
     "github3.py==4.0.1",
     "greenlet==3.5.6",
-    "jsonpath-ng==1.14.0",
+    "jsonpath-ng==1.16.0",
     "jsonschema==4.26.0",
     "kubernetes==36.0.3",
     "mako==1.4.3",
     "prometheus_client==0.26.0",
-    "psycopg[binary]==3.3.6",
+    "psycopg[binary]==3.3.8",
     "pyjwt==2.15.1",
     "requests==2.34.2",
-    "sqlalchemy==2.1.6",
+    "sqlalchemy==2.1.8",
     "starlette==1.10.0",
     "urllib3==2.8.0",
     "uvicorn==0.54.0",
@@ -58,7 +58,7 @@ dev = [
     "aiohttp-devtools==1.1.2",
     "greenlet==3.5.6",
     "pytest==9.2.0",
-    "pytest-asyncio==1.4.1",
+    "pytest-asyncio==1.4.1.post1",
     "testcontainers[postgres]==4.15.0",
     "ruff==0.17.3",
     "bandit==1.9.4",
@@ -72,9 +72,7 @@ skips = [
   'B104', # we intendedly bind to `0.0.0.0` in productive environments only
   'B105', # we do not hardcode passwords
   'B202', # false-positive: we do pass a filter to tar.extractall
-  'B301', # we do not use pickle for untrusted inputs
   'B311', # we know when not to use pseudo-random number generators
-  'B403', # we do not use pickle for untrusted inputs
   'B404', # we know how to call subprocesses
   'B413', # false-positive: we do not use pyCrypto, but pycryptodome
   'B603', # we know how to call subprocesses
