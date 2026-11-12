@@ -10,6 +10,7 @@ import time
 import traceback
 import uuid
 
+import kubernetes.client.rest
 import oci.client
 import ocm
 import structlog
@@ -216,11 +217,18 @@ def process_backlog_items(
                 },
             }
         else:
-            backlog_crd = k8s.backlog.get_backlog_crd_and_claim(
-                service=service,
-                namespace=namespace,
-                kubernetes_api=_kubernetes_api,
-            )
+            try:
+                backlog_crd = k8s.backlog.get_backlog_crd_and_claim(
+                    service=service,
+                    namespace=namespace,
+                    kubernetes_api=_kubernetes_api,
+                )
+            except kubernetes.client.rest.NotFoundException as e:
+                logger.warning(
+                    'backlog item could not be claimed: no longer exists, skipping',
+                    error=str(e),
+                )
+                continue
             claimed_at = datetime.datetime.now(tz=datetime.timezone.utc)
 
         if not backlog_crd:
