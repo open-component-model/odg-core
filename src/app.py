@@ -23,7 +23,8 @@ import middleware.auth
 import middleware.cors
 import middleware.db_session
 import middleware.errors
-import middleware.prometheus
+import middleware.metrics
+
 import middleware.route_feature_check as rfc
 import odg.logging_cfg
 import odg.telemetry
@@ -314,10 +315,6 @@ def add_routes(
         handler=dora.DoraMetrics,
     )
     swagger.add_view(
-        path='/metrics',
-        handler=middleware.prometheus.Metrics,
-    )
-    swagger.add_view(
         path='/cache',
         handler=deliverydb.cache_async.DeliveryDBCache,
     )
@@ -401,7 +398,7 @@ async def initialise_app():
             allow_credentials='*',
         ),
     )
-    app = middleware.prometheus.add_prometheus_middleware(app=app)
+    app = middleware.metrics.add_http_metrics_middleware(app=app)
 
     app = add_app_context_vars(
         app=app,

@@ -7,8 +7,8 @@ Usage (entry points, e.g. src/app.py or an extension's __main__.py):
     odg.telemetry.configure_telemetry()
 
 Mirrors `odg.logging_cfg.configure_logging()`: call once per process at
-startup. Traces only — metrics stay on the existing Prometheus `/metrics`
-endpoint (scraped by the telemetry chart), logs stay on structlog.
+startup. Configures both tracing and metrics — the old Prometheus `/metrics`
+endpoint was removed in favour of OTLP metrics; logs stay on structlog.
 
 Configuration is entirely via standard OTel env vars (read by the SDK):
 - `OTEL_EXPORTER_OTLP_ENDPOINT` — collector URL, e.g.
@@ -81,22 +81,29 @@ def configure_telemetry(
     # reading instrumentation config from the env
     os.environ.setdefault('OTEL_PYTHON_AIOHTTP_SERVER_EXCLUDED_URLS', excluded_urls)
 
+    from opentelemetry import metrics
     from opentelemetry import trace
+    from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
     from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+    from opentelemetry.sdk.metrics import MeterProvider
+    from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
     from opentelemetry.sdk.resources import Resource
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
     # env var (set by helm) wins so one chart helper serves every extension
     service_name = os.environ.get('OTEL_SERVICE_NAME', 'odg')
+    resource = Resource.create(attributes={'service.name': service_name})
 
-    provider = TracerProvider(
-        resource=Resource.create(attributes={'service.name': service_name}),
+    tracer_provider = TracerProvider(resource=resource)
+    tracer_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+    trace.set_tracer_provider(tracer_provider)
+
+    # default cadence matches the traces batch processor (~30s flush)
+    metric_reader = PeriodicExportingMetricReader(OTLPMetricExporter())
+    metrics.set_meter_provider(
+        MeterProvider(resource=resource, metric_readers=[metric_reader]),
     )
-    provider.add_span_processor(
-        BatchSpanProcessor(OTLPSpanExporter()),
-    )
-    trace.set_tracer_provider(provider)
 
     if instrument_aiohttp:
         from opentelemetry.instrumentation.aiohttp_client import AioHttpClientInstrumentor
