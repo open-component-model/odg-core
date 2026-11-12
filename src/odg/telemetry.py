@@ -20,24 +20,26 @@ Configuration is entirely via standard OTel env vars (read by the SDK):
 
 Instrumented libraries:
 - aiohttp server (delivery-service): one span per request, route-templated
-  span names (`/components/{name}`); instrumented BEFORE
-  `aiohttp.web.Application` is created (the instrumentor patches
-  `Application.__init__`)
+  span names (`/components/{name}`), plus `http.server.duration` /
+  `http.server.active_requests` metrics via the built-in meter —
+  middleware.metrics therefore only adds `http.server.request.count` and
+  `http.server.request.queue_depth`
 - aiohttp client: one span per outgoing request; W3C `traceparent` header
   propagation enables cross-extension traces (extensions call the
   delivery-service via odg_client, which uses aiohttp)
 - aiohttp and the propagators run on contextvars, so manual spans created via
   `opentelemetry.trace.get_tracer(...)` nest under the request span
   automatically
+- SQLAlchemy: one span per statement; instrumenting here (once) wraps
+  `sqlalchemy.create_engine`/`create_async_engine`, so engines created later
+  by deliverydb are instrumented without touching engine construction
 
-Probe/scrape endpoints (`/healthz`, `/ready`, `/metrics`) are excluded via
-`OTEL_PYTHON_AIOHTTP_SERVER_EXCLUDED_URLS` — the SDK exports this package's
-`excluded_urls` list as `OTEL_PYTHON_EXCLUDED_URLS` before initialising the
-instrumentation env-var parsing.
+Probe endpoints (`/healthz`, `/ready`) are excluded via
+`OTEL_PYTHON_AIOHTTP_SERVER_EXCLUDED_URLS` — anchored regexes; `ExcludeList`
+uses `re.search`, so bare `metrics` would also match real routes like
+`/dora/dora-metrics`.
 
 Not instrumented on purpose:
-- SQLAlchemy: engine registry lives in deliverydb.cli/entry points; add
-  `SqlalchemyInstrumentor` where the engine is created if DB spans are wanted
 - logging/trace-correlation: requires a logging handler that formats the
   whole record JSON; ODG's structlog pipeline does that itself, so add a
   processor injecting `trace_id`/`span_id` from `trace.get_current_span()`
@@ -50,11 +52,31 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
-# probe/scrape endpoints excluded from server spans (self-observation noise);
-# consumed by OTEL_PYTHON_AIOHTTP_SERVER_EXCLUDED_URLS (set below at import
-# time because `configure()` snapshots it into OTEL_PYTHON_EXCLUDED_URLS when
-# the env parses instrumentation config)
-excluded_urls = 'healthz,ready,metrics'
+# probe endpoints excluded from server spans (self-observation noise); consumed
+# in configure_telemetry() when setting OTEL_PYTHON_AIOHTTP_SERVER_EXCLUDED_URLS
+# (instrument() snapshots that into OTEL_PYTHON_EXCLUDED_URLS while the env
+# parses instrumentation config). Anchored: ExcludeList runs `re.search`, so an
+# unanchored `metrics` would also exclude real routes like `/dora/dora-metrics`
+excluded_urls = '^/healthz$,^/ready$'
+
+# explicit seconds buckets: the OTel SDK default histogram aggregation spans
+# 0 … 10000 (assumes ms scale), so without a View virtually every request
+# lands in one bucket and quantiles become meaningless. One View per unit
+# catches both the instrumentor's (ms) and our own (s) duration histograms
+duration_histogram_buckets_seconds = (
+    0.005,
+    0.025,
+    0.1,
+    0.5,
+    2.5,
+    10.0,
+    30.0,
+    60.0,
+    120.0,
+    300.0,
+    900.0,
+)
+duration_histogram_buckets_ms = tuple(s * 1000.0 for s in duration_histogram_buckets_seconds)
 
 
 def configure_telemetry(
@@ -99,11 +121,45 @@ def configure_telemetry(
     tracer_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
     trace.set_tracer_provider(tracer_provider)
 
+    from opentelemetry.sdk.metrics import Histogram
+    from opentelemetry.sdk.metrics._internal.aggregation import (
+        ExplicitBucketHistogramAggregation,
+    )
+    from opentelemetry.sdk.metrics.view import View
+
+    # scope-matched View for all seconds-unit histograms: own `odg.http` meter
+    # and the aiohttp-server semconv-new meter (schema url pins the scope)
+    views = [
+        View(
+            instrument_type=Histogram,
+            instrument_unit=unit,
+            aggregation=ExplicitBucketHistogramAggregation(
+                boundaries=bucket_boundaries,
+            ),
+        )
+        for unit, bucket_boundaries in (
+            ('s', duration_histogram_buckets_seconds),
+            ('ms', duration_histogram_buckets_ms),
+        )
+    ]
+
     # default cadence matches the traces batch processor (~30s flush)
     metric_reader = PeriodicExportingMetricReader(OTLPMetricExporter())
     metrics.set_meter_provider(
-        MeterProvider(resource=resource, metric_readers=[metric_reader]),
+        MeterProvider(
+            resource=resource,
+            metric_readers=[metric_reader],
+            views=views,
+        ),
     )
+
+    from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+
+    # with no `engine=` argument this only wraps create_engine/
+    # create_async_engine (per-engine spans attach when engines are built);
+    # must run here, not where engines are built — the instrumentor is a
+    # singleton and a second `instrument()` short-circuits with a warning
+    SQLAlchemyInstrumentor().instrument()
 
     if instrument_aiohttp:
         from opentelemetry.instrumentation.aiohttp_client import AioHttpClientInstrumentor
@@ -113,6 +169,6 @@ def configure_telemetry(
         AioHttpClientInstrumentor().instrument()
 
     logger.info(
-        'OTel tracing enabled',
+        'OpenTelemetry tracing enabled',
         **{'otel.exporter.otlp.endpoint': endpoint, 'service.name': service_name},
     )

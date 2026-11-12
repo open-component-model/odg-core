@@ -4,6 +4,8 @@ middleware is installed on a test app, requests run through aiohttp's test
 client, and the exported metrics are asserted directly off the reader.
 """
 
+import asyncio
+
 import aiohttp.test_utils
 import aiohttp.web
 import pytest
@@ -72,42 +74,88 @@ def _series(reader, name: str) -> list:
     return out
 
 
-async def test_records_request_count_and_duration(metrics_client, otel_reader):
+async def test_records_request_count(metrics_client, otel_reader):
     resp = await metrics_client.get('/hello')
     assert resp.status == 200
 
     call_data = otel_reader.get_metrics_data()
 
-    duration = None
     count = None
-    active = None
+    queue_depth = None
     for rms in call_data.resource_metrics:
         for sm in rms.scope_metrics:
             assert sm.scope.name == 'odg.http'
             for m in sm.metrics:
-                if m.name == 'http.server.duration':
-                    duration = m
-                elif m.name == 'http.server.request.count':
+                if m.name == 'http.server.request.count':
                     count = m
-                elif m.name == 'http.server.active_requests':
-                    active = m
+                elif m.name == 'http.server.request.queue_depth':
+                    queue_depth = m
 
-    assert duration is not None, 'http.server.duration metric not exported'
     assert count is not None, 'http.server.request.count metric not exported'
-    assert active is not None, 'http.server.active_requests metric not exported'
-
-    assert duration.data.data_points[0].count == 1
-    assert duration.data.data_points[0].sum > 0
-    assert duration.data.data_points[0].attributes['http.route'] == '/hello'
-    assert duration.data.data_points[0].attributes['http.request.method'] == 'GET'
+    # no concurrent requests: queue depth observations may exist with depth-1
+    # values depending on request interleave, or not at all
+    if queue_depth is not None:
+        assert all(dp.sum >= 0 for dp in queue_depth.data.data_points)
 
     counter_point = list(count.data.data_points)[0]
     assert counter_point.value == 1
     assert counter_point.attributes['http.route'] == '/hello'
+    assert counter_point.attributes['http.request.method'] == 'GET'
     assert counter_point.attributes['http.response.status_code'] == '200'
 
-    # up-down counter nets back to zero after the request finished
-    assert sum(p.value for p in active.data.data_points) == 0
+
+async def test_queue_depth_recorded_for_concurrent_requests(otel_reader):
+    slow_running = asyncio.Event()
+    slow_inflight = asyncio.Event()
+    second_in_middleware = asyncio.Event()
+
+    async def slow(request: aiohttp.web.Request) -> aiohttp.web.Response:
+        slow_running.set()
+        await slow_inflight.wait()
+        return aiohttp.web.Response(text='ok')
+
+    app = aiohttp.web.Application()
+    app.router.add_get('/slow', slow)
+    app = middleware.metrics.add_http_metrics_middleware(app=app)
+
+    # wrap the histogram's record to know exactly when the second request is in
+    # the middleware — asyncio scheduling between two aiohttp test requests is
+    # not stable enough for sleep(0) ticks
+    observed_depths: list[float] = []
+    histogram = app[middleware.metrics.APP_HTTP_SERVER_QUEUE_DEPTH]
+    queue_record = histogram.record
+
+    def wrapped_record(value, attrs=None):
+        observed_depths.append(value)
+        second_in_middleware.set()
+        return queue_record(value, attrs)
+
+    histogram.record = wrapped_record
+
+    async with aiohttp.test_utils.TestClient(aiohttp.test_utils.TestServer(app)) as client:
+        first = asyncio.create_task(client.get('/slow'))
+        await slow_running.wait()
+        second = asyncio.create_task(client.get('/slow'))
+        # wait for the second request to hit record (depth 1) before releasing
+        # the first one
+        await asyncio.wait_for(second_in_middleware.wait(), timeout=5)
+        slow_inflight.set()
+        await first
+        await second
+
+    assert observed_depths == [1.0]
+
+    points = [
+        dp
+        for rms in otel_reader.get_metrics_data().resource_metrics
+        for sm in rms.scope_metrics
+        for m in sm.metrics
+        if m.name == 'http.server.request.queue_depth'
+        for dp in m.data.data_points
+    ]
+    assert len(points) == 1
+    assert points[0].attributes['http.route'] == '/slow'
+    assert points[0].sum == 1  # one observation of depth 1
 
 
 async def test_excluded_route_is_not_recorded(metrics_client, otel_reader):

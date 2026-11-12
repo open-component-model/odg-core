@@ -5,11 +5,19 @@ global:
     repository: null
     tag: null
   imagePullSecrets: []
-  # OTLP gRPC endpoint for trace export. Empty = derive from target_namespace
-  # (telemetry chart's collector Service ships into the same namespace).
-  # Set via the ODG CR's spec.context.otlp_endpoint; an explicitly empty
-  # string must disable tracing, see charts/extensions/templates/helpers.tpl
-  # (odg.otelEnv). Leave commented-out to use namespace derivation.
+  # OTLP gRPC endpoint for trace export. Resolution order in odg.otelEnv
+  # (charts/extensions/templates/helpers.tpl) — key semantics depend on the
+  # key's PRESENCE, not its value:
+  #   key present, non-empty → exported to that collector
+  #   key present, empty ""  → tracing disabled (explicit opt-out)
+  #   key absent            → derived from target_namespace, exposing ODG
+  #                           workloads' traces to the collector shipped with
+  #                           the telemetry extension (or to nothing — pods
+  #                           resolve via namespace-local DNS and the export
+  #                           just times out when the collector is not there,
+  #                           with batch-processor back-pressure, so DNS
+  #                           failures are visible but not harmful)
+  # Set via the ODG CR's spec.context.otlp_endpoint.
   # otlpEndpoint: ""
 
 access-manager:
