@@ -54,6 +54,10 @@ SLOW_REQUEST_THRESHOLD_SECONDS = 30.0
 # endpoint attribute used for requests that did not match any registered route
 UNMATCHED_ENDPOINT = 'unmatched'
 
+# route canonicals (leading `/` stripped) with no observability value,
+# mirroring odg.telemetry's excluded_urls
+EXCLUDED_ENDPOINTS = frozenset({'healthz', 'ready', 'metrics'})
+
 
 def endpoint_label(request: aiohttp.web.Request) -> str:
     """
@@ -89,6 +93,8 @@ def add_http_metrics_middleware(
     ) -> aiohttp.web.StreamResponse:
         start_time = datetime.datetime.now()
         endpoint = endpoint_label(request)
+        if endpoint.lstrip('/') in EXCLUDED_ENDPOINTS:
+            return await handler(request)
         method = request.method
         request_key = (endpoint, method)
         attrs = {'http.route': endpoint, 'http.request.method': method}
