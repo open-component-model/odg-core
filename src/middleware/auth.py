@@ -1019,7 +1019,6 @@ def _jwt_from_signing_cfg_fields(
     key_id: str,
     algorithm: str,
     public_key: str,
-    private_key: str,
 ) -> odg_client.jwt.JSONWebKey:
     alg = odg_client.jwt.Algorithm(algorithm.upper())
     use = odg_client.jwt.Use.SIGNATURE
@@ -1033,12 +1032,8 @@ def _jwt_from_signing_cfg_fields(
             n=odg_client.jwt.encodeBase64urlUInt(rsa_key.n),
             e=odg_client.jwt.encodeBase64urlUInt(rsa_key.e),
         )
-    elif alg is odg_client.jwt.Algorithm.HS256:
-        return odg_client.jwt.SymmetricKey(
-            use=use,
-            kid=key_id,
-            k=odg_client.jwt.encodeBase64url(private_key.encode('utf-8')),
-        )
+
+    raise ValueError(f'unsupported signing {algorithm=}')
 
 
 def jwt_from_signing_cfg(
@@ -1048,7 +1043,6 @@ def jwt_from_signing_cfg(
         key_id=signing_cfg.id,
         algorithm=signing_cfg.algorithm,
         public_key=signing_cfg.public_key,
-        private_key=signing_cfg.private_key,
     )
 
 
