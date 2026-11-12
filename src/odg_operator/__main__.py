@@ -166,6 +166,42 @@ def _default_namespace(
     return manifest
 
 
+def _extract_tar_gz(
+    content: collections.abc.Iterable[bytes],
+    path: str,
+) -> None:
+    """
+    Extracts a gzipped tar archive into `path`. Members which would end up outside of `path`
+    (e.g. absolute or escaping links) raise a `tarfile.TarError`.
+    """
+    with tarfile.open(
+        fileobj=io.BytesIO(b''.join(content)),
+        mode='r:gz',
+        bufsize=tarfile.RECORDSIZE,
+    ) as tf:
+        tf.extractall(
+            path=path,
+            filter='data',
+        )
+
+
+def _resolve_chart_path(
+    base_path: str,
+    chart_name: str,
+) -> str | None:
+    """
+    Returns the real path of `chart_name` below `base_path`, or `None` if it escapes `base_path`
+    (e.g. via `..`, absolute names or symlinks).
+    """
+    real_base_path = os.path.realpath(base_path)
+    chart_path = os.path.realpath(os.path.join(real_base_path, chart_name))
+
+    if os.path.commonpath((real_base_path, chart_path)) != real_base_path:
+        return None
+
+    return chart_path
+
+
 def _helm_template(
     helm_path: str,
     values: dict,
@@ -321,7 +357,7 @@ def create_or_update_odg(
         extension_name: str,
         error_msg: str,
     ):
-        global encountered_error
+        nonlocal encountered_error
 
         logger.error(error_msg)
         status_for_extension[extension_name].append(error_msg)
@@ -373,11 +409,15 @@ def create_or_update_odg(
             )
 
             if artefact.access.type is ocm.AccessType.LOCAL_BLOB:
-                content_iterator = ocm_util.local_blob_access_as_blob_descriptor(
-                    access=artefact.access,
-                    oci_client=oci_client,
-                    image_reference=artefact.access.imageReference,
-                ).content
+                blob_descriptor = next(
+                    ocm_util.iter_blob_descriptors(
+                        component=installation_artefact.component,
+                        access=artefact.access,
+                        oci_client=oci_client,
+                        secret_factory=None,  # only required for s3 access
+                    ),
+                )
+                content_iterator = blob_descriptor.content
 
             elif artefact.access.type is ocm.AccessType.OCI_REGISTRY:
                 manifest = oci_client.manifest(
@@ -411,20 +451,30 @@ def create_or_update_odg(
 
             helm_charts_path = tempfile.TemporaryDirectory()
 
-            with tarfile.open(
-                fileobj=io.BytesIO(b''.join(content_iterator)),
-                mode='r:gz',
-                bufsize=tarfile.RECORDSIZE,
-            ) as tf:
-                tf.extractall(
+            try:
+                _extract_tar_gz(
+                    content=content_iterator,
                     path=helm_charts_path.name,
-                    filter='tar',
                 )
+            except tarfile.TarError as tar_error:
+                helm_charts_path.cleanup()
+                handle_error(
+                    extension_name=extension_instance.name,
+                    error_msg=f'invalid helm chart archive {artefact.name}: {tar_error}',
+                )
+                continue
 
-            helm_chart_path = os.path.join(
-                helm_charts_path.name,
-                installation_artefact.helm_chart_name,
+            helm_chart_path = _resolve_chart_path(
+                base_path=helm_charts_path.name,
+                chart_name=installation_artefact.helm_chart_name,
             )
+            if not helm_chart_path:
+                helm_charts_path.cleanup()
+                handle_error(
+                    extension_name=extension_instance.name,
+                    error_msg=f'invalid helm chart name {installation_artefact.helm_chart_name}',
+                )
+                continue
 
             default_values_path = os.path.join(helm_chart_path, 'values.yaml')
             with open(default_values_path) as f:
@@ -870,15 +920,10 @@ def _iter_extension_definitions_from_resource_node(
 
     extension_definitions_path = tempfile.TemporaryDirectory()
 
-    with tarfile.open(
-        fileobj=io.BytesIO(b''.join(odg_extension_tar_stream)),
-        mode='r:gz',
-        bufsize=tarfile.RECORDSIZE,
-    ) as tf:
-        tf.extractall(
-            path=extension_definitions_path.name,
-            filter='tar',
-        )
+    _extract_tar_gz(
+        content=odg_extension_tar_stream,
+        path=extension_definitions_path.name,
+    )
 
     for root, _, files in os.walk(extension_definitions_path.name):
         for file in files:
