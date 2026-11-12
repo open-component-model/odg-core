@@ -1306,6 +1306,15 @@ class ArtefactMetadata(aiohttp.web.View):
 
         del all_existing_entries  # free up memory
 
+        # Expunge prefetched ORM objects not needed for the write pass. Only existing_by_id
+        # entries are mutated (UPDATE path); existing_by_group is read-only (discovery date
+        # reuse). Global-scope writes (component_version=NULL) can prefetch tens of thousands
+        # of rows; expunging them reduces flush cost from O(prefetch) to O(batch).
+        # NOTE: existing_by_group entries become detached — only already-loaded column reads
+        # (e.g. discovery_date) are safe on them.
+        db_session.expunge_all()
+        db_session.add_all(existing_by_id.values())
+
         logger.info(
             f'[{correlation_id}] Filtered entries to {len(existing_by_id)=} and '
             f'{len(existing_by_group)=}',
