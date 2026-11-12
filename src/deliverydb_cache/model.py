@@ -7,16 +7,7 @@ import ocm
 
 class EncodingFormat(enum.StrEnum):
     JSON = 'json'
-    PICKLE = 'pickle-4.0'
     YAML = 'yaml'
-
-    @staticmethod
-    def pickle_protocol(pickle_encoding: str) -> int:
-        if not pickle_encoding.startswith('pickle'):
-            raise ValueError(f'Unsupported encoding format string for pickle: {pickle_encoding}')
-
-        pickle_version = pickle_encoding.split('-')[1]
-        return int(float(pickle_version))
 
 
 class CacheValueType(enum.StrEnum):
@@ -28,9 +19,7 @@ class CacheValueType(enum.StrEnum):
 @dataclasses.dataclass
 class CacheDescriptorBase:
     type: CacheValueType
-    encoding_format: (
-        EncodingFormat | str
-    )  # allow str to support pickle versions different to `pickle.format_version` # noqa: E501
+    encoding_format: EncodingFormat
 
     @property
     def key(self) -> str:

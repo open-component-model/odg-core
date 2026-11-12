@@ -826,9 +826,11 @@ class AlgorithmProperties:
 
 
 class CertificateKind(enum.StrEnum):
-    ROOT_CA = 'root-ca'
-    INTERMEDIATE_CA = 'intermediate-ca'
     END_USER = 'end-user'
+    INTERMEDIATE_CA = 'intermediate-ca'
+    ROOT_CA = 'root-ca'
+    # certificate found in a system trust store, i.e. trusted by the software rather than used by it
+    TRUST_ANCHOR = 'trust-anchor'
 
 
 @dataclasses.dataclass

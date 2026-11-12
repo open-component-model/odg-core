@@ -58,14 +58,22 @@ def on_backlog_change(
     for backlog_crd in backlog_crds:
         crd_name = backlog_crd.get('metadata').get('name')
         labels = backlog_crd.get('metadata').get('labels')
-        annotations = backlog_crd.get('metadata').get('annotations')
 
         label_claimed = labels.get(k8s.backlog.LABEL_CLAIMED)
         if not (label_claimed and k8s.util.label_is_true(label=label_claimed)):
             continue
 
-        claimed_by = annotations.get(k8s.backlog.ANNOTATION_CLAIMED_BY)
-        claimed_at = dateutil.parser.parse(annotations.get(k8s.backlog.ANNOTATION_CLAIMED_AT))
+        status = backlog_crd.get('status') or {}
+        claimed_by = status.get('claimed_by')
+        claimed_at_raw = status.get('claimed_at')
+        claimed_at = dateutil.parser.parse(status.get('claimed_at')) if claimed_at_raw else None
+
+        # backwards compatibility (bofore BLI status was used):
+        if not status:
+            annotations = backlog_crd.get('metadata').get('annotations')
+            claimed_by = annotations.get(f'{k8s.model.BacklogItemCrd.DOMAIN}/claimed-by')
+            claimed_at_raw = annotations.get(f'{k8s.model.BacklogItemCrd.DOMAIN}/claimed-at')
+            claimed_at = dateutil.parser.parse(claimed_at_raw) if claimed_at_raw else None
 
         if not running_pod_names:
             running_pod_names = [
@@ -86,8 +94,13 @@ def on_backlog_change(
                 kubernetes_api=kubernetes_api,
                 backlog_crd=backlog_crd,
             )
-        elif claimed_at.tzinfo and now - claimed_at >= datetime.timedelta(
-            minutes=remove_claim_after_minutes,
+        elif (
+            claimed_at
+            and claimed_at.tzinfo
+            and now - claimed_at
+            >= datetime.timedelta(
+                minutes=remove_claim_after_minutes,
+            )
         ):
             logger.warning(
                 f'the backlog item {crd_name} was claimed for more than '

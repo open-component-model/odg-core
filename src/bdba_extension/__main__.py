@@ -33,7 +33,7 @@ def _mark_compliance_summary_cache_for_deletion(
     finding_type: odg.model.Datatype,
 ):
     descriptor = dcm.CachedPythonFunction(
-        encoding_format=dcm.EncodingFormat.PICKLE,
+        encoding_format=dcm.EncodingFormat.JSON,
         function_name='compliance_summary.component_datatype_summaries',
         args=dcu.normalise_and_serialise_object(tuple()),
         kwargs=dcu.normalise_and_serialise_object(

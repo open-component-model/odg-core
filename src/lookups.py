@@ -520,7 +520,7 @@ def semver_sanitising_oci_client_async(
 def db_cache_component_descriptor_lookup_async(
     db_url_callback: collections.abc.Callable[[], str | None],
     ocm_repository_lookup: ocm.OcmRepositoryLookup = None,
-    encoding_format: dcm.EncodingFormat = dcm.EncodingFormat.PICKLE,
+    encoding_format: dcm.EncodingFormat = dcm.EncodingFormat.JSON,
     ttl_seconds: int = 0,
     keep_at_least_seconds: int = 0,
     max_size_octets: int = 0,
