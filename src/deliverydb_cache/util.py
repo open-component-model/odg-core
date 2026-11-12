@@ -87,11 +87,7 @@ def serialise_cache_value(
     value,
     encoding_format: dcm.EncodingFormat,
 ) -> bytes:
-    if encoding_format.startswith('pickle'):
-        protocol = dcm.EncodingFormat.pickle_protocol(pickle_encoding=encoding_format)
-        return pickle.dumps(value, protocol)
-
-    elif encoding_format is dcm.EncodingFormat.JSON:
+    if encoding_format is dcm.EncodingFormat.JSON:
         return orjson.dumps(value)
 
     elif encoding_format is dcm.EncodingFormat.YAML:
