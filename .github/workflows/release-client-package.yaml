@@ -8,6 +8,10 @@ on:
           - bdba
           - odg
 
+concurrency:
+  group: release-${{ inputs.client }}-client
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,11 +19,18 @@ jobs:
     permissions:
       id-token: write
     steps:
+      - name: Verify Dispatch Ref
+        run: |
+          if [[ "$GITHUB_REF_TYPE" != "branch" || "$GITHUB_REF_NAME" != "master" ]]; then
+            echo "Error: this workflow must be dispatched from 'master', got: $GITHUB_REF_NAME"
+            exit 1
+          fi
       - uses: gardener/cc-utils/.github/actions/trusted-checkout@v1
         with:
           token-server: ${{ vars.FEDERATED_GITHUB_ACCESS_TOKEN_SERVER }}
           github-auth-token-permissions: |
             contents: write
+            pull-requests: write
           init-git-identity: true
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
@@ -77,13 +88,21 @@ jobs:
           # Pin the exact version in pyproject.toml so downstream consumers get the correct version
           sed -i "s/\"${{ inputs.client }}-client.*\"/\"${{ inputs.client }}-client==${to_version}\"/" pyproject.toml
 
+          branch="bump-${{ inputs.client }}-client-${to_version}"
+          git checkout -b "${branch}"
           git add "$version_file" "packages/${{ inputs.client }}-client/pyproject.toml" pyproject.toml uv.lock
           git commit -m "Upgrade ${{ inputs.client }} client" -m "from ${from_version} to ${to_version}"
-          git push
+          git push origin "${branch}"
+          gh pr create \
+            --base "$GITHUB_REF_NAME" \
+            --head "${branch}" \
+            --title "Upgrade ${{ inputs.client }} client from ${from_version} to ${to_version}" \
+            --body "Automated version bump triggered by release-client-package workflow."
 
   pypi:
     runs-on: ubuntu-latest
     name: Publish to PyPI
+    environment: release  # require approval to run
     needs:
       - build
     permissions:
