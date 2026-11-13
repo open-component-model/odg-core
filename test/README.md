@@ -40,13 +40,13 @@ make build-docker-debug-local ODG_CORE_LIBS_VERSION=$(cat VERSION | cut -d- -f1)
 ## One-time setup: build the DB image
 
 Download a DB backup, then run `create_db_image.sh` once to bake it into a local Docker image
-to shorten start times of the DB to ~2 seconds:
+to shorten start times of the DB to ~2 seconds (OCM (v2) CLI must be available):
 
 ```bash
 ocm download resources \
-  -O data/delivery-db-backup/2026-10-26 \
+  --output data/delivery-db-backup/2026-10-26 \
   oci::${REGISTRY}//${NAME}:${VERSION} \
-  delivery-db-backup
+  --identity name=delivery-db-backup
 
 test/scripts/create_db_image.sh --db data/delivery-db-backup/2026-10-26
 ```
@@ -68,8 +68,8 @@ Override the DB image or the ODG image:
 
 ```bash
 cd test/perf
-ODG_DB_IMAGE=odg-test-db:2026-10-26 uv run pytest test/perf/ -v
-ODG_CORE_IMAGE=odg-core:1.2.3-debug  uv run pytest test/perf/ -v
+ODG_DB_IMAGE=odg-test-db:2026-10-26 uv run pytest -v
+ODG_CORE_IMAGE=odg-core:1.2.3-debug  uv run pytest -v
 ```
 
 ### Profiling
