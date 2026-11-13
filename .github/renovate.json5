@@ -26,6 +26,23 @@
   lockFileMaintenance: {
     automerge: true,
   },
+  customManagers: [
+    {
+      // Keep CBOMKIT_THEIA_COMMIT in sync with CBOMKIT_THEIA_VERSION.
+      // When a new cbomkit-theia release appears, both ARGs must be bumped together
+      // so the SHA verification in the Dockerfile passes.
+      customType: 'regex',
+      fileMatch: ['^Dockerfile$'],
+      matchStrings: [
+        'ARG CBOMKIT_THEIA_VERSION=(?<currentValue>[^\\n]+)\\nARG CBOMKIT_THEIA_COMMIT=(?<currentDigest>[^\\n]+)',
+      ],
+      datasourceTemplate: 'github-releases',
+      depNameTemplate: 'cbomkit/cbomkit-theia',
+      versioningTemplate: 'semver-coerced',
+      extractVersionTemplate: '^v?(?<version>.*)$',
+      digestValueTemplate: '{{newDigest}}',
+    },
+  ],
   packageRules: [
     {
       matchDepNames: ['gardener-cicd-libs', 'gardener-ocm', 'gardener-oci'],

@@ -1,12 +1,15 @@
 FROM golang:1.27.1-alpine3.24@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3bd96672ee5ed43414 AS cbomkit-theia-builder
 # renovate: datasource=github-releases depName=cbomkit/cbomkit-theia versioningTemplate=semver-coerced extractVersionTemplate=^v?(?<version>.*)$
 ARG CBOMKIT_THEIA_VERSION=1.1.2
+ARG CBOMKIT_THEIA_COMMIT=dcd95ac86d1cbe6e867ff3ee059b9ef77bac6a59
 # Cache mounts: local BuildKit only — harmless no-op where unsupported (e.g. kaniko in CI)
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     apk add --no-cache git \
  && git clone --depth 1 --branch release/${CBOMKIT_THEIA_VERSION} https://github.com/cbomkit/cbomkit-theia.git /cbomkit-theia \
- && cd /cbomkit-theia && go mod download -x && go build -v
+ && cd /cbomkit-theia \
+ && git rev-parse HEAD | grep -qx ${CBOMKIT_THEIA_COMMIT} \
+ && go mod download -x && go build -v
 
 FROM python:3.14-alpine3.24@sha256:eb2c62658b8d51bff0acc408504b76521d02030de56a8a3c1e830083e89b89d2
 
@@ -34,7 +37,7 @@ RUN apk add --no-cache \
  && mkdir /freshclam \
  && chown clamav /freshclam
 
-COPY --from=aquasec/trivy:latest@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 /usr/local/bin/trivy /usr/local/bin/trivy
+COPY --from=aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb /usr/local/bin/trivy /usr/local/bin/trivy
 # Alpine's syft (1.42) predates native Go FIPS 140 detection (`goCryptoSettings`, syft >= 1.51)
 COPY --from=anchore/syft:v1.57.0@sha256:3c70e6d5979364cefdc22b51617a78fd264574d3bd6b4f84a351204147025e2a /syft /usr/local/bin/syft
 
