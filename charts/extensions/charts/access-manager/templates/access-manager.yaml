@@ -44,6 +44,8 @@ spec:
                   value: {{ .Values.target_namespace | default .Release.Namespace }}
                 - name: ODG_LOG_LEVEL
                   value: {{ .Values.logLevel | default "INFO" | quote }}
+                {{- include "odg.otelEnv" . | nindent 16 }}
+                {{- include "odg.otelResourceAttrs" . | nindent 16 }}
               volumeMounts:
                 - name: delivery-db
                   mountPath: /secrets/delivery-db

@@ -15,6 +15,7 @@ import odg.extensions_cfg
 import odg.findings
 import odg.labels
 import odg.logging_cfg
+import odg.telemetry
 import odg.model
 import odg.util
 import odg_client
@@ -23,7 +24,8 @@ import secret_mgmt
 
 logger = structlog.get_logger(__name__)
 k8s.logging.configure_kubernetes_logging()
-odg.logging_cfg.configure_logging(service_name='codeql')
+odg.logging_cfg.configure_logging()
+odg.telemetry.configure_telemetry()
 
 # CodeQL uses different language names than GitHub's /languages endpoint.
 # This mapping expands CodeQL language identifiers to their GitHub equivalents

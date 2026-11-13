@@ -191,3 +191,52 @@ def test_default_namespace():
     for kind in ('ClusterRole', 'ClusterRoleBinding', 'CustomResourceDefinition'):
         cluster_scoped = {'kind': kind, 'metadata': {'name': 'foo'}}
         assert 'namespace' not in odgc._default_namespace(cluster_scoped, 'bar')['metadata']
+
+
+def _extension_definition(name: str) -> odgm.ExtensionDefinition:
+    return dacite.from_dict(
+        data={
+            'name': name,
+            'installation': {'ocm_references': [], 'value_templates': []},
+            'outputs': [],
+            'dependencies': [],
+        },
+        data_class=odgm.ExtensionDefinition,
+        config=dacite.Config(cast=[enum.Enum]),
+    )
+
+
+def test_resolve_otlp_endpoint_derives_when_telemetry_deployed():
+    assert (
+        odgc.resolve_otlp_endpoint(
+            odg_context={'target_namespace': 'delivery'},
+            requested_extension_definitions=[
+                _extension_definition('delivery-service'),
+                _extension_definition('telemetry'),
+            ],
+        )
+        == 'http://telemetry-opentelemetry-collector.delivery:4317'
+    )
+
+
+def test_resolve_otlp_endpoint_unset_when_telemetry_not_deployed():
+    assert (
+        odgc.resolve_otlp_endpoint(
+            odg_context={'target_namespace': 'delivery'},
+            requested_extension_definitions=[_extension_definition('delivery-service')],
+        )
+        is None
+    )
+
+
+def test_resolve_otlp_endpoint_explicit_value_wins():
+    assert (
+        odgc.resolve_otlp_endpoint(
+            odg_context={
+                'target_namespace': 'delivery',
+                'otlp_endpoint': 'https://central-collector.example.com:4317',
+            },
+            requested_extension_definitions=[_extension_definition('telemetry')],
+        )
+        is None
+    )
