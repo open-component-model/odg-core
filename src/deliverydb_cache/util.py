@@ -4,9 +4,13 @@ import datetime
 import enum
 import json
 
+import orjson
+import structlog
 import yaml
 
 import deliverydb_cache.model as dcm
+
+logger = structlog.get_logger(__name__)
 
 
 def normalise_and_serialise_object(
@@ -84,7 +88,7 @@ def serialise_cache_value(
     encoding_format: dcm.EncodingFormat,
 ) -> bytes:
     if encoding_format is dcm.EncodingFormat.JSON:
-        return json.dumps(value).encode('utf-8')
+        return orjson.dumps(value)
 
     elif encoding_format is dcm.EncodingFormat.YAML:
         return yaml.dump(value).encode('utf-8')
@@ -98,7 +102,14 @@ def deserialise_cache_value(
     encoding_format: dcm.EncodingFormat,
 ):
     if encoding_format is dcm.EncodingFormat.JSON:
-        return json.loads(value)
+        try:
+            return orjson.loads(value)
+        except orjson.JSONDecodeError:
+            # legacy entries (e.g. containing NaN/Infinity, rejected by orjson) remain
+            # readable via the lenient stdlib decoder; if that also fails, the error
+            # propagates instead of fabricating a cached `None`
+            logger.info('cache entry rejected by orjson, falling back to stdlib json')
+            return json.loads(value)
 
     elif encoding_format is dcm.EncodingFormat.YAML:
         return yaml.safe_load(value)
