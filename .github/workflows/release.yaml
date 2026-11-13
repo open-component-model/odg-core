@@ -1,35 +1,83 @@
-name: Release (ODG)
+name: Release
 on:
   workflow_dispatch:
     inputs:
-      next-version:
+      mode:
         type: choice
         options:
-          - automatic
-          - bump-minor
-          - bump-patch
+          - candidate
+          - regular
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
+  preprocess:
+    runs-on: ubuntu-latest
+    name: Preprocess
+    environment: release  # require approval to run
+    permissions: {}
+    outputs:
+      release-candidate: ${{ steps.determine-rc.outputs.release-candidate }}
+    steps:
+      - name: Verify Release Branch
+        run: |
+          if [[ "$GITHUB_REF_TYPE" != "branch" || ! "$GITHUB_REF_NAME" =~ ^release-[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: release workflow must run on a 'release-<major>.<minor>' branch, got: $GITHUB_REF_NAME"
+            echo "Hint: run the 'Prepare Release Candidate' workflow first to create a release branch."
+            exit 1
+          fi
+      - uses: gardener/cc-utils/.github/actions/trusted-checkout@v1
+      - name: Verify Component References Are No Release Candidates
+        if: ${{ inputs.mode == 'regular' }}
+        run: |
+          candidates=$(yq '.componentReferences[].version | select(test("-rc\\."))' .ocm/base-component.yaml)
+          if [[ -n "$candidates" ]]; then
+            echo "Error: the following componentReference versions are release candidates:"
+            echo "$candidates"
+            echo "All componentReferences in .ocm/base-component.yaml must be full releases before releasing."
+            exit 1
+          fi
+      - name: Determine Release Candidate
+        id: determine-rc
+        if: ${{ inputs.mode == 'candidate' }}
+        run: |
+          version=$(cat VERSION)
+          if [[ "$version" =~ -rc\.([0-9]+)$ ]]; then
+            release_candidate="${BASH_REMATCH[1]}"
+          else
+            release_candidate=0
+          fi
+
+          echo "Will use release candidate 'rc.${release_candidate}'"
+          echo "release-candidate=${release_candidate}" >> "$GITHUB_OUTPUT"
+
   build:
     uses: ./.github/workflows/build.yaml
+    needs:
+      - preprocess
     permissions:
       contents: write
       packages: write
       id-token: write
     with:
       mode: release
+      version-prerelease: ${{ inputs.mode == 'candidate' && format('rc.{0}', needs.preprocess.outputs.release-candidate) || '' }}
 
   release-to-github-and-bump:
     uses: gardener/cc-utils/.github/workflows/release.yaml@v1
     needs:
       - build
+      - preprocess
     permissions:
       contents: write
       packages: write
       id-token: write
     with:
-      release-commit-target: branch
-      next-version: ${{ inputs.next-version }}
+      next-version: ${{ inputs.mode == 'candidate' && 'set-prerelease' || 'bump-patch' }}
+      release-candidate: ${{ inputs.mode == 'candidate' && needs.preprocess.outputs.release-candidate || '' }}
+      github-release-notes-recursion-depth: -1
 
   pypi:
     runs-on: ubuntu-latest
