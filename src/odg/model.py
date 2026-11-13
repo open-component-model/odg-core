@@ -7,7 +7,9 @@ import hashlib
 import textwrap
 import typing
 
-import dacite
+import mashumaro.codecs
+import mashumaro.codecs.orjson
+import mashumaro.dialect
 import ocm
 import ocm.iter
 import structlog
@@ -508,7 +510,8 @@ class VulnerabilityFinding(Finding):
     cve: str
     purl: str | None = None
     cvss_score: float | None = None  # allow fallback to cvss_v3_score for compatibility
-    cvss: odg.cvss.CVSSV3 | dict | None = None
+    # `dict` first: decoded rows keep a plain dict (as before; rescore.artefacts expects that)
+    cvss: dict | odg.cvss.CVSSV3 | None = None
     rating_source: str | None = None  # name of the CVSS rating source, e.g. 'NVD', 'redhat', 'alma'
     summary: str | None = None
     recommendation: str | None = None
@@ -735,7 +738,7 @@ class GitHubSecretFinding(Finding):
     secret_type_display_name: str
     resolution: str | None
     url: str
-    locations: list[GitHubSecretFindingLocation] | None
+    locations: list[GitHubSecretFindingLocation] | None = None  # key is absent in older rows
     path: str | None = None  # has been replaced by `locations` -> keep for backwards compatibility
     line: int | None = None  # has been replaced by `locations`
     location_type: str | None = None  # has been replaced by `locations`
@@ -748,7 +751,7 @@ class GitHubSecretFinding(Finding):
 @dataclasses.dataclass
 class RescoreGitHubSecretFinding:
     html_url: str
-    resolution: str
+    resolution: str | None  # null for auto-rescored closed alerts
 
     @property
     def key(self) -> str:
@@ -765,11 +768,12 @@ class DikiCheck:
 class DikiFinding(Finding):
     provider_id: str
     ruleset_id: str
-    ruleset_name: str | None
     ruleset_version: str
     rule_id: str
-    rule_name: str | None
     checks: list[DikiCheck]
+    # keys are absent in older delivery-db rows
+    ruleset_name: str | None = None
+    rule_name: str | None = None
 
     @property
     def key(self) -> str:
@@ -1003,6 +1007,22 @@ class ArtefactUUID:
     uuid4: str
 
 
+_RescoringFindingField = (
+    RescoringVulnerabilityFinding
+    | RescoringIPFinding
+    | RescoringLicenseFinding
+    | MalwareFindingDetails
+    | RescoreSastFinding
+    | RescoreCodeqlFinding
+    | RescoringCryptoFinding
+    | RescoringDikiFinding
+    | RescoreOsIdFinding
+    | RescoringFalcoFinding
+    | RescoringKyvernoFinding
+    | RescoreGitHubSecretFinding
+)
+
+
 @dataclasses.dataclass
 class CustomRescoring:
     """
@@ -1012,23 +1032,10 @@ class CustomRescoring:
     individual discovery dates (for example, this might be the case if exceptions apply).
     """
 
-    finding: (
-        RescoringVulnerabilityFinding
-        | RescoringLicenseFinding
-        | MalwareFindingDetails
-        | RescoreSastFinding
-        | RescoreCodeqlFinding
-        | RescoringCryptoFinding
-        | RescoringDikiFinding
-        | RescoreOsIdFinding
-        | RescoringFalcoFinding
-        | RescoringKyvernoFinding
-        | RescoreGitHubSecretFinding
-        | RescoringIPFinding
-    )
+    finding: _RescoringFindingField
     referenced_type: str
     severity: str
-    user: BDBAUser | GitHubUser | User
+    user: BDBAUser | GitHubUser | OidcUser | User
     matching_rules: list[str] = dataclasses.field(default_factory=list)
     comment: str | None = None
     allowed_processing_time: str | None = None
@@ -1065,20 +1072,7 @@ class SlaViolationTraceEntry:
 
 @dataclasses.dataclass
 class SlaViolation:
-    finding: (
-        RescoringVulnerabilityFinding
-        | RescoringLicenseFinding
-        | MalwareFindingDetails
-        | RescoreSastFinding
-        | RescoreCodeqlFinding
-        | RescoringCryptoFinding
-        | RescoringDikiFinding
-        | RescoreOsIdFinding
-        | RescoringFalcoFinding
-        | RescoringKyvernoFinding
-        | RescoreGitHubSecretFinding
-        | RescoringIPFinding
-    )
+    finding: _RescoringFindingField
     referenced_type: str
     severity: str
     artefact: ComponentArtefactId
@@ -1753,6 +1747,54 @@ class ArtefactMetadataSpecificity(enum.Enum):
         return self._asint(self) >= self._asint(other)
 
 
+# `Datatype` -> single payload class. Rescorings, vulnerability findings, scanner writebacks and
+# artefact scan infos (several classes or mixed rows) have dedicated functions in
+# `_decode_payload_by_type` instead.
+_payload_model_by_type: dict[Datatype, type] = {
+    Datatype.CODEQL_FINDING: CodeqlFinding,
+    Datatype.COMPLIANCE_SNAPSHOTS: ComplianceSnapshot,
+    Datatype.CRYPTO_ASSET: CryptoAsset,
+    Datatype.CRYPTO_FINDING: CryptoFinding,
+    Datatype.DIKI_FINDING: DikiFinding,
+    Datatype.FALCO_FINDING: FalcoFinding,
+    Datatype.GHAS_FINDING: GitHubSecretFinding,
+    Datatype.INVENTORY_FINDING: InventoryFinding,
+    Datatype.IP_FINDING: IPFinding,
+    Datatype.KYVERNO_FINDING: KyvernoFinding,
+    Datatype.LICENSE_FINDING: LicenseFinding,
+    Datatype.MALWARE_FINDING: ClamAVMalwareFinding,
+    # Datatype.OSID is not dispatched on purpose: its rows are operating-system identification
+    # payloads (all fields optional, `OperatingSystemId` isn't in the envelope union), which the
+    # union resolves structurally to OsIdFinding or dict
+    Datatype.OSID_FINDING: OsIdFinding,
+    Datatype.RESPONSIBLES: ResponsibleInfo,
+    Datatype.SAST_FINDING: SastFinding,
+    Datatype.SLA_VIOLATION: SlaViolations,
+    Datatype.STRUCTURE_INFO: StructureInfo,
+    Datatype.UUID: ArtefactUUID,
+}
+
+
+def _strict_str(value: str) -> str:
+    # mashumaro would silently turn e.g. None into 'None' for `str` fields; dacite rejected it.
+    # Rejecting keeps such rows on the dict fallback, which their stored row ids depend on.
+    if not isinstance(value, str):
+        raise ValueError(f'expected str, got {type(value).__name__}')
+    return value
+
+
+def _parse_discovery_date(value: str | None) -> datetime.date | None:
+    return datetime.datetime.fromisoformat(value).date() if value else None
+
+
+class _StrictDialect(mashumaro.dialect.Dialect):
+    serialization_strategy = {str: {'deserialize': _strict_str}}  # noqa: RUF012
+
+
+def _basic_decoder(model: type) -> mashumaro.codecs.BasicDecoder:
+    return mashumaro.codecs.BasicDecoder(model, default_dialect=_StrictDialect)
+
+
 FindingModels = (
     ClamAVMalwareFinding
     | CodeqlFinding
@@ -1777,7 +1819,6 @@ MetaModels = (
     | ComplianceSnapshot
     | ArtefactUUID
     | SlaViolations
-    | dict
 )
 
 
@@ -1800,27 +1841,22 @@ class ArtefactMetadata:
 
     artefact: ComponentArtefactId
     meta: Metadata
-    data: FindingModels | InformationalModels | MetaModels
+    # MetaModels must precede InformationalModels: ResponsibleInfo only requires `referenced_type`
+    # and, as extra keys are ignored, would otherwise swallow e.g. rescorings
+    data: FindingModels | MetaModels | InformationalModels | dict
     discovery_date: datetime.date | None = None  # required for finding specific SLA tracking
     allowed_processing_time: str | None = None
 
     @staticmethod
     def from_dict(raw: dict):
-        return dacite.from_dict(
-            data_class=ArtefactMetadata,
-            data=raw,
-            config=dacite.Config(
-                type_hooks={
-                    datetime.datetime: datetime.datetime.fromisoformat,
-                    datetime.date: lambda date: datetime.datetime.fromisoformat(date).date(),
-                },
-                cast=[
-                    enum.StrEnum,
-                    MatchCondition,
-                ],
-                strict=True,
-            ),
-        )
+        meta_type = raw['meta']['type']
+        data = raw['data']
+
+        if decode := _decode_payload_by_type.get(meta_type):
+            data = decode(data)
+        # else: types without payload class keep their raw data
+
+        return _build_artefact_metadata(raw, data)
 
     @property
     def key(self) -> str:
@@ -1862,6 +1898,99 @@ class ArtefactMetadata:
 
     def __hash__(self) -> int:
         return hash(self.key)
+
+
+_decode_custom_rescoring = _basic_decoder(CustomRescoring)
+_decode_artefact = _basic_decoder(ComponentArtefactId)
+_decode_metadata = _basic_decoder(Metadata)
+
+# the `referenced_type` stored in every rescoring `data` blob maps 1:1 to the concrete rescoring
+# finding class; picking it by this discriminator is unambiguous, unlike the structural union
+_decode_rescoring_finding_by_type: dict[str, mashumaro.codecs.BasicDecoder] = {
+    Datatype.CODEQL_FINDING: _basic_decoder(RescoreCodeqlFinding),
+    Datatype.CRYPTO_FINDING: _basic_decoder(RescoringCryptoFinding),
+    Datatype.DIKI_FINDING: _basic_decoder(RescoringDikiFinding),
+    Datatype.FALCO_FINDING: _basic_decoder(RescoringFalcoFinding),
+    Datatype.GHAS_FINDING: _basic_decoder(RescoreGitHubSecretFinding),
+    Datatype.IP_FINDING: _basic_decoder(RescoringIPFinding),
+    Datatype.KYVERNO_FINDING: _basic_decoder(RescoringKyvernoFinding),
+    Datatype.LICENSE_FINDING: _basic_decoder(RescoringLicenseFinding),
+    Datatype.MALWARE_FINDING: _basic_decoder(MalwareFindingDetails),
+    Datatype.OSID_FINDING: _basic_decoder(RescoreOsIdFinding),
+    Datatype.SAST_FINDING: _basic_decoder(RescoreSastFinding),
+    Datatype.VULNERABILITY_FINDING: _basic_decoder(RescoringVulnerabilityFinding),
+}
+
+
+def _build_artefact_metadata(raw: dict, data: typing.Any) -> ArtefactMetadata:
+    """Decodes the envelope parts of `raw` and attaches the already decoded `data`."""
+    return ArtefactMetadata(
+        **{
+            **raw,  # unknown envelope keys raise a TypeError
+            'artefact': _decode_artefact.decode(raw['artefact']),
+            'meta': _decode_metadata.decode(raw['meta']),
+            'data': data,
+            'discovery_date': _parse_discovery_date(raw.get('discovery_date')),
+        },
+    )
+
+
+def _decode_rescoring(data: dict) -> CustomRescoring:
+    # the `finding` union can't tell the reduced findings apart, so it is decoded by
+    # `referenced_type` instead
+    rescoring = _decode_custom_rescoring.decode(data)
+    finding = _decode_rescoring_finding_by_type[data['referenced_type']].decode(data['finding'])
+    return dataclasses.replace(rescoring, finding=finding)
+
+
+_decode_bdba_vulnerability_finding = _basic_decoder(BDBAVulnerabilityFinding)
+_decode_vulnerability_finding = _basic_decoder(VulnerabilityFinding)
+
+
+def _decode_vulnerability(data: dict) -> VulnerabilityFinding:
+    # both classes share `meta.type`; BDBA rows (nearly all) carry the mixin fields
+    if 'base_url' in data:
+        return _decode_bdba_vulnerability_finding.decode(data)
+    return _decode_vulnerability_finding.decode(data)
+
+
+_decode_responsible_info = _basic_decoder(ResponsibleInfo)
+
+
+def _decode_artefact_scan_info(data: dict) -> ResponsibleInfo | dict:
+    # most rows of this `meta.type` are payloads without class (`{}`, `{'report_url': ...}`)
+    if 'referenced_type' in data:
+        return _decode_responsible_info.decode(data)
+    return data
+
+
+_decode_package_version_scanner_writeback = _basic_decoder(PackageVersionScannerWriteback)
+_decode_license_scanner_writeback = _basic_decoder(LicenseScannerWriteback)
+
+
+def _decode_scanner_writeback(
+    data: dict,
+) -> PackageVersionScannerWriteback | LicenseScannerWriteback:
+    # both classes share `meta.type`; `license_to` is required for (only) the license variant
+    if 'license_to' in data:
+        return _decode_license_scanner_writeback.decode(data)
+    return _decode_package_version_scanner_writeback.decode(data)
+
+
+# one payload class per `meta.type`; decoding it directly is ~10x faster than mashumaro's
+# structural union resolution, which trials every candidate
+_decode_payload_by_type: dict[str, typing.Callable[[dict], object]] = {
+    datatype: _basic_decoder(model).decode for datatype, model in _payload_model_by_type.items()
+} | {
+    Datatype.ARTEFACT_SCAN_INFO: _decode_artefact_scan_info,
+    Datatype.RESCORING: _decode_rescoring,
+    Datatype.SCANNER_WRITEBACK: _decode_scanner_writeback,
+    Datatype.VULNERABILITY_FINDING: _decode_vulnerability,
+}
+
+
+artefact_metadata_encoder = mashumaro.codecs.orjson.ORJSONEncoder(ArtefactMetadata)
+artefact_metadata_basic_encoder = mashumaro.codecs.BasicEncoder(ArtefactMetadata)
 
 
 def artefact_scan_info(
