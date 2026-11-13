@@ -169,6 +169,7 @@ def test_create_or_update_odg_reports_invalid_archive(monkeypatch):
             (
                 types.SimpleNamespace(
                     content=_tar_gz(_symlink('chart/values.yaml', '/etc/passwd')),
+                    media_type=odgc.HELM_CHART_MEDIA_TYPE,
                 ),
             ),
         ),

@@ -415,41 +415,25 @@ def create_or_update_odg(
                 artefact_name=artefact.name,
             )
 
-            if artefact.access.type is ocm.AccessType.LOCAL_BLOB:
-                blob_descriptor = next(
-                    ocm_util.iter_blob_descriptors(
-                        component=installation_artefact.component,
-                        access=artefact.access,
-                        oci_client=oci_client,
-                        secret_factory=None,  # only required for s3 access
-                    ),
-                )
-                content_iterator = blob_descriptor.content
+            try:
+                for blob_descriptor in ocm_util.iter_blob_descriptors(
+                    component=installation_artefact.component,
+                    access=artefact.access,
+                    oci_client=oci_client,
+                    secret_factory=None,  # only required for s3 access
+                ):
+                    if blob_descriptor.media_type != HELM_CHART_MEDIA_TYPE:
+                        continue
 
-            elif artefact.access.type is ocm.AccessType.OCI_REGISTRY:
-                manifest = oci_client.manifest(
-                    image_reference=artefact.access.imageReference,
-                )
-
-                helm_chart_layer = None
-                for layer in manifest.layers:
-                    if layer.mediaType == HELM_CHART_MEDIA_TYPE:
-                        helm_chart_layer = layer
-                        break
+                    content_iterator = blob_descriptor.content
+                    break
                 else:
                     handle_error(
                         extension_name=extension_instance.name,
-                        error_msg=f'no helm chart layer found in {artefact.access.imageReference}',
+                        error_msg=f'no helm chart content found in {artefact.access=}',
                     )
                     continue
-
-                content_iterator = oci_client.blob(
-                    image_reference=artefact.access.imageReference,
-                    digest=helm_chart_layer.digest,
-                    stream=True,
-                ).iter_content(chunk_size=tarfile.RECORDSIZE)
-
-            else:
+            except RuntimeError:
                 handle_error(
                     extension_name=extension_instance.name,
                     error_msg=f'unsupported artefact access type {artefact.access.type}',
