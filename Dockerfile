@@ -1,12 +1,15 @@
 FROM golang:1.27.1-alpine3.24@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3bd96672ee5ed43414 AS cbomkit-theia-builder
 # renovate: datasource=github-releases depName=cbomkit/cbomkit-theia versioningTemplate=semver-coerced extractVersionTemplate=^v?(?<version>.*)$
 ARG CBOMKIT_THEIA_VERSION=1.1.2
+ARG CBOMKIT_THEIA_COMMIT=dcd95ac86d1cbe6e867ff3ee059b9ef77bac6a59
 # Cache mounts: local BuildKit only — harmless no-op where unsupported (e.g. kaniko in CI)
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     apk add --no-cache git \
  && git clone --depth 1 --branch release/${CBOMKIT_THEIA_VERSION} https://github.com/cbomkit/cbomkit-theia.git /cbomkit-theia \
- && cd /cbomkit-theia && go mod download -x && go build -v
+ && cd /cbomkit-theia \
+ && git rev-parse HEAD | grep -qx ${CBOMKIT_THEIA_COMMIT} \
+ && go mod download -x && go build -v
 
 FROM python:3.14-alpine3.24@sha256:eb2c62658b8d51bff0acc408504b76521d02030de56a8a3c1e830083e89b89d2
 
