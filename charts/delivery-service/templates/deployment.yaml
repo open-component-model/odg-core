@@ -105,11 +105,13 @@ spec:
           - name: K8S_TARGET_NAMESPACE
             value: {{ .Values.target_namespace | default .Release.Namespace }}
           # same semantics as odg.otelEnv in charts/extensions/templates/helpers.tpl
-          # (this chart doesn't include that helper)
+          # (this chart doesn't include that helper); global.otlpEndpoint is the
+          # attribute the operator renders the ODG CR's context.otlp_endpoint
+          # into, uniformly for all managed charts (extension-definitions.yaml)
           - name: OTEL_EXPORTER_OTLP_ENDPOINT
             value: {{ ternary ((.Values.global).otlpEndpoint) (printf "http://telemetry-opentelemetry-collector.%s:4317" (.Values.target_namespace | default .Release.Namespace)) (hasKey (.Values.global | default dict) "otlpEndpoint") | quote }}
           - name: OTEL_SERVICE_NAME
-            value: delivery-service
+            value: {{ .Chart.Name | quote }}
           - name: OTEL_SEMCONV_STABILITY_OPT_IN
             value: http
           # k8s identity via downward API for resource attrs (collector-side

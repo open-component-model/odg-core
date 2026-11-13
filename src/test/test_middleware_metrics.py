@@ -22,18 +22,18 @@ def anyio_backend():
 
 @pytest.fixture
 async def otel_reader():
-    from opentelemetry import metrics as otel_metrics
-    from opentelemetry.sdk.metrics import MeterProvider
-    from opentelemetry.sdk.metrics.export import InMemoryMetricReader
-    from opentelemetry.util._once import Once
+    import opentelemetry.metrics._internal as metrics_internal
+    import opentelemetry.sdk.metrics
+    import opentelemetry.sdk.metrics.export
+    import opentelemetry.util._once
 
-    reader = InMemoryMetricReader()
-    provider = MeterProvider(metric_readers=[reader])
-    otel_metrics._internal._METER_PROVIDER = provider
+    reader = opentelemetry.sdk.metrics.export.InMemoryMetricReader()
+    provider = opentelemetry.sdk.metrics.MeterProvider(metric_readers=[reader])
+    metrics_internal._METER_PROVIDER = provider
     yield reader
     provider.shutdown()
-    otel_metrics._internal._METER_PROVIDER = None
-    otel_metrics._internal._METER_PROVIDER_SET_ONCE = Once()
+    metrics_internal._METER_PROVIDER = None
+    metrics_internal._METER_PROVIDER_SET_ONCE = opentelemetry.util._once.Once()
 
 
 @pytest.fixture

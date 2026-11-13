@@ -49,9 +49,9 @@ async def test_no_endpoint_is_noop(unset_otel, caplog, capfd):
 async def test_excluded_urls_match_probes_but_not_dora(unset_otel):
     """`ExcludeList` uses re.search — unanchored tokens like `metrics` would
     also exclude real endpoints (`/dora/dora-metrics`)."""
-    from opentelemetry.util.http import ExcludeList
+    import opentelemetry.util.http
 
-    excluded = ExcludeList(unset_otel.excluded_urls.split(','))
+    excluded = opentelemetry.util.http.ExcludeList(unset_otel.excluded_urls.split(','))
 
     assert excluded.url_disabled('/healthz')
     assert excluded.url_disabled('/ready')
@@ -85,8 +85,15 @@ async def test_configure_with_endpoint_sets_providers(unset_otel, monkeypatch):
     """With an endpoint, tracer + meter providers and instrumentations are
     configured. Providers are global singletons (`Once`); as soon as one test
     in this process set a provider the assertion relies on that global state."""
-    from opentelemetry.instrumentation.aiohttp_server import AioHttpServerInstrumentor
-    from opentelemetry.util._once import Once
+    import opentelemetry.instrumentation.aiohttp_client
+    import opentelemetry.instrumentation.aiohttp_server
+    import opentelemetry.instrumentation.requests
+    import opentelemetry.metrics
+    import opentelemetry.metrics._internal as metrics_internal
+    import opentelemetry.sdk.metrics
+    import opentelemetry.sdk.trace
+    import opentelemetry.trace
+    import opentelemetry.util._once
 
     monkeypatch.setenv('OTEL_EXPORTER_OTLP_ENDPOINT', 'http://localhost:4317')
     monkeypatch.setenv('OTEL_SERVICE_NAME', 'test-svc')
@@ -94,13 +101,14 @@ async def test_configure_with_endpoint_sets_providers(unset_otel, monkeypatch):
     try:
         unset_otel.configure_telemetry()
 
-        from opentelemetry import metrics
-        from opentelemetry import trace
-        from opentelemetry.sdk.metrics import MeterProvider
-        from opentelemetry.sdk.trace import TracerProvider
-
-        assert isinstance(trace.get_tracer_provider(), TracerProvider)
-        assert isinstance(metrics.get_meter_provider(), MeterProvider)
+        assert isinstance(
+            opentelemetry.trace.get_tracer_provider(),
+            opentelemetry.sdk.trace.TracerProvider,
+        )
+        assert isinstance(
+            opentelemetry.metrics.get_meter_provider(),
+            opentelemetry.sdk.metrics.MeterProvider,
+        )
     finally:
         # restore global state for other tests in the same process
         providers = []
@@ -114,37 +122,32 @@ async def test_configure_with_endpoint_sets_providers(unset_otel, monkeypatch):
                 provider.shutdown()
             except Exception:
                 pass
-        import opentelemetry.trace as otel_trace_module
-        import opentelemetry.metrics as otel_metrics_module
-
-        otel_trace_module._TRACER_PROVIDER = None
-        otel_trace_module._TRACER_PROVIDER_SET_ONCE = Once()
-        otel_metrics_module._internal._METER_PROVIDER = None
-        otel_metrics_module._internal._METER_PROVIDER_SET_ONCE = Once()
+        opentelemetry.trace._TRACER_PROVIDER = None
+        opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = opentelemetry.util._once.Once()
+        metrics_internal._METER_PROVIDER = None
+        metrics_internal._METER_PROVIDER_SET_ONCE = opentelemetry.util._once.Once()
 
         # both instrumentors attach middlewares/meters sharing the global
         # providers — reset them so no scope leaks into metrics tests
-        from opentelemetry.instrumentation.aiohttp_client import AioHttpClientInstrumentor
-        from opentelemetry.instrumentation.requests import RequestsInstrumentor
-
         for instrumentor in (
-            AioHttpServerInstrumentor,
-            AioHttpClientInstrumentor,
-            RequestsInstrumentor,
+            opentelemetry.instrumentation.aiohttp_server.AioHttpServerInstrumentor,
+            opentelemetry.instrumentation.aiohttp_client.AioHttpClientInstrumentor,
+            opentelemetry.instrumentation.requests.RequestsInstrumentor,
         ):
             instrumentor._is_instrumented_by_opentelemetry = False
             instrumentor().uninstrument()
 
 
 def test_scrubbing_span_processor_redacts_credential_attributes():
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+    import opentelemetry.sdk.trace
+    import opentelemetry.sdk.trace.export
+    import opentelemetry.sdk.trace.export.in_memory_span_exporter as in_memory_span_exporter
 
-    exporter = InMemorySpanExporter()
-    tracer_provider = TracerProvider()
+    exporter = in_memory_span_exporter.InMemorySpanExporter()
+    tracer_provider = opentelemetry.sdk.trace.TracerProvider()
     tracer_provider.add_span_processor(odg.telemetry._scrubbing_span_processor())
-    tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
+    exporter_processor = opentelemetry.sdk.trace.export.SimpleSpanProcessor(exporter)
+    tracer_provider.add_span_processor(exporter_processor)
 
     tracer_provider.get_tracer(__name__).start_span(
         'POST',

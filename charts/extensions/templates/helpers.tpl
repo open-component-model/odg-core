@@ -41,10 +41,17 @@ The app code treats an empty OTEL_EXPORTER_OTLP_ENDPOINT as "tracing
 off" (odg.telemetry.configure_telemetry no-ops), so this renders an empty
 value with no further gating in every template.
 
-Intended use inside each workload's env: block (needs the sub-chart name for
-OTEL_SERVICE_NAME, which matches the service_name passed to configure_logging):
+Intended use inside each workload's env: block:
 
   {{- include "odg.otelEnv" . | nindent 12 }}
+
+OTEL_SERVICE_NAME defaults to the sub-chart name and is the single service
+identity for traces AND logs (configure_logging() falls back to it, so entry
+points no longer hardcode service names). Workloads whose process name differs
+from the chart name — charts shipping more than one process, e.g. clamav
+(malware) + freshclam — pass an override:
+
+  {{- include "odg.otelEnv" (mergeOverwrite (deepCopy .) (dict "serviceName" "malware")) | nindent 12 }}
 
 `odg.otelResourceAttrs` additionally injects k8s metadata (pod name / uid /
 namespace) via the downward API into OTEL_RESOURCE_ATTRIBUTES. Prefer it for
@@ -66,7 +73,7 @@ inside the define renders into pod manifests, so no YAML comments in the body.
 - name: OTEL_EXPORTER_OTLP_ENDPOINT
   value: {{ ternary (.Values.global.otlpEndpoint) (printf "http://telemetry-opentelemetry-collector.%s:4317" (.Values.target_namespace | default .Release.Namespace)) (hasKey .Values.global "otlpEndpoint") | quote }}
 - name: OTEL_SERVICE_NAME
-  value: {{ .Chart.Name | quote }}
+  value: {{ .serviceName | default .Chart.Name | quote }}
 - name: OTEL_SEMCONV_STABILITY_OPT_IN
   value: http
 {{- end -}}

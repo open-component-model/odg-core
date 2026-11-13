@@ -341,7 +341,6 @@ async def initialise_app():
     odg.logging_cfg.configure_logging(
         log_level=parsed_arguments.log_level,
         json_logs=parsed_arguments.json_logs,
-        service_name='delivery-service',
     )
     # before `aiohttp.web.Application(...)` — instrumentation patches Application.__init__
     odg.telemetry.configure_telemetry()

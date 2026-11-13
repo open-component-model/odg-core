@@ -39,7 +39,7 @@ import odg_operator.odg_util as odgu
 import paths
 import util
 
-odg.logging_cfg.configure_logging(service_name='odg-operator')
+odg.logging_cfg.configure_logging()
 odg.telemetry.configure_telemetry()
 logger = structlog.get_logger(__name__)
 
@@ -958,7 +958,6 @@ if __name__ == '__main__':
     if parsed.debug:
         odg.logging_cfg.configure_logging(
             log_level=logging.DEBUG,
-            service_name='odg-operator',
         )
 
     if not (extensions_cfg_path := parsed.extensions_cfg_path):

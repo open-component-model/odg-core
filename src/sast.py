@@ -22,7 +22,7 @@ import rescore.utility
 
 logger = structlog.get_logger(__name__)
 k8s.logging.configure_kubernetes_logging()
-odg.logging_cfg.configure_logging(service_name='sast')
+odg.logging_cfg.configure_logging()
 odg.telemetry.configure_telemetry()
 
 

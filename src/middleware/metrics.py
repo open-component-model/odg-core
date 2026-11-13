@@ -28,22 +28,24 @@ import datetime
 import aiohttp.typedefs
 import aiohttp.web
 import aiohttp.web_exceptions
+import opentelemetry.metrics
 import structlog
-from opentelemetry import metrics
-from opentelemetry.metrics import Counter
-from opentelemetry.metrics import Histogram
 
 
 logger = structlog.get_logger(__name__)
 
 # aiohttp app storage keys
-APP_HTTP_SERVER_REQUEST_COUNT: aiohttp.web.AppKey[Counter] = aiohttp.web.AppKey(
-    'http.server.request.count',
-    Counter,
+APP_HTTP_SERVER_REQUEST_COUNT: aiohttp.web.AppKey[opentelemetry.metrics.Counter] = (
+    aiohttp.web.AppKey(
+        'http.server.request.count',
+        opentelemetry.metrics.Counter,
+    )
 )
-APP_HTTP_SERVER_QUEUE_DEPTH: aiohttp.web.AppKey[Histogram] = aiohttp.web.AppKey(
-    'http.server.request.queue_depth',
-    Histogram,
+APP_HTTP_SERVER_QUEUE_DEPTH: aiohttp.web.AppKey[opentelemetry.metrics.Histogram] = (
+    aiohttp.web.AppKey(
+        'http.server.request.queue_depth',
+        opentelemetry.metrics.Histogram,
+    )
 )
 
 SLOW_REQUEST_THRESHOLD_SECONDS = 30.0
@@ -145,7 +147,7 @@ def add_http_metrics_middleware(
 
         return response
 
-    meter = metrics.get_meter('odg.http')
+    meter = opentelemetry.metrics.get_meter('odg.http')
 
     app[APP_HTTP_SERVER_REQUEST_COUNT] = meter.create_counter(
         name='http.server.request.count',

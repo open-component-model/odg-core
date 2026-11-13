@@ -15,8 +15,9 @@ Configuration is entirely via standard OTel env vars (read by the SDK):
   `http://telemetry-opentelemetry-collector.odg-system:4317`. **Unset or empty
   means no instrumentation**: `configure_telemetry()` is a no-op, so local
   dev/tests and clusters without a collector run unmodified.
-- `OTEL_SERVICE_NAME` — overrides `service_name`; injected by helm per
-  extension, matches the name passed to `configure_logging()`.
+- `OTEL_SERVICE_NAME` — service identity for traces AND logs; injected by
+  helm per extension (`.Chart.Name`). `configure_logging()` falls back to it
+  when no `service_name` is passed, so logs and traces report the same name.
 
 Instrumented libraries:
 - aiohttp server (delivery-service): one span per request, route-templated
@@ -28,7 +29,7 @@ Instrumented libraries:
   propagation
 - requests: same for the sync client; extensions call the delivery-service
   via odg_client (requests-based), so this links extension and
-  delivery-service spans into one trace. Remove once odg_client is async
+  delivery-service spans into one trace
 - aiohttp and the propagators run on contextvars, so manual spans created via
   `opentelemetry.trace.get_tracer(...)` nest under the request span
   automatically
@@ -61,6 +62,8 @@ import structlog
 
 import odg.logging_cfg
 
+# annotations only — the OTel SDK stays lazily imported inside the functions
+# below so importing this module never pulls it in when telemetry is disabled
 if typing.TYPE_CHECKING:
     import opentelemetry.context
     import opentelemetry.sdk.trace
@@ -95,9 +98,9 @@ duration_histogram_buckets_ms = tuple(s * 1000.0 for s in duration_histogram_buc
 
 
 def _scrubbing_span_processor() -> 'opentelemetry.sdk.trace.SpanProcessor':
-    from opentelemetry.sdk.trace import SpanProcessor
+    import opentelemetry.sdk.trace
 
-    class ScrubbingSpanProcessor(SpanProcessor):
+    class ScrubbingSpanProcessor(opentelemetry.sdk.trace.SpanProcessor):
         """
         Scrub credentials from string attributes set at span start (where
         instrumentors put URL/query attributes); attributes are immutable
@@ -143,39 +146,41 @@ def configure_telemetry(
     # reading instrumentation config from the env
     os.environ.setdefault('OTEL_PYTHON_AIOHTTP_SERVER_EXCLUDED_URLS', excluded_urls)
 
-    from opentelemetry import metrics
-    from opentelemetry import trace
-    from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
-    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-    from opentelemetry.sdk.metrics import MeterProvider
-    from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
-    from opentelemetry.sdk.resources import Resource
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    import opentelemetry.exporter.otlp.proto.grpc.metric_exporter as metric_exporter
+    import opentelemetry.exporter.otlp.proto.grpc.trace_exporter as trace_exporter
+    import opentelemetry.metrics
+    import opentelemetry.sdk.metrics
+    import opentelemetry.sdk.metrics.export
+    import opentelemetry.sdk.resources
+    import opentelemetry.sdk.trace
+    import opentelemetry.sdk.trace.export
+    import opentelemetry.trace
 
     # env var (set by helm) wins so one chart helper serves every extension
     service_name = os.environ.get('OTEL_SERVICE_NAME', 'odg')
-    resource = Resource.create(attributes={'service.name': service_name})
+    resource = opentelemetry.sdk.resources.Resource.create(
+        attributes={'service.name': service_name},
+    )
 
-    tracer_provider = TracerProvider(resource=resource)
+    tracer_provider = opentelemetry.sdk.trace.TracerProvider(resource=resource)
     # processors run in registration order: scrub before anything can export
     tracer_provider.add_span_processor(_scrubbing_span_processor())
-    tracer_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
-    trace.set_tracer_provider(tracer_provider)
-
-    from opentelemetry.sdk.metrics import Histogram
-    from opentelemetry.sdk.metrics._internal.aggregation import (
-        ExplicitBucketHistogramAggregation,
+    batch_processor = opentelemetry.sdk.trace.export.BatchSpanProcessor(
+        trace_exporter.OTLPSpanExporter(),
     )
-    from opentelemetry.sdk.metrics.view import View
+    tracer_provider.add_span_processor(batch_processor)
+    opentelemetry.trace.set_tracer_provider(tracer_provider)
+
+    import opentelemetry.sdk.metrics._internal.aggregation as metrics_aggregation
+    import opentelemetry.sdk.metrics.view
 
     # scope-matched View for all seconds-unit histograms: own `odg.http` meter
     # and the aiohttp-server semconv-new meter (schema url pins the scope)
     views = [
-        View(
-            instrument_type=Histogram,
+        opentelemetry.sdk.metrics.view.View(
+            instrument_type=opentelemetry.sdk.metrics.Histogram,
             instrument_unit=unit,
-            aggregation=ExplicitBucketHistogramAggregation(
+            aggregation=metrics_aggregation.ExplicitBucketHistogramAggregation(
                 boundaries=bucket_boundaries,
             ),
         )
@@ -186,35 +191,37 @@ def configure_telemetry(
     ]
 
     # default cadence matches the traces batch processor (~30s flush)
-    metric_reader = PeriodicExportingMetricReader(OTLPMetricExporter())
-    metrics.set_meter_provider(
-        MeterProvider(
+    metric_reader = opentelemetry.sdk.metrics.export.PeriodicExportingMetricReader(
+        metric_exporter.OTLPMetricExporter(),
+    )
+    opentelemetry.metrics.set_meter_provider(
+        opentelemetry.sdk.metrics.MeterProvider(
             resource=resource,
             metric_readers=[metric_reader],
             views=views,
         ),
     )
 
-    from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+    import opentelemetry.instrumentation.sqlalchemy
 
     # with no `engine=` argument this only wraps create_engine/
     # create_async_engine (per-engine spans attach when engines are built);
     # must run here, not where engines are built — the instrumentor is a
     # singleton and a second `instrument()` short-circuits with a warning
-    SQLAlchemyInstrumentor().instrument()
+    opentelemetry.instrumentation.sqlalchemy.SQLAlchemyInstrumentor().instrument()
 
-    from opentelemetry.instrumentation.requests import RequestsInstrumentor
+    import opentelemetry.instrumentation.requests
 
     # independent of `instrument_aiohttp`: batch processes call the
     # delivery-service via the requests-based odg_client
-    RequestsInstrumentor().instrument()
+    opentelemetry.instrumentation.requests.RequestsInstrumentor().instrument()
 
     if instrument_aiohttp:
-        from opentelemetry.instrumentation.aiohttp_client import AioHttpClientInstrumentor
-        from opentelemetry.instrumentation.aiohttp_server import AioHttpServerInstrumentor
+        import opentelemetry.instrumentation.aiohttp_client as aiohttp_client
+        import opentelemetry.instrumentation.aiohttp_server as aiohttp_server
 
-        AioHttpServerInstrumentor().instrument()
-        AioHttpClientInstrumentor().instrument()
+        aiohttp_server.AioHttpServerInstrumentor().instrument()
+        aiohttp_client.AioHttpClientInstrumentor().instrument()
 
     logger.info(
         'OpenTelemetry tracing enabled',

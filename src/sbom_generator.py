@@ -32,7 +32,7 @@ import syft
 
 logger = structlog.get_logger(__name__)
 k8s.logging.configure_kubernetes_logging()
-odg.logging_cfg.configure_logging(service_name='sbom-generator')
+odg.logging_cfg.configure_logging()
 odg.telemetry.configure_telemetry()
 own_dir = os.path.abspath(os.path.dirname(__file__))
 

@@ -360,8 +360,10 @@ def configure_logging(
     Configure root stdlib logger + structlog for this process.
 
     Set `json_logs=False` for human-readable console output (e.g. local dev).
-    `service_name`, if given, is added to every log entry as `service.name`
-    (OTel semantic convention; use the extension/service name, e.g. 'malware').
+    `service_name` is added to every log entry as `service.name` (OTel
+    semantic convention). It defaults to the `OTEL_SERVICE_NAME` env var —
+    injected by helm per extension — so logs and OTel traces share one
+    service identity; pass explicitly only to override (e.g. in tests).
 
     `log_level` may be an int (e.g. `logging.DEBUG`) or a level name (e.g.
     'DEBUG'); unknown names fall back to INFO. If `None` (default), the
@@ -379,6 +381,9 @@ def configure_logging(
 
     if isinstance(log_level, str):
         log_level = logging.getLevelNamesMapping().get(log_level.upper(), logging.INFO)
+
+    if service_name is None:
+        service_name = os.environ.get('OTEL_SERVICE_NAME')
 
     processors = list(_shared_processors)
 
