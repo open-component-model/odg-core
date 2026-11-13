@@ -135,6 +135,7 @@ class ExtensionDefinition:
 class ExtensionInstallationArtefact:
     helm_chart_name: str
     artefact: ocm.Resource
+    component: ocm.Component
 
 
 @dataclasses.dataclass
@@ -177,6 +178,7 @@ class ExtensionInstance:
                 ExtensionInstallationArtefact(
                     helm_chart_name=ocm_ref.helm_chart_name,
                     artefact=resource_node.resource,
+                    component=resource_node.component,
                 ),
             )
 
