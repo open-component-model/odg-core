@@ -207,7 +207,6 @@ def _scrubbed_span(
         events=events,
         links=span.links,
         kind=span.kind,
-        instrumentation_info=span.instrumentation_info,
         status=span.status,
         start_time=span.start_time,
         end_time=span.end_time,
