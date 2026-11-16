@@ -208,9 +208,12 @@ def test_is_allowlisted_ocm_repo_dynamic_netloc():
 def test_is_allowlisted_ocm_repo_virtual():
     # virtual OCM repo names (e.g. '<auto>') are matched by exact string, not as a URL
     virtual_repos = ['<auto>', 'my-virtual-repo']
-    with unittest.mock.patch(
-        'lookups._iter_allowlisted_virtual_ocm_repos',
-        side_effect=lambda: iter(virtual_repos),
+    with (
+        unittest.mock.patch(
+            'lookups._iter_allowlisted_virtual_ocm_repos',
+            side_effect=lambda: iter(virtual_repos),
+        ),
+        _patched_allowlist(),
     ):
         assert lookups.is_allowlisted_ocm_repo('<auto>') is True
         assert lookups.is_allowlisted_ocm_repo('my-virtual-repo') is True
