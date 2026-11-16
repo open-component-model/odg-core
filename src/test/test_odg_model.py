@@ -207,8 +207,8 @@ class TestFromDictDataTypeResolution:
             ),
             (
                 odg.model.Datatype.ARTEFACT_SCAN_INFO,
-                {'referenced_type': 'finding/vulnerability'},
-                odg.model.ResponsibleInfo,
+                {'report_url': 'https://example.org/report'},
+                dict,
             ),
             (
                 odg.model.Datatype.RESCORING,

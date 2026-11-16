@@ -1954,16 +1954,6 @@ def _decode_vulnerability(data: dict) -> VulnerabilityFinding:
     return _decode_vulnerability_finding.decode(data)
 
 
-_decode_responsible_info = _basic_decoder(ResponsibleInfo)
-
-
-def _decode_artefact_scan_info(data: dict) -> ResponsibleInfo | dict:
-    # most rows of this `meta.type` are payloads without class (`{}`, `{'report_url': ...}`)
-    if 'referenced_type' in data:
-        return _decode_responsible_info.decode(data)
-    return data
-
-
 _decode_package_version_scanner_writeback = _basic_decoder(PackageVersionScannerWriteback)
 _decode_license_scanner_writeback = _basic_decoder(LicenseScannerWriteback)
 
@@ -1971,8 +1961,8 @@ _decode_license_scanner_writeback = _basic_decoder(LicenseScannerWriteback)
 def _decode_scanner_writeback(
     data: dict,
 ) -> PackageVersionScannerWriteback | LicenseScannerWriteback:
-    # both classes share `meta.type`; `license_to` is required for (only) the license variant
-    if 'license_to' in data:
+    # both classes share `meta.type`; discriminate on `sub_type` (always present in stored rows)
+    if data.get('sub_type') == ScannerWritebackType.LICENSE:
         return _decode_license_scanner_writeback.decode(data)
     return _decode_package_version_scanner_writeback.decode(data)
 
@@ -1982,7 +1972,6 @@ def _decode_scanner_writeback(
 _decode_payload_by_type: dict[str, typing.Callable[[dict], object]] = {
     datatype: _basic_decoder(model).decode for datatype, model in _payload_model_by_type.items()
 } | {
-    Datatype.ARTEFACT_SCAN_INFO: _decode_artefact_scan_info,
     Datatype.RESCORING: _decode_rescoring,
     Datatype.SCANNER_WRITEBACK: _decode_scanner_writeback,
     Datatype.VULNERABILITY_FINDING: _decode_vulnerability,
