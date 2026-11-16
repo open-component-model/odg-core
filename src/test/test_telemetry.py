@@ -154,8 +154,8 @@ def test_scrubbing_span_processor_redacts_credential_attributes():
         'POST',
         attributes={
             'http.status_code': 200,
-            'http.target': '/auth?code=abc&client_id=xyz',
-            'url.full': 'https://github.com/login/oauth/access_token?client_secret=s3cr3t&code=abc',
+            'http.target': '/auth?code=changeme&client_id=xyz',
+            'url.full': 'https://github.com/login/oauth/access_token?client_secret=changeme&code=changeme',
         },
     ).end()
 
@@ -185,7 +185,7 @@ def test_scrubbing_span_processor_redacts_exception_events():
     try:
         raise RuntimeError(
             '0, message="Exceeded redirects", url=URL(\'https://github.com/login/oauth'
-            "/access_token?client_secret=s3cr3t&code=abc')",
+            "/access_token?client_secret=changeme&code=changeme')",
         )
     except RuntimeError as exception:
         span = tracer_provider.get_tracer(__name__).start_span('POST')
@@ -196,5 +196,66 @@ def test_scrubbing_span_processor_redacts_exception_events():
     (event,) = exported.events
     assert event.name == 'exception'
     for field in ('exception.message', 'exception.stacktrace'):
-        assert 's3cr3t' not in event.attributes[field]
+        assert 'changeme' not in event.attributes[field]
         assert 'client_secret=***&code=***' in event.attributes[field]
+
+
+def test_scrubbing_span_exporter_redacts_sequence_attribute_values():
+    """captured request headers are recorded as string sequences when header
+    capture is enabled, e.g. a Referer carrying a credential-bearing URL —
+    pattern scrubbing must reach into sequences on non-redacted keys too"""
+    import opentelemetry.sdk.trace
+    import opentelemetry.sdk.trace.export
+    import opentelemetry.sdk.trace.export.in_memory_span_exporter as in_memory_span_exporter
+
+    exporter = in_memory_span_exporter.InMemorySpanExporter()
+    tracer_provider = opentelemetry.sdk.trace.TracerProvider()
+    exporter_processor = opentelemetry.sdk.trace.export.SimpleSpanProcessor(
+        odg.telemetry._scrubbing_span_exporter(exporter),
+    )
+    tracer_provider.add_span_processor(exporter_processor)
+
+    tracer_provider.get_tracer(__name__).start_span(
+        'GET',
+        attributes={
+            'http.request.header.referer': (
+                'https://github.com/login/oauth/access_token?client_secret=changeme',
+            ),
+        },
+    ).end()
+
+    (span,) = exporter.get_finished_spans()
+    (header,) = span.attributes['http.request.header.referer']
+    assert 'changeme' not in header
+    assert 'client_secret=***' in header
+
+
+def test_scrubbing_span_exporter_redacts_sensitive_header_attributes_by_key():
+    """captured headers are also redacted BY KEY: with header capture enabled
+    (opt-in), a sensitive header value matching no credential pattern (e.g. a
+    bare api key) must still be redacted; non-sensitive headers stay"""
+    import opentelemetry.sdk.trace
+    import opentelemetry.sdk.trace.export
+    import opentelemetry.sdk.trace.export.in_memory_span_exporter as in_memory_span_exporter
+
+    exporter = in_memory_span_exporter.InMemorySpanExporter()
+    tracer_provider = opentelemetry.sdk.trace.TracerProvider()
+    exporter_processor = opentelemetry.sdk.trace.export.SimpleSpanProcessor(
+        odg.telemetry._scrubbing_span_exporter(exporter),
+    )
+    tracer_provider.add_span_processor(exporter_processor)
+
+    tracer_provider.get_tracer(__name__).start_span(
+        'GET',
+        attributes={
+            'http.request.header.x_api_key': ('7ff9-plain-opaque',),
+            'http.request.header.authorization': ('Bearer changeme-changeme',),
+            'http.request.header.content_type': ('application/json',),
+        },
+    ).end()
+
+    (span,) = exporter.get_finished_spans()
+    assert span.attributes['http.request.header.x_api_key'] == ['***']
+    assert span.attributes['http.request.header.authorization'] == ['***']
+    (content_type,) = span.attributes['http.request.header.content_type']
+    assert content_type == 'application/json'

@@ -14,7 +14,10 @@ Configuration is entirely via standard OTel env vars (read by the SDK):
 - `OTEL_EXPORTER_OTLP_ENDPOINT` — collector URL, e.g.
   `http://telemetry-opentelemetry-collector.odg-system:4317`. **Unset or empty
   means no instrumentation**: `configure_telemetry()` is a no-op, so local
-  dev/tests and clusters without a collector run unmodified.
+  dev/tests and clusters without a collector run unmodified. Transport is
+  gRPC-only (4317, matching the collector chart); `OTEL_EXPORTER_OTLP_PROTOCOL`
+  is not honored — `http/protobuf` would need the proto-http exporter package,
+  which is deliberately not a dependency.
 - `OTEL_SERVICE_NAME` — service identity for traces AND logs; injected by
   helm per extension (`.Chart.Name`). `configure_logging()` falls back to it
   when no `service_name` is passed, so logs and traces report the same name.
@@ -98,14 +101,59 @@ duration_histogram_buckets_seconds = (
 )
 duration_histogram_buckets_ms = tuple(s * 1000.0 for s in duration_histogram_buckets_seconds)
 
+# header capture (OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_*) is opt-in and
+# off here, but if it is ever enabled these captured header values are redacted
+# by KEY regardless of the value pattern (a bare api key matches no pattern)
+redacted_header_attributes = {
+    f'http.{direction}.header.{name}'
+    for direction in ('request', 'response')
+    for name in (
+        'authorization',
+        'cookie',
+        'proxy_authorization',
+        'set_cookie',
+        'x_api_key',
+        'x_github_token',
+    )
+}
+
 
 def _iter_scrubbed_values(
     attributes: collections.abc.Mapping,
-) -> collections.abc.Iterator[tuple[str, str]]:
-    """yield (key, scrubbed) for string values matching the log credential patterns"""
+) -> collections.abc.Iterator[tuple[str, str | list[str]]]:
+    """
+    yield (key, scrubbed) for values that must not be exported: sensitive
+    header attributes by key (see redacted_header_attributes) and any string
+    matching the log credential patterns — scalar strings and string sequences
+    alike (instrumentors record captured headers as sequences, e.g.
+    `http.request.header.authorization = ['Bearer ...']`)
+    """
     for key, value in (attributes or {}).items():
-        if isinstance(value, str) and (scrubbed := odg.logging_cfg.scrub_string(value)) != value:
-            yield key, scrubbed
+        if key.lower() in redacted_header_attributes:
+            if isinstance(value, str) or not isinstance(value, collections.abc.Sequence):
+                yield key, '***'
+            else:
+                yield key, ['***'] * len(value)
+            continue
+
+        if isinstance(value, str):
+            if (scrubbed := odg.logging_cfg.scrub_string(value)) != value:
+                yield key, scrubbed
+        elif isinstance(value, collections.abc.Sequence):
+            items = []
+            changed = False
+            for item in value:
+                if (
+                    isinstance(item, str)
+                    and (scrubbed := odg.logging_cfg.scrub_string(item)) != item
+                ):
+                    items.append(scrubbed)
+                    changed = True
+                else:
+                    items.append(item)
+
+            if changed:
+                yield key, items
 
 
 def _scrubbed_span(

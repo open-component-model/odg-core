@@ -87,6 +87,11 @@ sends outbound, so pod IP -> pod lookup can miss for ClusterIP callers).
 The SDK merges OTEL_RESOURCE_ATTRIBUTES into its resource on startup. Pair with
 `odg.otelEnv` — defined separately because it includes fieldRef entries
 (valueFrom), which make the include unusable inline with `- name: X` entries.
+
+k8s.container.name defaults to the chart name; workloads whose container
+differs (freshclam, sla-report) pass an override like odg.otelEnv's serviceName:
+
+  {{- include "odg.otelResourceAttrs" (mergeOverwrite (deepCopy .) (dict "containerName" "freshclam")) | nindent 12 }}
 */}}
 {{- define "odg.otelResourceAttrs" -}}
 - name: K8S_POD_NAME
@@ -102,7 +107,7 @@ The SDK merges OTEL_RESOURCE_ATTRIBUTES into its resource on startup. Pair with
     fieldRef:
       fieldPath: metadata.namespace
 - name: OTEL_RESOURCE_ATTRIBUTES
-  value: k8s.pod.name=$(K8S_POD_NAME),k8s.pod.uid=$(K8S_POD_UID),k8s.namespace.name=$(K8S_POD_NAMESPACE),k8s.container.name={{ .Chart.Name }}
+  value: k8s.pod.name=$(K8S_POD_NAME),k8s.pod.uid=$(K8S_POD_UID),k8s.namespace.name=$(K8S_POD_NAMESPACE),k8s.container.name={{ .containerName | default .Chart.Name }}
 {{- end -}}
 
 {{- define "odg.rbac" -}}

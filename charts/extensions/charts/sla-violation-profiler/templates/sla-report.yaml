@@ -76,7 +76,7 @@ spec:
             - name: ODG_LOG_LEVEL
               value: {{ .Values.logLevel | default "INFO" | quote }}
             {{- include "odg.otelEnv" (mergeOverwrite (deepCopy .) (dict "serviceName" "sla-report")) | nindent 12 }}
-            {{- include "odg.otelResourceAttrs" . | nindent 12 }}
+            {{- include "odg.otelResourceAttrs" (mergeOverwrite (deepCopy .) (dict "containerName" "sla-report")) | nindent 12 }}
             volumeMounts:
             - name: github
               mountPath: /secrets/github

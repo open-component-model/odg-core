@@ -60,6 +60,10 @@ spec:
             value: /secrets
           - name: K8S_TARGET_NAMESPACE
             value: {{ .Values.target_namespace | default .Release.Namespace }}
+          # keep the migration log identity: OTEL_SERVICE_NAME from the main
+          # container does not reach init containers
+          - name: OTEL_SERVICE_NAME
+            value: delivery-db-migration
           volumeMounts:
             - name: delivery-db
               mountPath: /secrets/delivery-db
@@ -105,11 +109,12 @@ spec:
           - name: K8S_TARGET_NAMESPACE
             value: {{ .Values.target_namespace | default .Release.Namespace }}
           # same semantics as odg.otelEnv in charts/extensions/templates/helpers.tpl
-          # (this chart doesn't include that helper); global.otlpEndpoint is the
-          # attribute the operator renders the ODG CR's context.otlp_endpoint
-          # into, uniformly for all managed charts (extension-definitions.yaml)
+          # (this chart doesn't include that helper); unlike the extensions
+          # umbrella chart (subcharts reach global.* automatically) a standalone
+          # chart uses a plain value: the operator renders the ODG CR's
+          # context.otlp_endpoint into `otlpEndpoint`, empty disables tracing
           - name: OTEL_EXPORTER_OTLP_ENDPOINT
-            value: {{ ternary ((.Values.global).otlpEndpoint) (printf "http://telemetry-opentelemetry-collector.%s:4317" (.Values.target_namespace | default .Release.Namespace)) (hasKey (.Values.global | default dict) "otlpEndpoint") | quote }}
+            value: {{ ternary (.Values.otlpEndpoint) (printf "http://telemetry-opentelemetry-collector.%s:4317" (.Values.target_namespace | default .Release.Namespace)) (hasKey .Values "otlpEndpoint") | quote }}
           - name: OTEL_SERVICE_NAME
             value: {{ .Chart.Name | quote }}
           - name: OTEL_SEMCONV_STABILITY_OPT_IN

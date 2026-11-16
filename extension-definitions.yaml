@@ -40,7 +40,7 @@ installation:
     value: ${deliveryServiceMaxReplicas}
     value_type: python-string-template
   - default: ''
-    helm_attribute: global.otlpEndpoint
+    helm_attribute: otlpEndpoint
     helm_chart_name: delivery-service
     value: ${otlp_endpoint}
     value_type: python-string-template
