@@ -111,6 +111,26 @@ def test_stdlib_logger_emits_json_with_service_name():
     assert 'timestamp' in entry
 
 
+def test_service_name_defaults_to_otel_env_var(monkeypatch):
+    monkeypatch.setenv('OTEL_SERVICE_NAME', 'env-service')
+    captured = _configured_logging(service_name=None)
+
+    logging.getLogger('some.module').info('hello world')
+
+    (entry,) = _log_lines(captured)
+    assert entry['service.name'] == 'env-service'
+
+
+def test_explicit_service_name_wins_over_otel_env_var(monkeypatch):
+    monkeypatch.setenv('OTEL_SERVICE_NAME', 'env-service')
+    captured = _configured_logging(service_name='explicit-service')
+
+    logging.getLogger('some.module').info('hello world')
+
+    (entry,) = _log_lines(captured)
+    assert entry['service.name'] == 'explicit-service'
+
+
 def test_structlog_logger_emits_json():
     import structlog
 
@@ -170,7 +190,7 @@ def test_sensitive_query_param_in_url_is_scrubbed():
     ],
 )
 def test_scrubber_keeps_lookalike_names(value: str):
-    assert lc._scrub_string(value) == value
+    assert lc.scrub_string(value) == value
 
 
 @pytest.mark.parametrize(
@@ -185,7 +205,7 @@ def test_scrubber_keeps_lookalike_names(value: str):
     ],
 )
 def test_scrubber_replaces_sensitive_params(value: str, expected: str):
-    assert lc._scrub_string(value) == expected
+    assert lc.scrub_string(value) == expected
 
 
 def test_structlog_logger_scrubs_string_values():

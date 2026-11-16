@@ -60,6 +60,10 @@ spec:
             value: /secrets
           - name: K8S_TARGET_NAMESPACE
             value: {{ .Values.target_namespace | default .Release.Namespace }}
+          # keep the migration log identity: OTEL_SERVICE_NAME from the main
+          # container does not reach init containers
+          - name: OTEL_SERVICE_NAME
+            value: delivery-db-migration
           volumeMounts:
             - name: delivery-db
               mountPath: /secrets/delivery-db
@@ -104,6 +108,33 @@ spec:
             value: /github_mappings/github_mappings
           - name: K8S_TARGET_NAMESPACE
             value: {{ .Values.target_namespace | default .Release.Namespace }}
+          # same semantics as odg.otelEnv in charts/extensions/templates/helpers.tpl
+          # (this chart doesn't include that helper); unlike the extensions
+          # umbrella chart (subcharts reach global.* automatically) a standalone
+          # chart uses a plain value: the operator renders the ODG CR's
+          # context.otlp_endpoint into `otlpEndpoint`, empty disables tracing
+          - name: OTEL_EXPORTER_OTLP_ENDPOINT
+            value: {{ ternary (.Values.otlpEndpoint) (printf "http://telemetry-opentelemetry-collector.%s:4317" (.Values.target_namespace | default .Release.Namespace)) (hasKey .Values "otlpEndpoint") | quote }}
+          - name: OTEL_SERVICE_NAME
+            value: {{ .Chart.Name | quote }}
+          - name: OTEL_SEMCONV_STABILITY_OPT_IN
+            value: http
+          # k8s identity via downward API for resource attrs (collector-side
+          # k8sattributes pod_association misses outbound OTLP)
+          - name: K8S_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: K8S_POD_UID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.uid
+          - name: K8S_POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: OTEL_RESOURCE_ATTRIBUTES
+            value: k8s.pod.name=$(K8S_POD_NAME),k8s.pod.uid=$(K8S_POD_UID),k8s.namespace.name=$(K8S_POD_NAMESPACE),k8s.container.name=delivery-service
           {{- if default dict .Values.envVars }}
           {{- range $key, $value := .Values.envVars }}
           - name: {{ $key }}

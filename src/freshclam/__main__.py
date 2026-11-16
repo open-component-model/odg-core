@@ -10,12 +10,15 @@ import starlette.staticfiles
 import uvicorn
 
 import odg.logging_cfg
+import odg.telemetry
 import paths
 
-odg.logging_cfg.configure_logging(service_name='freshclam')
+odg.logging_cfg.configure_logging()
 odg.logging_cfg.route_foreign_loggers('uvicorn', 'uvicorn.access', 'uvicorn.error')
 # drop noisy kubelet probe access-log entries (2xx/3xx; failures still logged)
 odg.logging_cfg.quiet_uvicorn_access_log(path_prefixes=('/readiness',))
+# serves starlette/uvicorn, not aiohttp — only span export + log/trace identity apply
+odg.telemetry.configure_telemetry(instrument_aiohttp=False)
 
 
 status_file = os.path.join('/', 'freshclam', 'status')
