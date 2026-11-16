@@ -46,6 +46,10 @@ async def _sqlalchemy_sessionmaker_async(
         db_url,
         echo=False,
         future=True,
+        # generic sa.JSON columns are (de)serialised by sqlalchemy itself (stdlib json by
+        # default); psycopg's set_json_loads/dumps above never fires for them
+        json_serializer=lambda data: orjson.dumps(data).decode(),
+        json_deserializer=orjson.loads,
         pool_pre_ping=True,
         pool_size=pool_size,
         max_overflow=max_overflow,
