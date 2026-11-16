@@ -40,7 +40,6 @@
       depNameTemplate: 'cbomkit/cbomkit-theia',
       versioningTemplate: 'semver-coerced',
       extractVersionTemplate: '^v?(?<version>.*)$',
-      digestValueTemplate: '{{newDigest}}',
     },
   ],
   packageRules: [
