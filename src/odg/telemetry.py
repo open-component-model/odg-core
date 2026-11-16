@@ -42,11 +42,12 @@ Probe endpoints (`/healthz`, `/ready`) are excluded via
 uses `re.search`, so bare `metrics` would also match real routes like
 `/dora/dora-metrics`.
 
-Span attributes are scrubbed via `odg.logging_cfg.scrub_string` (same
-credential patterns as logs): instrumentors record full URLs incl. query
+Span attributes and span events are scrubbed via `odg.logging_cfg.scrub_string`
+(same credential patterns as logs): instrumentors record full URLs incl. query
 strings, e.g. `/auth?code=…&access_token=…` (server) or the GitHub token
-exchange with `client_secret=…` (client); OTel's built-in redaction only
-covers a few cloud-signature params.
+exchange with `client_secret=…` (client), and exception events can carry the
+same URLs (aiohttp's `TooManyRedirects` embeds the request URL in its message);
+OTel's built-in redaction only covers a few cloud-signature params.
 
 Not instrumented on purpose:
 - logging/trace-correlation: requires a logging handler that formats the
@@ -55,6 +56,7 @@ Not instrumented on purpose:
   when that integration is wanted
 """
 
+import collections.abc
 import os
 import typing
 
@@ -65,8 +67,8 @@ import odg.logging_cfg
 # annotations only — the OTel SDK stays lazily imported inside the functions
 # below so importing this module never pulls it in when telemetry is disabled
 if typing.TYPE_CHECKING:
-    import opentelemetry.context
     import opentelemetry.sdk.trace
+    import opentelemetry.sdk.trace.export
 
 logger = structlog.get_logger(__name__)
 
@@ -97,29 +99,100 @@ duration_histogram_buckets_seconds = (
 duration_histogram_buckets_ms = tuple(s * 1000.0 for s in duration_histogram_buckets_seconds)
 
 
-def _scrubbing_span_processor() -> 'opentelemetry.sdk.trace.SpanProcessor':
+def _iter_scrubbed_values(
+    attributes: collections.abc.Mapping,
+) -> collections.abc.Iterator[tuple[str, str]]:
+    """yield (key, scrubbed) for string values matching the log credential patterns"""
+    for key, value in (attributes or {}).items():
+        if isinstance(value, str) and (scrubbed := odg.logging_cfg.scrub_string(value)) != value:
+            yield key, scrubbed
+
+
+def _scrubbed_span(
+    span: 'opentelemetry.sdk.trace.ReadableSpan',
+) -> 'opentelemetry.sdk.trace.ReadableSpan':
+    """
+    copy of `span` with credential patterns (see `odg.logging_cfg.scrub_string`)
+    scrubbed from attribute and event values; returns `span` unchanged when
+    nothing matched — the fast path for the common credential-free span.
+
+    Span events are covered because exception events can carry credential-bearing
+    URLs, e.g. aiohttp's `TooManyRedirects` embeds the full request URL
+    (client_secret/code) in `exception.message`/`exception.stacktrace`.
+    """
     import opentelemetry.sdk.trace
 
-    class ScrubbingSpanProcessor(opentelemetry.sdk.trace.SpanProcessor):
+    scrubbed_attributes = dict(span.attributes)
+    attributes_changed = False
+    for key, scrubbed in _iter_scrubbed_values(scrubbed_attributes):
+        scrubbed_attributes[key] = scrubbed
+        attributes_changed = True
+
+    events = []
+    events_changed = False
+    for event in span.events:
+        event_attributes = dict(event.attributes)
+        event_changed = False
+        for key, scrubbed in _iter_scrubbed_values(event_attributes):
+            event_attributes[key] = scrubbed
+            event_changed = True
+        events_changed |= event_changed
+        events.append(
+            opentelemetry.sdk.trace.Event(
+                name=event.name,
+                attributes=event_attributes,
+                timestamp=event.timestamp,
+            )
+            if event_changed
+            else event,
+        )
+
+    if not attributes_changed and not events_changed:
+        return span
+
+    return opentelemetry.sdk.trace.ReadableSpan(
+        name=span.name,
+        context=span.context,
+        parent=span.parent,
+        resource=span.resource,
+        attributes=scrubbed_attributes,
+        events=events,
+        links=span.links,
+        kind=span.kind,
+        instrumentation_info=span.instrumentation_info,
+        status=span.status,
+        start_time=span.start_time,
+        end_time=span.end_time,
+        instrumentation_scope=span.instrumentation_scope,
+    )
+
+
+def _scrubbing_span_exporter(
+    exporter: 'opentelemetry.sdk.trace.export.SpanExporter',
+) -> 'opentelemetry.sdk.trace.export.SpanExporter':
+    import opentelemetry.sdk.trace.export
+
+    class ScrubbingSpanExporter(opentelemetry.sdk.trace.export.SpanExporter):
         """
-        Scrub credentials from string attributes set at span start (where
-        instrumentors put URL/query attributes); attributes are immutable
-        once the span ended, so `on_end` cannot rewrite them.
+        delegate that scrubs credentials off spans right before export. The SDK
+        hands immutable span snapshots to span processors, so rebuilding spans
+        at export is the only scrub point that also covers span events recorded
+        after `on_start` (exception messages/stacktraces).
         """
 
-        def on_start(
+        def export(
             self,
-            span: 'opentelemetry.sdk.trace.Span',
-            parent_context: 'opentelemetry.context.Context | None' = None,
-        ) -> None:
-            for key, value in (span.attributes or {}).items():
-                if (
-                    isinstance(value, str)
-                    and (scrubbed := odg.logging_cfg.scrub_string(value)) != value
-                ):
-                    span.set_attribute(key, scrubbed)
+            spans: collections.abc.Sequence['opentelemetry.sdk.trace.ReadableSpan'],
+        ) -> 'opentelemetry.sdk.trace.export.SpanExportResult':
+            return exporter.export([_scrubbed_span(span) for span in spans])
 
-    return ScrubbingSpanProcessor()
+        def force_flush(self, timeout_millis: int = 30000) -> bool:
+            return exporter.force_flush(timeout_millis)
+
+        def shutdown(self) -> None:
+            return exporter.shutdown()
+
+    return ScrubbingSpanExporter()
 
 
 def configure_telemetry(
@@ -163,10 +236,11 @@ def configure_telemetry(
     )
 
     tracer_provider = opentelemetry.sdk.trace.TracerProvider(resource=resource)
-    # processors run in registration order: scrub before anything can export
-    tracer_provider.add_span_processor(_scrubbing_span_processor())
+    # exporter wrapper scrubs credentials off spans and their events — the
+    # snapshots span processors see are immutable, so export is the one scrub
+    # point that covers everything (e.g. exception events from redirect loops)
     batch_processor = opentelemetry.sdk.trace.export.BatchSpanProcessor(
-        trace_exporter.OTLPSpanExporter(),
+        _scrubbing_span_exporter(trace_exporter.OTLPSpanExporter()),
     )
     tracer_provider.add_span_processor(batch_processor)
     opentelemetry.trace.set_tracer_provider(tracer_provider)

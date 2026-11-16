@@ -145,8 +145,9 @@ def test_scrubbing_span_processor_redacts_credential_attributes():
 
     exporter = in_memory_span_exporter.InMemorySpanExporter()
     tracer_provider = opentelemetry.sdk.trace.TracerProvider()
-    tracer_provider.add_span_processor(odg.telemetry._scrubbing_span_processor())
-    exporter_processor = opentelemetry.sdk.trace.export.SimpleSpanProcessor(exporter)
+    exporter_processor = opentelemetry.sdk.trace.export.SimpleSpanProcessor(
+        odg.telemetry._scrubbing_span_exporter(exporter),
+    )
     tracer_provider.add_span_processor(exporter_processor)
 
     tracer_provider.get_tracer(__name__).start_span(
@@ -164,3 +165,36 @@ def test_scrubbing_span_processor_redacts_credential_attributes():
     assert span.attributes['url.full'] == (
         'https://github.com/login/oauth/access_token?client_secret=***&code=***'
     )
+
+
+def test_scrubbing_span_processor_redacts_exception_events():
+    """exception events are recorded after on_start, so they need on_end
+    scrubbing: e.g. aiohttp's TooManyRedirects embeds the credential-bearing
+    request URL in the message (and the stacktrace echoes both)"""
+    import opentelemetry.sdk.trace
+    import opentelemetry.sdk.trace.export
+    import opentelemetry.sdk.trace.export.in_memory_span_exporter as in_memory_span_exporter
+
+    exporter = in_memory_span_exporter.InMemorySpanExporter()
+    tracer_provider = opentelemetry.sdk.trace.TracerProvider()
+    exporter_processor = opentelemetry.sdk.trace.export.SimpleSpanProcessor(
+        odg.telemetry._scrubbing_span_exporter(exporter),
+    )
+    tracer_provider.add_span_processor(exporter_processor)
+
+    try:
+        raise RuntimeError(
+            '0, message="Exceeded redirects", url=URL(\'https://github.com/login/oauth'
+            "/access_token?client_secret=s3cr3t&code=abc')",
+        )
+    except RuntimeError as exception:
+        span = tracer_provider.get_tracer(__name__).start_span('POST')
+        span.record_exception(exception)
+        span.end()
+
+    (exported,) = exporter.get_finished_spans()
+    (event,) = exported.events
+    assert event.name == 'exception'
+    for field in ('exception.message', 'exception.stacktrace'):
+        assert 's3cr3t' not in event.attributes[field]
+        assert 'client_secret=***&code=***' in event.attributes[field]
