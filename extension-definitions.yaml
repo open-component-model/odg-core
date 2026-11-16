@@ -110,7 +110,7 @@ installation:
     value: delivery-db-password
     value_type: literal
   - default: ''
-    helm_attribute: global.otlpEndpoint
+    helm_attribute: otlpEndpoint
     helm_chart_name: postgresql
     value: ${otlp_endpoint}
     value_type: python-string-template
@@ -146,7 +146,7 @@ installation:
     value: '"true"'
     value_type: literal
   - default: ''
-    helm_attribute: global.otlpEndpoint
+    helm_attribute: otlpEndpoint
     helm_chart_name: extensions
     value: ${otlp_endpoint}
     value_type: python-string-template
@@ -176,7 +176,7 @@ installation:
     value: true
     value_type: literal
   - default: ''
-    helm_attribute: global.otlpEndpoint
+    helm_attribute: otlpEndpoint
     helm_chart_name: extensions
     value: ${otlp_endpoint}
     value_type: python-string-template
@@ -212,7 +212,7 @@ installation:
     value: ${artefact_enumerator}
     value_type: python-string-template
   - default: ''
-    helm_attribute: global.otlpEndpoint
+    helm_attribute: otlpEndpoint
     helm_chart_name: extensions
     value: ${otlp_endpoint}
     value_type: python-string-template
@@ -248,7 +248,7 @@ installation:
     value: ${cache_manager}
     value_type: python-string-template
   - default: ''
-    helm_attribute: global.otlpEndpoint
+    helm_attribute: otlpEndpoint
     helm_chart_name: extensions
     value: ${otlp_endpoint}
     value_type: python-string-template
@@ -284,7 +284,7 @@ installation:
     value: ${access_manager}
     value_type: python-string-template
   - default: ''
-    helm_attribute: global.otlpEndpoint
+    helm_attribute: otlpEndpoint
     helm_chart_name: extensions
     value: ${otlp_endpoint}
     value_type: python-string-template
@@ -320,7 +320,7 @@ installation:
     value: '"true"'
     value_type: literal
   - default: ''
-    helm_attribute: global.otlpEndpoint
+    helm_attribute: otlpEndpoint
     helm_chart_name: extensions
     value: ${otlp_endpoint}
     value_type: python-string-template
@@ -356,7 +356,7 @@ installation:
     value: '"true"'
     value_type: literal
   - default: ''
-    helm_attribute: global.otlpEndpoint
+    helm_attribute: otlpEndpoint
     helm_chart_name: extensions
     value: ${otlp_endpoint}
     value_type: python-string-template
@@ -391,7 +391,7 @@ installation:
     value: '"true"'
     value_type: literal
   - default: ''
-    helm_attribute: global.otlpEndpoint
+    helm_attribute: otlpEndpoint
     helm_chart_name: extensions
     value: ${otlp_endpoint}
     value_type: python-string-template
@@ -427,7 +427,7 @@ installation:
     value: '"true"'
     value_type: literal
   - default: ''
-    helm_attribute: global.otlpEndpoint
+    helm_attribute: otlpEndpoint
     helm_chart_name: extensions
     value: ${otlp_endpoint}
     value_type: python-string-template
@@ -463,7 +463,7 @@ installation:
     value: '"true"'
     value_type: literal
   - default: ''
-    helm_attribute: global.otlpEndpoint
+    helm_attribute: otlpEndpoint
     helm_chart_name: extensions
     value: ${otlp_endpoint}
     value_type: python-string-template
@@ -499,7 +499,7 @@ installation:
     value: '"true"'
     value_type: literal
   - default: ''
-    helm_attribute: global.otlpEndpoint
+    helm_attribute: otlpEndpoint
     helm_chart_name: extensions
     value: ${otlp_endpoint}
     value_type: python-string-template
@@ -535,7 +535,7 @@ installation:
     value: ${delivery_db_backup}
     value_type: python-string-template
   - default: ''
-    helm_attribute: global.otlpEndpoint
+    helm_attribute: otlpEndpoint
     helm_chart_name: extensions
     value: ${otlp_endpoint}
     value_type: python-string-template
@@ -571,7 +571,7 @@ installation:
     value: ${ghas}
     value_type: python-string-template
   - default: ''
-    helm_attribute: global.otlpEndpoint
+    helm_attribute: otlpEndpoint
     helm_chart_name: extensions
     value: ${otlp_endpoint}
     value_type: python-string-template
@@ -606,7 +606,7 @@ installation:
     value: '"true"'
     value_type: literal
   - default: ''
-    helm_attribute: global.otlpEndpoint
+    helm_attribute: otlpEndpoint
     helm_chart_name: extensions
     value: ${otlp_endpoint}
     value_type: python-string-template
@@ -642,7 +642,7 @@ installation:
     value: '"true"'
     value_type: literal
   - default: ''
-    helm_attribute: global.otlpEndpoint
+    helm_attribute: otlpEndpoint
     helm_chart_name: extensions
     value: ${otlp_endpoint}
     value_type: python-string-template
@@ -677,7 +677,7 @@ installation:
     value: '"true"'
     value_type: literal
   - default: ''
-    helm_attribute: global.otlpEndpoint
+    helm_attribute: otlpEndpoint
     helm_chart_name: extensions
     value: ${otlp_endpoint}
     value_type: python-string-template
@@ -718,7 +718,7 @@ installation:
     value: ${sla_report}
     value_type: python-string-template
   - default: ''
-    helm_attribute: global.otlpEndpoint
+    helm_attribute: otlpEndpoint
     helm_chart_name: extensions
     value: ${otlp_endpoint}
     value_type: python-string-template

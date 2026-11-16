@@ -31,7 +31,7 @@ deployments); `patch` is only granted where `patch_namespaced_*` is actually cal
 */}}
 {{/*
 Renders the OTel env vars shared by all ODG workloads. The endpoint is either
-taken from global.otlpEndpoint (set via the ODG CR's `otlp_endpoint`, empty
+taken from `otlpEndpoint` (set via the ODG CR's `otlp_endpoint`, empty
 disables tracing) or derived from the target namespace: the telemetry chart
 ships the collector Service `telemetry-opentelemetry-collector` into the same
 namespace (charts pinned via fullnameOverride), so pods resolve it via
@@ -65,13 +65,13 @@ Intended use (or combine both into one include — see artefact-enumerator):
   {{- include "odg.otelResourceAttrs" . | nindent 12 }}
 
 Implementation note: ternary+hasKey rather than `default` because an explicitly
-set empty global.otlpEndpoint must disable tracing — `default` and `empty`
+set empty otlpEndpoint must disable tracing — `default` and `empty`
 treat "" as missing and would fall through to the derived URL. All content
 inside the define renders into pod manifests, so no YAML comments in the body.
 */}}
 {{- define "odg.otelEnv" -}}
 - name: OTEL_EXPORTER_OTLP_ENDPOINT
-  value: {{ ternary (.Values.global.otlpEndpoint) (printf "http://telemetry-opentelemetry-collector.%s:4317" (.Values.target_namespace | default .Release.Namespace)) (hasKey .Values.global "otlpEndpoint") | quote }}
+  value: {{ ternary (.Values.otlpEndpoint) (printf "http://telemetry-opentelemetry-collector.%s:4317" (.Values.target_namespace | default .Release.Namespace)) (hasKey .Values "otlpEndpoint") | quote }}
 - name: OTEL_SERVICE_NAME
   value: {{ .serviceName | default .Chart.Name | quote }}
 - name: OTEL_SEMCONV_STABILITY_OPT_IN
