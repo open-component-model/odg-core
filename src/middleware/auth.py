@@ -42,6 +42,10 @@ SESSION_TOKEN_MAX_AGE = datetime.timedelta(minutes=5)
 _jwks_clients: dict[str, jwt.PyJWKClient] = {}
 REFRESH_TOKEN_MAX_AGE = datetime.timedelta(days=183)
 
+# POST /auth requires no authentication -> bound its body size (16 KiB is generous for login
+# payloads, incl. OIDC JWTs) so unauthenticated clients cannot force unbounded buffering
+POST_AUTH_BODY_MAX_SIZE = 16 * 1024
+
 
 class GithubRoutes:
     def __init__(self, api_url: str):
@@ -155,38 +159,15 @@ class OAuthCfgs(aiohttp.web.View):
         def oauth_cfg_to_dict(oauth_cfg: secret_mgmt.oauth_cfg.OAuthCfg):
             github_host = urllib.parse.urlparse(oauth_cfg.api_url).hostname.lower()
 
-            redirect_uri = (
-                util.urljoin(
-                    self.request.app[consts.APP_BASE_URL],
-                    'auth',
-                )
-                + '?'
-                + urllib.parse.urlencode(
-                    {
-                        'client_id': oauth_cfg.client_id,
-                    },
-                )
-            )
-
-            oauth_url = (
-                oauth_cfg.oauth_url.rstrip('?')
-                + '?'
-                + urllib.parse.urlencode(
-                    {
-                        'client_id': oauth_cfg.client_id,
-                        'redirect_uri': redirect_uri,
-                    },
-                )
-            )
-
+            # note: no `redirect_uri`/`oauth_url_with_redirect` here on purpose: the OAuth
+            # callback is owned by the UI (its landing page POSTs the code to /auth); GET
+            # /auth (the former callback target) is gone
             return {
                 'name': oauth_cfg.name,
                 'github_host': github_host,
                 'api_url': oauth_cfg.api_url,
                 'oauth_url': oauth_cfg.oauth_url,
                 'client_id': oauth_cfg.client_id,
-                'redirect_uri': redirect_uri,
-                'oauth_url_with_redirect': oauth_url,
             }
 
         secret_factory = ctx_util.secret_factory()
@@ -722,6 +703,9 @@ class OAuthLogin(aiohttp.web.View):
             description: The request body was empty, not valid JSON, or not a JSON object.
           "401":
             description: The provided auth information is not valid.
+          "413":
+            description: >
+              The request body exceeds the maximum size of 16 KiB.
           "415":
             description: The request body must be sent as "application/json".
         """
@@ -736,8 +720,24 @@ class OAuthLogin(aiohttp.web.View):
                 text='POST /auth requires an "application/json" body',
             )
 
+        if self.request.content_length and self.request.content_length > POST_AUTH_BODY_MAX_SIZE:
+            raise aiohttp.web.HTTPRequestEntityTooLarge(
+                max_size=POST_AUTH_BODY_MAX_SIZE,
+                actual_size=self.request.content_length,
+            )
+
+        body_bytes = bytearray()
+        async for chunk in self.request.content.iter_any():
+            body_bytes.extend(chunk)
+            if len(body_bytes) > POST_AUTH_BODY_MAX_SIZE:
+                # also bound chunked bodies (they bypass the Content-Length check above)
+                raise aiohttp.web.HTTPRequestEntityTooLarge(
+                    max_size=POST_AUTH_BODY_MAX_SIZE,
+                    actual_size=len(body_bytes),
+                )
+
         try:
-            body = await self.request.json()
+            body = json.loads(bytes(body_bytes))
         except json.JSONDecodeError:
             raise aiohttp.web.HTTPBadRequest(text='POST /auth requires a JSON object body')
 
@@ -748,7 +748,11 @@ class OAuthLogin(aiohttp.web.View):
         try:
             auth_request = dacite.from_dict(data_class=AuthRequest, data=body)
         except TypeError, dacite.DaciteError:
-            raise aiohttp.web.HTTPBadRequest(text='POST /auth requires a JSON object body')
+            # dacite errors contain the offending value (e.g. a token) -> suppress the context so
+            # credential values do not end up in the traceback logged by errors_middleware
+            raise aiohttp.web.HTTPBadRequest(
+                text='POST /auth requires a JSON object body',
+            ) from None
 
         match auth_request.use_refresh_token:
             case None:

@@ -1,5 +1,6 @@
 import datetime
 import json
+import traceback
 import unittest.mock
 import uuid
 
@@ -422,11 +423,16 @@ def _make_login_view(
     request = unittest.mock.MagicMock()
     request.app = app
     request.content_type = content_type
-    # aiohttp's request.json() = json.loads(await request.text()); mock the same semantics
-    # (in particular: malformed JSON raises json.JSONDecodeError)
-    request.json = unittest.mock.AsyncMock(
-        side_effect=lambda: json.loads(body.decode()),
-    )
+    request.content_length = len(body)
+
+    # aiohttp exposes the body via request.content.iter_any(); mock the same semantics
+    async def iter_body(chunks: list[bytes] | None = None):
+        for chunk in chunks or [body]:
+            yield chunk
+
+    request.content = unittest.mock.MagicMock()
+    request.content.iter_any = iter_body
+    request.iter_body = iter_body
     request.rel_url = yarl.URL.build(query=query or {})
     request.headers = headers or {}
     request.__getitem__ = lambda self, key: db_session
@@ -461,6 +467,40 @@ async def test_login_rejects_invalid_or_non_object_body(body):
 
     with pytest.raises(aiohttp.web.HTTPBadRequest):
         await view._post()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    'chunks',
+    (
+        # oversized body announced via Content-Length
+        None,
+        # oversized chunked body (no Content-Length; enforced while streaming)
+        [b'{"code": "', b'x' * middleware.auth.POST_AUTH_BODY_MAX_SIZE],
+    ),
+)
+async def test_login_rejects_oversized_body(chunks):
+    view = _make_login_view(body=b'x' * (middleware.auth.POST_AUTH_BODY_MAX_SIZE + 1))
+
+    if chunks is not None:
+        view.request.content_length = None
+        view.request.content.iter_any = lambda: view.request.iter_body(chunks)
+
+    with pytest.raises(aiohttp.web.HTTPRequestEntityTooLarge):
+        await view._post()
+
+
+@pytest.mark.asyncio
+async def test_login_bad_field_type_does_not_leak_value_in_traceback():
+    token = 'ghp_example_secret'
+    view = _make_login_view(body=json.dumps({'access_token': [token]}).encode())
+
+    with pytest.raises(aiohttp.web.HTTPBadRequest) as excinfo:
+        await view._post()
+
+    # dacite's error contains the offending value; it must not be retained as exception context
+    # (errors_middleware logs the full traceback, including chained exceptions)
+    assert token not in ''.join(traceback.format_exception(excinfo.value))
 
 
 @pytest.mark.asyncio
