@@ -19,6 +19,7 @@ import importlib
 import io
 import json
 import logging
+import os
 import subprocess
 import sys
 
@@ -100,7 +101,8 @@ def test_modules_with_own_main_emit_json_with_correct_service_name(tmp_path):
 
 
 def test_subprocess_isolation_of_extension_logging(tmp_path):
-    """launcher-level sanity check: an extension run in a subprocess emits JSON"""
+    """launcher-level sanity check: an extension run in a subprocess emits JSON;
+    service.name comes from the helm-injected OTEL_SERVICE_NAME env var"""
     cmd = [
         sys.executable,
         '-c',
@@ -110,7 +112,8 @@ def test_subprocess_isolation_of_extension_logging(tmp_path):
             'import logging; logging.getLogger("subprocess-test").warning("hello")'
         ),
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd='.')
+    env = {**os.environ, 'OTEL_SERVICE_NAME': 'artefact-enumerator'}
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd='.', env=env)
 
     if result.returncode != 0:
         raise AssertionError(f'subprocess failed: {result.stderr}')

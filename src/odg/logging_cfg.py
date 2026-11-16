@@ -244,7 +244,7 @@ def _scrub_nested(value, redact: bool = False):
     as renderers would serialise their representation.
     """
     if isinstance(value, str):
-        return SENSITIVE_REPLACEMENT if redact else _scrub_string(value)
+        return SENSITIVE_REPLACEMENT if redact else scrub_string(value)
     if isinstance(value, collections.abc.Mapping):
         return {
             key: _scrub_nested(
@@ -279,7 +279,7 @@ def scrub_sensitive_fields(logger, method_name: str, event_dict: dict) -> dict:
     return event_dict
 
 
-def _scrub_string(value: str) -> str:
+def scrub_string(value: str) -> str:
     value = SENSITIVE_QUERY_PARAMS_RE.sub(lambda m: f'{m["name"]}={SENSITIVE_REPLACEMENT}', value)
     value = BEARER_TOKEN_RE.sub(SENSITIVE_REPLACEMENT, value)
     value = BASIC_CREDENTIALS_RE.sub(SENSITIVE_REPLACEMENT, value)
@@ -296,7 +296,7 @@ def scrub_string_values(logger, method_name: str, event_dict: dict) -> dict:
     """
     for key, value in event_dict.items():
         if isinstance(value, str):
-            event_dict[key] = _scrub_string(value)
+            event_dict[key] = scrub_string(value)
 
     return event_dict
 
@@ -360,8 +360,10 @@ def configure_logging(
     Configure root stdlib logger + structlog for this process.
 
     Set `json_logs=False` for human-readable console output (e.g. local dev).
-    `service_name`, if given, is added to every log entry as `service.name`
-    (OTel semantic convention; use the extension/service name, e.g. 'malware').
+    `service_name` is added to every log entry as `service.name` (OTel
+    semantic convention). It defaults to the `OTEL_SERVICE_NAME` env var —
+    injected by helm per extension — so logs and OTel traces share one
+    service identity; pass explicitly only to override (e.g. in tests).
 
     `log_level` may be an int (e.g. `logging.DEBUG`) or a level name (e.g.
     'DEBUG'); unknown names fall back to INFO. If `None` (default), the
@@ -379,6 +381,9 @@ def configure_logging(
 
     if isinstance(log_level, str):
         log_level = logging.getLevelNamesMapping().get(log_level.upper(), logging.INFO)
+
+    if service_name is None:
+        service_name = os.environ.get('OTEL_SERVICE_NAME')
 
     processors = list(_shared_processors)
 

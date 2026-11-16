@@ -18,6 +18,7 @@ import lookups
 import odg.extensions_cfg
 import odg.findings
 import odg.logging_cfg
+import odg.telemetry
 import odg.model
 import odg.util
 import odg_client
@@ -27,7 +28,8 @@ import util
 
 logger = structlog.get_logger(__name__)
 k8s.logging.configure_kubernetes_logging()
-odg.logging_cfg.configure_logging(service_name='ghas')
+odg.logging_cfg.configure_logging()
+odg.telemetry.configure_telemetry()
 
 
 @dataclasses.dataclass

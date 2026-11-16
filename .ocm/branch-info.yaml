@@ -1,4 +1,4 @@
-release-branch-template: hotfix-$major.$minor # e.g. hotfix-1.0
+release-branch-template: release-$major.$minor # e.g. release-1.0
 branch-policy:
   significant-part: minor # major, minor, patch
   supported-versions-count: 0
