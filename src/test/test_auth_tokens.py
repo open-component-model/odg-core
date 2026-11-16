@@ -7,6 +7,8 @@ import Crypto.PublicKey.RSA
 import jwt
 import pytest
 
+import yarl
+
 import deliverydb.model as dm
 import middleware.auth
 import odg_client.jwt
@@ -397,3 +399,201 @@ async def test_logout_user_missing_from_db_still_clears_cookies():
     assert response.cookies[odg_client.jwt.JWT_KEY]['max-age'] == '0'
     assert response.cookies[odg_client.jwt.REFRESH_TOKEN_KEY]['max-age'] == '0'
     db_session.commit.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
+# OAuthLogin (POST /auth)
+# ---------------------------------------------------------------------------
+
+
+def _make_login_view(
+    body: bytes = b'{}',
+    content_type: str = 'application/json',
+    query: dict[str, str] | None = None,
+    headers: dict[str, str] | None = None,
+    user: dm.UserIdentifiers | None = None,
+) -> middleware.auth.OAuthLogin:
+    db_session = _make_db_session(user)
+
+    app = unittest.mock.MagicMock()
+    app.__getitem__ = lambda self, key: ISSUER
+
+    request = unittest.mock.MagicMock()
+    request.app = app
+    request.content_type = content_type
+    request.text = unittest.mock.AsyncMock(return_value=body.decode())
+    request.rel_url = yarl.URL.build(query=query or {})
+    request.headers = headers or {}
+    request.__getitem__ = lambda self, key: db_session
+
+    view = middleware.auth.OAuthLogin(request)
+
+    return view
+
+
+def _make_user_idp() -> dm.UserIdentifiers:
+    user_idp = dm.UserIdentifiers()
+    user_idp.user_id = USER_ID
+
+    return user_idp
+
+
+@pytest.mark.asyncio
+async def test_login_rejects_non_json_content_type():
+    view = _make_login_view(content_type='text/plain')
+
+    with pytest.raises(aiohttp.web.HTTPUnsupportedMediaType):
+        await view._post()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    'body',
+    (b'', b'{invalid', b'"plain string"', b'[1, 2]'),
+)
+async def test_login_rejects_invalid_or_non_object_body(body):
+    view = _make_login_view(body=body)
+
+    with pytest.raises(aiohttp.web.HTTPBadRequest):
+        await view._post()
+
+
+@pytest.mark.asyncio
+async def test_login_get_rejects_with_410():
+    view = _make_login_view(query={'code': 'code', 'client_id': 'id'})
+
+    with pytest.raises(aiohttp.web.HTTPGone):
+        await view.get()
+
+
+@pytest.mark.asyncio
+async def test_github_login_via_code_and_client_id(signing_cfg):
+    view = _make_login_view(
+        body=b'{"code": "code", "client_id": "id"}',
+        user=_make_user_idp(),
+    )
+
+    with (
+        unittest.mock.patch('ctx_util.secret_factory'),
+        unittest.mock.patch.object(
+            middleware.auth,
+            'find_github_oauth_cfg',
+            return_value=unittest.mock.MagicMock(),
+        ),
+        unittest.mock.patch.object(
+            middleware.auth,
+            'find_github_identifier',
+            new=unittest.mock.AsyncMock(),
+        ),
+        unittest.mock.patch.object(
+            middleware.auth,
+            'find_role_bindings',
+            return_value={'reader'},
+        ),
+        unittest.mock.patch.object(
+            middleware.auth,
+            'set_session_and_refresh_token',
+            new=unittest.mock.AsyncMock(return_value=aiohttp.web.json_response()),
+        ),
+    ):
+        response = await view._post()
+
+    assert response.status == 200
+
+
+@pytest.mark.asyncio
+async def test_github_login_via_access_token_and_api_url(signing_cfg):
+    view = _make_login_view(
+        body=b'{"access_token": "token", "api_url": "https://github.example.com/api"}',
+        user=_make_user_idp(),
+    )
+
+    with (
+        unittest.mock.patch('ctx_util.secret_factory'),
+        unittest.mock.patch.object(
+            middleware.auth,
+            'find_github_oauth_cfg',
+            return_value=unittest.mock.MagicMock(),
+        ),
+        unittest.mock.patch.object(
+            middleware.auth,
+            'find_github_identifier',
+            new=unittest.mock.AsyncMock(),
+        ),
+        unittest.mock.patch.object(
+            middleware.auth,
+            'set_session_and_refresh_token',
+            new=unittest.mock.AsyncMock(return_value=aiohttp.web.json_response()),
+        ),
+    ):
+        response = await view._post()
+
+    assert response.status == 200
+
+
+@pytest.mark.asyncio
+async def test_oidc_login_via_authorization_header():
+    view = _make_login_view(
+        headers={'Authorization': 'Bearer oidc-token'},
+        user=_make_user_idp(),
+    )
+
+    with (
+        unittest.mock.patch('ctx_util.secret_factory'),
+        unittest.mock.patch.object(
+            middleware.auth,
+            'find_oidc_cfg',
+        ),
+        unittest.mock.patch.object(
+            middleware.auth,
+            'verify_oidc_token',
+            new=unittest.mock.AsyncMock(),
+        ),
+        unittest.mock.patch.object(
+            middleware.auth,
+            'set_session_and_refresh_token',
+            new=unittest.mock.AsyncMock(return_value=aiohttp.web.json_response()),
+        ),
+    ):
+        response = await view._post()
+
+    assert response.status == 200
+
+
+@pytest.mark.asyncio
+async def test_oidc_login_via_access_token_in_body():
+    view = _make_login_view(
+        body=b'{"access_token": "oidc-token"}',
+        user=_make_user_idp(),
+    )
+
+    with (
+        unittest.mock.patch('ctx_util.secret_factory'),
+        unittest.mock.patch.object(
+            middleware.auth,
+            'find_oidc_cfg',
+        ),
+        unittest.mock.patch.object(
+            middleware.auth,
+            'verify_oidc_token',
+            new=unittest.mock.AsyncMock(),
+        ),
+        unittest.mock.patch.object(
+            middleware.auth,
+            'set_session_and_refresh_token',
+            new=unittest.mock.AsyncMock(return_value=aiohttp.web.json_response()),
+        ),
+    ):
+        response = await view._post()
+
+    assert response.status == 200
+
+
+@pytest.mark.asyncio
+async def test_login_without_credentials_raises_401():
+    view = _make_login_view(body=b'{}')
+
+    with pytest.raises(aiohttp.web.HTTPUnauthorized) as excinfo:
+        await view._post()
+
+    assert 'WWW-Authenticate' in excinfo.value.headers

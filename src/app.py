@@ -438,7 +438,8 @@ async def run_app():
     runner = aiohttp.web.AppRunner(
         app=app,
         access_log_class=odg.logging_cfg.aiohttp_access_logger_class(
-            # do not log query parameters of auth endpoints (may contain secrets)
+            # do not log query parameters of auth endpoints (stale clients may still
+            # send credentials as query params; even rejected requests get access-logged)
             masked_query_path_prefixes=('/auth',),
             # suppress successful probe + scrape requests to keep log volume low
             quiet_path_prefixes=('/healthz', '/metrics', '/ready'),

@@ -1,5 +1,27 @@
 components:
   schemas:
+    AuthRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          description: GitHub OAuth code (requires client_id).
+        client_id:
+          type: string
+          description: GitHub OAuth client ID (requires code).
+        access_token:
+          type: string
+          description: >
+            GitHub access token (requires api_url) or OIDC bearer token (without
+            api_url). Alternative to an "Authorization: Bearer <token>" header.
+        api_url:
+          type: string
+          description: GitHub API URL (required for login with access_token).
+        use_refresh_token:
+          type: boolean
+          description: >
+            Whether a refresh token is issued. Defaults to false for logins with an
+            access token and to true otherwise. Always false for OIDC logins.
     AuthToken:
       type: object
       required:

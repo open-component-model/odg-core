@@ -4,6 +4,7 @@ import datetime
 import enum
 import functools
 import hashlib
+import json
 import re
 import urllib.parse
 import uuid
@@ -661,29 +662,28 @@ class OAuthLogin(aiohttp.web.View):
         ---
         tags:
         - Authentication
+        responses:
+          "410":
+            description: >
+              Login via GET with credentials in the URL query string is gone.
+              Login is POST /auth with a JSON body (GitHub: "code" and "client_id" or
+              "access_token" and "api_url"; OIDC: Authorization bearer header or
+              "access_token" in the JSON body).
+        """
+        raise aiohttp.web.HTTPGone(
+            text=(
+                'Login is POST /auth with a JSON body: GitHub login: "code" and '
+                '"client_id" (or "access_token" and "api_url"); OIDC login: bearer token '
+                'in the Authorization header or "access_token" in the JSON body.'
+            ),
+        )
+
+    async def post(self):
+        """
+        ---
+        tags:
+        - Authentication
         parameters:
-        - in: query
-          name: code
-          required: false
-          schema:
-            type: string
-        - in: query
-          name: client_id
-          required: false
-          schema:
-            type: string
-        - in: query
-          name: access_token
-          required: false
-          schema:
-            type: string
-          description: >
-            GitHub access token (requires api_url) or OIDC bearer token (without api_url).
-        - in: query
-          name: api_url
-          required: false
-          schema:
-            type: string
         - in: header
           name: Authorization
           required: false
@@ -692,6 +692,12 @@ class OAuthLogin(aiohttp.web.View):
           description: >
             OIDC bearer token in the form "Bearer <token>". Alternative to passing the
             token as access_token without api_url. No refresh token is issued for OIDC logins.
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthRequest'
         responses:
           "200":
             description: Successfully logged in.
@@ -699,22 +705,65 @@ class OAuthLogin(aiohttp.web.View):
               application/json:
                 schema:
                   $ref: '#/components/schemas/AuthToken'
+          "400":
+            description: The request body was empty, not valid JSON, or not a JSON object.
           "401":
             description: The provided auth information is not valid.
+          "415":
+            description: The request body must be sent as "application/json".
         """
+        return await self._post()
+
+    async def _post(self) -> aiohttp.web.StreamResponse:
         issuer = self.request.app[consts.APP_BASE_URL]
         db_session: sqlasync.session.AsyncSession = self.request[consts.REQUEST_DB_SESSION]
 
-        params = self.request.rel_url.query
-        code = util.param(params, 'code')
-        client_id = util.param(params, 'client_id')
-        access_token = util.param(params, 'access_token')
-        api_url = util.param(params, 'api_url')
+        if self.request.content_type != 'application/json':
+            raise aiohttp.web.HTTPUnsupportedMediaType(
+                text='POST /auth requires an "application/json" body',
+            )
+
+        body = await self.request.text()
+
+        try:
+            body = json.loads(body)
+        except json.JSONDecodeError:
+            raise aiohttp.web.HTTPBadRequest(text='POST /auth requires a JSON object body')
+
+        if not isinstance(body, dict):
+            raise aiohttp.web.HTTPBadRequest(text='POST /auth requires a JSON object body')
+
+        code = util.param(body, 'code')
+        client_id = util.param(body, 'client_id')
+        access_token = util.param(body, 'access_token')
+        api_url = util.param(body, 'api_url')
         use_refresh_token = util.param_as_bool(
-            params=params,
+            params=body,
             name='use_refresh_token',
             default=not bool(access_token),  # if login via access-token, don't use refresh tokens
         )
+
+        return await self._do_authenticate(
+            issuer=issuer,
+            db_session=db_session,
+            code=code,
+            client_id=client_id,
+            access_token=access_token,
+            api_url=api_url,
+            use_refresh_token=use_refresh_token,
+        )
+
+    async def _do_authenticate(
+        self,
+        *,
+        issuer: str,
+        db_session: sqlasync.session.AsyncSession,
+        code: str | None,
+        client_id: str | None,
+        access_token: str | None,
+        api_url: str | None,
+        use_refresh_token: bool,
+    ) -> aiohttp.web.StreamResponse:
 
         if (access_token and api_url) or (client_id and code):
             idp_type = secret_mgmt.oauth_cfg.OAuthCfgTypes.GITHUB
@@ -732,9 +781,9 @@ class OAuthLogin(aiohttp.web.View):
             raise aiohttp.web.HTTPUnauthorized(
                 headers={
                     'WWW-Authenticate': (
-                        'Add either the url query params "code" and "client_id" '
-                        'or a valid "access_token" with a github "api_url"'
-                        'or a Bearer token in the Authorization header for OIDC'
+                        'POST a JSON body with either "code" and "client_id" '
+                        'or a valid "access_token" with a github "api_url" '
+                        'or pass a Bearer token in the Authorization header for OIDC'
                     ),
                 },
             )
