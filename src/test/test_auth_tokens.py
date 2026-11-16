@@ -1,4 +1,5 @@
 import datetime
+import json
 import unittest.mock
 import uuid
 
@@ -421,7 +422,11 @@ def _make_login_view(
     request = unittest.mock.MagicMock()
     request.app = app
     request.content_type = content_type
-    request.text = unittest.mock.AsyncMock(return_value=body.decode())
+    # aiohttp's request.json() = json.loads(await request.text()); mock the same semantics
+    # (in particular: malformed JSON raises json.JSONDecodeError)
+    request.json = unittest.mock.AsyncMock(
+        side_effect=lambda: json.loads(body.decode()),
+    )
     request.rel_url = yarl.URL.build(query=query or {})
     request.headers = headers or {}
     request.__getitem__ = lambda self, key: db_session

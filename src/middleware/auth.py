@@ -1,5 +1,6 @@
 import asyncio
 import collections.abc
+import dataclasses
 import datetime
 import enum
 import functools
@@ -13,6 +14,7 @@ import aiohttp
 import aiohttp.typedefs
 import aiohttp.web
 import Crypto.PublicKey.RSA
+import dacite
 import cryptography.hazmat.primitives.asymmetric.rsa
 import jsonschema
 import jsonschema.exceptions
@@ -655,6 +657,17 @@ async def set_session_and_refresh_token(
     return response
 
 
+@dataclasses.dataclass
+class AuthRequest:
+    """request body of `POST /auth` (mirror of the `AuthRequest` schema in swagger.yaml)"""
+
+    code: str | None = None
+    client_id: str | None = None
+    access_token: str | None = None
+    api_url: str | None = None
+    use_refresh_token: bool | str | None = None
+
+
 @noauth
 class OAuthLogin(aiohttp.web.View):
     async def get(self):
@@ -723,33 +736,36 @@ class OAuthLogin(aiohttp.web.View):
                 text='POST /auth requires an "application/json" body',
             )
 
-        body = await self.request.text()
-
         try:
-            body = json.loads(body)
+            body = await self.request.json()
         except json.JSONDecodeError:
             raise aiohttp.web.HTTPBadRequest(text='POST /auth requires a JSON object body')
 
+        # dacite silently accepts non-dict iterables (e.g. JSON lists/strings) as empty instances
         if not isinstance(body, dict):
             raise aiohttp.web.HTTPBadRequest(text='POST /auth requires a JSON object body')
 
-        code = util.param(body, 'code')
-        client_id = util.param(body, 'client_id')
-        access_token = util.param(body, 'access_token')
-        api_url = util.param(body, 'api_url')
-        use_refresh_token = util.param_as_bool(
-            params=body,
-            name='use_refresh_token',
-            default=not bool(access_token),  # if login via access-token, don't use refresh tokens
-        )
+        try:
+            auth_request = dacite.from_dict(data_class=AuthRequest, data=body)
+        except TypeError, dacite.DaciteError:
+            raise aiohttp.web.HTTPBadRequest(text='POST /auth requires a JSON object body')
+
+        match auth_request.use_refresh_token:
+            case None:
+                # if login via access-token, don't use refresh tokens
+                use_refresh_token = not bool(auth_request.access_token)
+            case bool():
+                use_refresh_token = auth_request.use_refresh_token
+            case str():
+                use_refresh_token = auth_request.use_refresh_token.lower() in {'true', 'yes', '1'}
 
         return await self._do_authenticate(
             issuer=issuer,
             db_session=db_session,
-            code=code,
-            client_id=client_id,
-            access_token=access_token,
-            api_url=api_url,
+            code=auth_request.code,
+            client_id=auth_request.client_id,
+            access_token=auth_request.access_token,
+            api_url=auth_request.api_url,
             use_refresh_token=use_refresh_token,
         )
 
