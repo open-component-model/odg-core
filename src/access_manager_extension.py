@@ -27,6 +27,7 @@ import k8s.util
 import lookups
 import odg.extensions_cfg
 import odg.logging_cfg
+import odg.telemetry
 import odg.util
 import secret_mgmt.oauth_cfg
 import util
@@ -34,7 +35,8 @@ import util
 logger = structlog.get_logger(__name__)
 # CRD FileHandlers (legacy odg-ui format) must be attached before structlog takes over stdout
 k8s.logging.configure_kubernetes_logging()
-odg.logging_cfg.configure_logging(service_name='access-manager')
+odg.logging_cfg.configure_logging()
+odg.telemetry.configure_telemetry()
 
 
 github_host = str

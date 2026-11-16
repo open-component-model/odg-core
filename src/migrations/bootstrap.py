@@ -132,5 +132,5 @@ def main() -> int:
 
 
 if __name__ == '__main__':
-    odg.logging_cfg.configure_logging(service_name='delivery-db-migration')
+    odg.logging_cfg.configure_logging()
     raise SystemExit(main())

@@ -56,6 +56,9 @@ async def _sqlalchemy_sessionmaker_async(
         },
     )
 
+    # no SQLAlchemyInstrumentor here: engines are wrapped by
+    # odg.telemetry.configure_telemetry() (global create_engine patch); calling
+    # instrument() a second time would no-op with a warning
     sessionmaker = sqlasync.async_sessionmaker(bind=engine)
     sessionmakers_async[(pool_size, max_overflow, pool_timeout)] = sessionmaker
 
