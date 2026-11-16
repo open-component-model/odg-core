@@ -2,14 +2,19 @@ import datetime
 import unittest.mock
 
 import aiohttp.web
+import Crypto.PublicKey.RSA
 import jwt
 import pytest
 
 import middleware.auth
+import odg_client.jwt
 
 ISSUER = 'delivery_service'
-JWT_KEY = 'foobar-test-key-padded-to-32-bytes!'
-JWT_ALGORITHM = 'HS256'
+KEY_ID = 'foobar'
+JWT_ALGORITHM = 'RS256'
+_rsa_key = Crypto.PublicKey.RSA.generate(2048)
+JWT_PRIVATE_KEY = _rsa_key.export_key().decode()
+JWT_PUBLIC_KEY = _rsa_key.public_key().export_key().decode()
 
 
 def gen_jwt_payload():
@@ -27,7 +32,7 @@ def gen_jwt_payload():
 
 def gen_jwt_token(
     payload: dict,
-    key: str = JWT_KEY,
+    key: str = JWT_PRIVATE_KEY,
     algorithm: str = JWT_ALGORITHM,
 ):
     return jwt.encode(
@@ -38,13 +43,12 @@ def gen_jwt_token(
 
 
 @pytest.fixture()
-def signing_cfg(
-    key: str = JWT_KEY,
-    algorithm: str = JWT_ALGORITHM,
-):
+def signing_cfg():
     signing_cfg_mock = unittest.mock.Mock()
-    signing_cfg_mock.private_key = key
-    signing_cfg_mock.algorithm = algorithm
+    signing_cfg_mock.id = KEY_ID
+    signing_cfg_mock.private_key = JWT_PRIVATE_KEY
+    signing_cfg_mock.public_key = JWT_PUBLIC_KEY
+    signing_cfg_mock.algorithm = JWT_ALGORITHM
 
     return signing_cfg_mock
 
@@ -179,3 +183,16 @@ def test_no_roles():
 
     with pytest.raises(aiohttp.web.HTTPUnauthorized):
         middleware.auth.validate_jwt_payload(payload)
+
+
+def test_jwt_from_signing_cfg(signing_cfg):
+    jwt = middleware.auth.jwt_from_signing_cfg(signing_cfg)
+    jwt.use is odg_client.jwt.Use.SIGNATURE
+    jwt.kid is KEY_ID
+    jwt.key == JWT_PUBLIC_KEY.encode()
+
+    invalid_signing_cfg_mock = unittest.mock.MagicMock()
+    invalid_signing_cfg_mock.algorithm = 'HS256'
+
+    with pytest.raises(ValueError):
+        middleware.auth.jwt_from_signing_cfg(invalid_signing_cfg_mock)

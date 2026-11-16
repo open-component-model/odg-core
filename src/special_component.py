@@ -1,7 +1,32 @@
 import aiohttp.web
+import github3.exceptions
+import structlog
 
 import features
 import util
+
+logger = structlog.get_logger(__name__)
+
+
+def retrieve_version(
+    version_cfg: odg.extensions_cfg.CurrentVersion | None,
+    component_id: str,
+) -> str | None:
+    if not version_cfg:
+        return None
+    try:
+        return version_cfg.retrieve()
+    except (ValueError, github3.exceptions.NotFoundError) as e:
+        logger.warning(
+            'cannot retrieve current version of special component',
+            component_id=component_id,
+            error=str(e),
+        )
+        raise aiohttp.web.HTTPUnprocessableEntity(
+            reason=f'Failed to retrieve version for special component {component_id!r}',
+            text=f'Check GitHub app permissions for currentVersion.source.repo'
+            f' "{version_cfg.source.repo}": {e}',
+        )
 
 
 class CurrentDependencies(aiohttp.web.View):
@@ -25,6 +50,8 @@ class CurrentDependencies(aiohttp.web.View):
               application/json:
                 schema:
                   type: object
+          "422":
+            description: Misconfigured currentVersion source
         """
         params = self.request.rel_url.query
 
@@ -43,9 +70,7 @@ class CurrentDependencies(aiohttp.web.View):
             {
                 'name': dependency.name,
                 'displayName': dependency.displayName,
-                'version': (
-                    dependency.currentVersion.retrieve() if dependency.currentVersion else None
-                ),
+                'version': retrieve_version(dependency.currentVersion, dependency.name),
             }
             for dependency in component_cfg.dependencies
         ]
@@ -54,8 +79,6 @@ class CurrentDependencies(aiohttp.web.View):
             data={
                 'displayName': component_cfg.displayName,
                 'componentDependencies': resolved_dependencies,
-                'version': (
-                    component_cfg.currentVersion.retrieve() if component_cfg.currentVersion else None
-                ),
+                'version': retrieve_version(component_cfg.currentVersion, id),
             },
         )

@@ -20,8 +20,12 @@ import util
 logger = structlog.get_logger(__name__)
 
 LABEL_CLAIMED = f'{k8s.model.BacklogItemCrd.DOMAIN}/claimed'
-ANNOTATION_CLAIMED_BY = f'{k8s.model.BacklogItemCrd.DOMAIN}/claimed-by'
-ANNOTATION_CLAIMED_AT = f'{k8s.model.BacklogItemCrd.DOMAIN}/claimed-at'
+
+
+class BacklogItemPhase(enum.StrEnum):
+    FAILED = 'Failed'
+    PENDING = 'Pending'
+    PROCESSING = 'Processing'
 
 
 class BacklogPriorities(enum.IntEnum):
@@ -93,6 +97,12 @@ def create_backlog_crd_body(
             'namespace': namespace,
         },
         'spec': backlog_item.as_dict(),
+        'status': {
+            'phase': BacklogItemPhase.PENDING,
+            'last_updated': datetime.datetime.now(tz=datetime.timezone.utc).strftime(
+                '%Y-%m-%dT%H:%M:%SZ',
+            ),
+        },
     }
 
 
@@ -210,6 +220,67 @@ def create_backlog_item(
     return False
 
 
+def set_backlog_item_status(
+    namespace: str,
+    kubernetes_api: k8s.util.KubernetesApi,
+    backlog_crd: dict,
+    phase: BacklogItemPhase,
+    claimed_by: str | None = None,
+    claimed_at: datetime.datetime | None = None,
+    error: dict | None = None,
+    max_retries: int = 3,
+    retry_count: int = 0,
+) -> dict:
+    metadata = backlog_crd.get('metadata')
+    name = metadata.get('name')
+
+    status = {
+        'phase': phase,
+        'claimed_by': claimed_by,
+        'claimed_at': claimed_at.strftime('%Y-%m-%dT%H:%M:%SZ') if claimed_at else None,
+        'last_updated': datetime.datetime.now(tz=datetime.timezone.utc).strftime(
+            '%Y-%m-%dT%H:%M:%SZ',
+        ),
+        'error': error,
+    }
+    backlog_crd['status'] = status
+
+    try:
+        # use "replace" instead of "patch" here to allow running in a conflict
+        # -> "patch" silently ignores conflicts and overrides the resource anyways
+        backlog_crd = kubernetes_api.custom_kubernetes_api.replace_namespaced_custom_object(
+            group=k8s.model.BacklogItemCrd.DOMAIN,
+            version=k8s.model.BacklogItemCrd.VERSION,
+            plural=k8s.model.BacklogItemCrd.PLURAL_NAME,
+            namespace=namespace,
+            name=name,
+            body=backlog_crd,
+        )
+    except kubernetes.client.rest.ApiException as e:
+        if e.status != http.HTTPStatus.CONFLICT or retry_count >= max_retries:
+            raise e
+
+        retry_interval = (retry_count + 1) * 10
+        logger.warning(
+            'trying to update backlog item status resulted in a conflict, will retry in '
+            f'{retry_interval} sec...',
+        )
+        time.sleep(retry_interval)
+        return set_backlog_item_status(
+            namespace=namespace,
+            kubernetes_api=kubernetes_api,
+            backlog_crd=backlog_crd,
+            phase=phase,
+            claimed_by=claimed_by,
+            claimed_at=claimed_at,
+            error=error,
+            max_retries=max_retries,
+            retry_count=retry_count + 1,
+        )
+
+    return backlog_crd
+
+
 def get_backlog_crd_and_claim(
     service: odg.extensions_cfg.Services,
     namespace: str,
@@ -252,48 +323,21 @@ def get_backlog_crd_and_claim(
     labels[LABEL_CLAIMED] = 'True'
     metadata['labels'] = labels
 
-    annotations = metadata.get('annotations', dict())
-    annotations[ANNOTATION_CLAIMED_BY] = os.environ.get('HOSTNAME', 'local')
-    annotations[ANNOTATION_CLAIMED_AT] = datetime.datetime.now(tz=datetime.timezone.utc)
-    metadata['annotations'] = annotations
-
-    try:
-        # use "replace" instead of "patch" here to allow running in a conflict
-        # -> "patch" silently ignores conflicts and overrides the resource anyways
-        kubernetes_api.custom_kubernetes_api.replace_namespaced_custom_object(
-            group=k8s.model.BacklogItemCrd.DOMAIN,
-            version=k8s.model.BacklogItemCrd.VERSION,
-            plural=k8s.model.BacklogItemCrd.PLURAL_NAME,
-            namespace=namespace,
-            name=metadata.get('name'),
-            body=backlog_crd,
-        )
-    except kubernetes.client.rest.ApiException as e:
-        if e.status != http.HTTPStatus.CONFLICT:
-            raise e
-
-        retry_interval = 10
-        logger.warning(
-            'trying to claim a new backlog item resulted in a conflict, '
-            f'will try to claim a different backlog item in {retry_interval} sec...',
-        )
-        time.sleep(retry_interval)
-        return get_backlog_crd_and_claim(
-            service=service,
-            namespace=namespace,
-            kubernetes_api=kubernetes_api,
-        )
-
-    return backlog_crd
+    return set_backlog_item_status(
+        namespace=namespace,
+        kubernetes_api=kubernetes_api,
+        backlog_crd=backlog_crd,
+        phase=BacklogItemPhase.PROCESSING,
+        claimed_by=os.environ.get('HOSTNAME', 'local'),
+        claimed_at=datetime.datetime.now(tz=datetime.timezone.utc),
+    )
 
 
 def remove_claim(
     namespace: str,
     kubernetes_api: k8s.util.KubernetesApi,
     backlog_crd: dict,
-    max_retries: int = 3,
-    retry_count: int = 0,
-) -> dict | None:
+) -> dict:
     metadata = backlog_crd.get('metadata')
     name = metadata.get('name')
 
@@ -301,43 +345,18 @@ def remove_claim(
     labels[LABEL_CLAIMED] = 'False'
     metadata['labels'] = labels
 
-    annotations = metadata.get('annotations')
-    del annotations[ANNOTATION_CLAIMED_BY]
-    del annotations[ANNOTATION_CLAIMED_AT]
-    metadata['annotations'] = annotations
-
     logger.info(f'attempting to remove claim from backlog item {name} in {namespace=}')
 
-    try:
-        # use "replace" instead of "patch" here to allow running in a conflict
-        # -> "patch" silently ignores conflicts and overrides the resource anyways
-        kubernetes_api.custom_kubernetes_api.replace_namespaced_custom_object(
-            group=k8s.model.BacklogItemCrd.DOMAIN,
-            version=k8s.model.BacklogItemCrd.VERSION,
-            plural=k8s.model.BacklogItemCrd.PLURAL_NAME,
-            namespace=namespace,
-            name=name,
-            body=backlog_crd,
-        )
-    except kubernetes.client.rest.ApiException as e:
-        if e.status != http.HTTPStatus.CONFLICT or retry_count >= max_retries:
-            raise e
-
-        retry_interval = (retry_count + 1) * 10
-        logger.warning(
-            f'trying to remove claim from backlog item {name} resulted in a conflict, '
-            f'will try to remove claim again in {retry_interval} sec...',
-        )
-        time.sleep(retry_interval)
-        return remove_claim(
-            namespace=namespace,
-            kubernetes_api=kubernetes_api,
-            backlog_crd=backlog_crd,
-            max_retries=max_retries,
-            retry_count=retry_count + 1,
-        )
+    backlog_crd = set_backlog_item_status(
+        namespace=namespace,
+        kubernetes_api=kubernetes_api,
+        backlog_crd=backlog_crd,
+        phase=BacklogItemPhase.PENDING,
+    )
 
     logger.info(f'removed claim from backlog item {name} in {namespace=}')
+
+    return backlog_crd
 
 
 def update_backlog_crd(

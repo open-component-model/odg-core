@@ -24,7 +24,6 @@ REFRESH_TOKEN_KEY = 'refresh_token'
 
 class KeyType(enum.StrEnum):
     RSA = 'RSA'
-    OCTET_SEQUENCE = 'oct'  # used to represent symmetric keys
 
 
 class Use(enum.StrEnum):
@@ -34,7 +33,6 @@ class Use(enum.StrEnum):
 
 class Algorithm(enum.StrEnum):
     RS256 = 'RS256'
-    HS256 = 'HS256'
 
 
 @dataclasses.dataclass(frozen=True)
@@ -55,7 +53,6 @@ class JSONWebKey:
 
         class_by_algorithm = {
             Algorithm.RS256: RSAPublicKey,
-            Algorithm.HS256: SymmetricKey,
         }
 
         return dacite.from_dict(
@@ -82,17 +79,6 @@ class RSAPublicKey(JSONWebKey):
                 decodeBase64urlUInt(self.e),
             ),
         ).export_key(format='PEM')
-
-
-@dataclasses.dataclass(frozen=True, kw_only=True)
-class SymmetricKey(JSONWebKey):
-    k: str  # key value (base64url encoded)
-    kty: KeyType = KeyType.OCTET_SEQUENCE
-    alg: Algorithm = Algorithm.HS256
-
-    @property
-    def key(self) -> bytes:
-        return decodeBase64url(self.k)
 
 
 def encodeBase64url(b: bytes) -> str:
