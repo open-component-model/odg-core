@@ -126,3 +126,10 @@ select = [
 ]
 
 ignore = ['F722', 'F821']
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = 'function'
+filterwarnings = [
+    # upstream: opentelemetry-instrumentation-aiohttp-server subclasses web.Application
+    'ignore:Inheritance class _InstrumentedApplication from web.Application is discouraged:DeprecationWarning',
+]
