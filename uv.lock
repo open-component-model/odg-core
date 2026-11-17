@@ -1571,7 +1571,7 @@ wheels = [
 
 [[package]]
 name = "odg-client"
-version = "0.16.0"
+version = "0.17.0"
 source = { editable = "packages/odg-client" }
 dependencies = [
     { name = "dacite" },
@@ -1579,6 +1579,7 @@ dependencies = [
     { name = "pycryptodome" },
     { name = "pyjwt" },
     { name = "requests" },
+    { name = "structlog" },
 ]
 
 [package.metadata]
@@ -1588,6 +1589,7 @@ requires-dist = [
     { name = "pycryptodome", specifier = "==3.24.1" },
     { name = "pyjwt", specifier = "==2.15.1" },
     { name = "requests", specifier = "==2.34.2" },
+    { name = "structlog", specifier = "==26.1.0" },
 ]
 
 [[package]]
