@@ -17,4 +17,5 @@ dependencies = [
     "pycryptodome==3.24.1",
     "pyjwt==2.15.1",
     "requests==2.34.2",
+    "structlog==26.1.0",
 ]
