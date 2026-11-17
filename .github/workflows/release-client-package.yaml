@@ -26,6 +26,7 @@ jobs:
             exit 1
           fi
       - uses: gardener/cc-utils/.github/actions/trusted-checkout@v1
+        id: token
         with:
           token-server: ${{ vars.FEDERATED_GITHUB_ACCESS_TOKEN_SERVER }}
           github-auth-token-permissions: |
@@ -77,6 +78,8 @@ jobs:
             f.write(f'version-file={version_file}\n')
       - name: Update Version
         shell: bash
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
         run: |
           from_version=${{ steps.version.outputs.from-version }}
           to_version=${{ steps.version.outputs.to-version }}
