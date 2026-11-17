@@ -20,19 +20,15 @@
     minimumReleaseAge: null,
     automerge: false,
   },
-  // Weekly maintenance regenerating uv.lock (enabled via config:best-practices
-  // -> :maintainLockFilesWeekly). Automerge like patch updates: the scheduled
-  // sweeper merges it unattended, no human review needed.
   lockFileMaintenance: {
     automerge: true,
   },
   customManagers: [
     {
-      // Keep CBOMKIT_THEIA_COMMIT in sync with CBOMKIT_THEIA_VERSION.
-      // When a new cbomkit-theia release appears, both ARGs must be bumped together
-      // so the SHA verification in the Dockerfile passes.
       customType: 'regex',
-      fileMatch: ['^Dockerfile$'],
+      managerFilePatterns: [
+        '/^Dockerfile$/',
+      ],
       matchStrings: [
         'ARG CBOMKIT_THEIA_VERSION=(?<currentValue>[^\\n]+)\\nARG CBOMKIT_THEIA_COMMIT=(?<currentDigest>[^\\n]+)',
       ],
@@ -40,57 +36,62 @@
       depNameTemplate: 'cbomkit/cbomkit-theia',
       versioningTemplate: 'semver-coerced',
       extractVersionTemplate: '^v?(?<version>.*)$',
-      digestValueTemplate: '{{newDigest}}',
     },
   ],
   packageRules: [
     {
-      matchDepNames: ['gardener-cicd-libs', 'gardener-ocm', 'gardener-oci'],
+      matchDepNames: [
+        'gardener-cicd-libs',
+        'gardener-ocm',
+        'gardener-oci',
+      ],
       groupName: 'gardener python deps',
     },
     {
-      // sdk/exporter (1.x) and instrumentation-* (0.xbN) are released in
-      // lockstep and pin each other exactly via
-      // opentelemetry-semantic-conventions — separate PRs fail to lock.
-      matchPackageNames: ['opentelemetry-*'],
+      matchPackageNames: [
+        'opentelemetry-*',
+      ],
       groupName: 'opentelemetry python deps',
     },
     {
-      // Majors wait as checkboxes in the dependency dashboard ("Pending
-      // Approval") instead of occupying prConcurrentLimit slots — tick one
-      // there to have its PR created when you're ready to work on it.
-      matchUpdateTypes: ['major'],
+      matchUpdateTypes: [
+        'major',
+      ],
       dependencyDashboardApproval: true,
     },
     {
-      // Also covers digest bumps from republished tags and the initial
-      // pinning itself (docker:pinDigests) — both are noise-free.
-      matchUpdateTypes: ['patch', 'digest', 'pinDigest'],
+      matchUpdateTypes: [
+        'patch',
+        'digest',
+        'pinDigest',
+      ],
       automerge: true,
     },
     {
-      matchManagers: ['github-actions'],
+      matchManagers: [
+        'github-actions',
+      ],
       automerge: true,
     },
     {
-      // gardener/cc-utils is intentionally pinned to @v1 as a floating major
-      // tag — frequent updates, deliberately unpinned. Disable to avoid
-      // constant SHA-bump PRs.
-      matchManagers: ['github-actions'],
-      matchDepNames: ['gardener/cc-utils'],
+      matchManagers: [
+        'github-actions',
+      ],
+      matchDepNames: [
+        'gardener/cc-utils',
+      ],
       enabled: false,
     },
     {
-      // bdba-client/odg-client are uv workspace members (packages/), wired
-      // via [tool.uv.sources] workspace=true — their versions live in the
-      // member pyproject.tomls, not on PyPI. Disable so renovate never
-      // treats them as external PyPI packages.
-      matchManagers: ['pep621', 'uv'],
-      matchDepNames: ['bdba-client', 'odg-client'],
+      matchManagers: [
+        'pep621',
+        'uv',
+      ],
+      matchDepNames: [
+        'bdba-client',
+        'odg-client',
+      ],
       enabled: false,
     },
   ],
-  // NOTE: .ocm/base-component.yaml is deliberately NOT managed here (no
-  // customManager, no postUpgradeTasks sync) — its postgresql chart/image
-  // versions are tied to the delivery-db schema and updated manually.
 }

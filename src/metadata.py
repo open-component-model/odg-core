@@ -22,7 +22,6 @@ import lookups
 import middleware.cors
 import odg.findings
 import odg.model
-import util
 
 logger = structlog.get_logger(__name__)
 
@@ -884,7 +883,7 @@ class ArtefactMetadataQueryBySearchExpression(aiohttp.web.View):
                     if cfg.type == dso.meta.type and not cfg.matches(dso.artefact):
                         break
                 else:
-                    items.append(util.dict_serialisation(dso))
+                    items.append(odg.model.artefact_metadata_basic_encoder.encode(dso))
                     if len(items) >= page_size:
                         # next page should continue after LAST RETURNED object
                         next_cursor = _make_next_cursor(sort, obj)
@@ -1110,22 +1109,6 @@ class ArtefactMetadataQuery(aiohttp.web.View):
                 ),
             )
 
-        async def serialise_and_enrich_finding(
-            finding: odg.model.ArtefactMetadata,
-        ) -> dict:
-            def result_dict(
-                finding: odg.model.ArtefactMetadata,
-                meta: dict = None,
-            ) -> dict:
-                finding_dict = util.dict_serialisation(finding)
-
-                if meta:
-                    finding_dict['meta'] = meta
-
-                return finding_dict
-
-            return result_dict(finding)
-
         db_session: sqlasync.session.AsyncSession = self.request[consts.REQUEST_DB_SESSION]
         db_stream = await db_session.stream(db_statement)
 
@@ -1161,9 +1144,7 @@ class ArtefactMetadataQuery(aiohttp.web.View):
                             await response.write(b',')
                         first = False
                         await response.write(
-                            util.dict_to_json_factory(
-                                await serialise_and_enrich_finding(artefact_metadatum),
-                            ).encode(),
+                            odg.model.artefact_metadata_encoder.encode(artefact_metadatum),
                         )
             await response.write(b']')
             await response.write_eof()

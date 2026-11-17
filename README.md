@@ -3,7 +3,7 @@
 This repository is the home of the core API and feature extensions for the [Open Delivery Gear](https://github.com/open-component-model/open-delivery-gear).
 
 [![REUSE status](https://api.reuse.software/badge/github.com/open-component-model/odg-core)](https://api.reuse.software/info/github.com/open-component-model/odg-core)
-![tests](https://github.com/open-component-model/odg-core/actions/workflows/non-release.yaml/badge.svg)
+![tests](https://github.com/open-component-model/odg-core/actions/workflows/ci.yaml/badge.svg)
 ![release](https://github.com/open-component-model/odg-core/actions/workflows/release.yaml/badge.svg)
 
 ## Index
