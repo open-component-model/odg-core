@@ -186,6 +186,12 @@ class DeliveryServiceClient:
                 ),
             ),
         )
+        # sub-routes (e.g. /auth/refresh rotates single-use refresh tokens) are not idempotent
+        # -> restore default retry behaviour for them (prefix matching would include them)
+        self._session.mount(
+            f'{self._routes.auth().rstrip("/")}/',
+            requests.adapters.HTTPAdapter(max_retries=max_retries),
+        )
 
     @classmethod
     def for_github(

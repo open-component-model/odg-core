@@ -8,7 +8,6 @@ import aiohttp.web
 import Crypto.PublicKey.RSA
 import jwt
 import pytest
-
 import yarl
 
 import deliverydb.model as dm
@@ -506,7 +505,7 @@ async def test_login_bad_field_type_does_not_leak_value_in_traceback():
 @pytest.mark.asyncio
 async def test_login_get_is_deprecated_alias(signing_cfg):
     view = _make_login_view(
-        query={'code': 'code', 'client_id': 'id'},
+        query={'access_token': 'token', 'api_url': 'https://github.example.com/api'},
         user=_make_user_idp(),
     )
 
@@ -532,7 +531,95 @@ async def test_login_get_is_deprecated_alias(signing_cfg):
 
     # GET /auth must keep working for older clients, but is marked as deprecated
     assert response.status == 200
-    assert response.headers.get('Deprecation') == 'true'
+    assert response.headers.get('Deprecation') == middleware.auth.GET_AUTH_DEPRECATION
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    'query',
+    (
+        {'code': 'code', 'client_id': 'id'},
+        {'code': 'code'},
+        {'client_id': 'id'},
+    ),
+)
+async def test_login_get_rejects_oauth_code(query):
+    # a crafted link with an attacker's code must not log the victim in (login CSRF)
+    view = _make_login_view(query=query)
+
+    with pytest.raises(aiohttp.web.HTTPBadRequest):
+        await view.get()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    'headers',
+    (
+        {'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Site': 'cross-site'},
+        {'Sec-Fetch-Mode': 'cors'},
+        {'Sec-Fetch-Site': 'same-origin'},
+    ),
+)
+async def test_login_get_rejects_browser_requests(headers):
+    # browsers would store the session cookies of a top-level navigation (login CSRF)
+    view = _make_login_view(
+        query={'access_token': 'token', 'api_url': 'https://github.example.com/api'},
+        headers=headers,
+    )
+
+    with pytest.raises(aiohttp.web.HTTPBadRequest):
+        await view.get()
+
+
+class _GithubTokenResponse:
+    status = 200
+
+    def raise_for_status(self):
+        pass
+
+    async def text(self):
+        return 'access_token=gho_example'
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_):
+        return None
+
+
+@pytest.mark.asyncio
+async def test_find_github_identifier_sends_client_secret_in_body():
+    oauth_cfg = unittest.mock.MagicMock()
+    oauth_cfg.token_url = 'https://github.example.com/login/oauth/access_token'
+    oauth_cfg.client_id = 'client-id'
+    oauth_cfg.client_secret = 'client-secret'
+
+    session = unittest.mock.MagicMock()
+    session.post = unittest.mock.MagicMock(return_value=_GithubTokenResponse())
+    session.__aenter__ = unittest.mock.AsyncMock(return_value=session)
+    session.__aexit__ = unittest.mock.AsyncMock(return_value=None)
+
+    with (
+        unittest.mock.patch('aiohttp.ClientSession', return_value=session),
+        # stop after the token exchange, the GitHub user lookup is not of interest here
+        unittest.mock.patch.object(middleware.auth, 'GithubApi', side_effect=RuntimeError),
+        pytest.raises(RuntimeError),
+    ):
+        await middleware.auth.find_github_identifier(
+            oauth_cfg=oauth_cfg,
+            github_code='oauth-code',
+        )
+
+    session.post.assert_called_once()
+    _, kwargs = session.post.call_args
+
+    # no credentials in the URL (access logs of proxies/gateways), only in the POST body
+    assert kwargs['url'] == oauth_cfg.token_url
+    assert kwargs['data'] == {
+        'client_id': 'client-id',
+        'client_secret': 'client-secret',
+        'code': 'oauth-code',
+    }
 
 
 @pytest.mark.asyncio

@@ -14,8 +14,8 @@ import aiohttp
 import aiohttp.typedefs
 import aiohttp.web
 import Crypto.PublicKey.RSA
-import dacite
 import cryptography.hazmat.primitives.asymmetric.rsa
+import dacite
 import jsonschema
 import jsonschema.exceptions
 import jwt
@@ -45,6 +45,9 @@ REFRESH_TOKEN_MAX_AGE = datetime.timedelta(days=183)
 # POST /auth requires no authentication -> bound its body size (16 KiB is generous for login
 # payloads, incl. OIDC JWTs) so unauthenticated clients cannot force unbounded buffering
 POST_AUTH_BODY_MAX_SIZE = 16 * 1024
+
+# date of the deprecation of GET /auth (2026-11-17) as RFC 9745 `Deprecation` header value
+GET_AUTH_DEPRECATION = '@1794873600'
 
 
 class GithubRoutes:
@@ -657,19 +660,10 @@ class OAuthLogin(aiohttp.web.View):
         deprecated: true
         description: >
           Deprecated alias for POST /auth kept for backwards compatibility of older
-          clients. Credentials travel in the URL query string here (access logs, browser
-          and proxy history), so use POST /auth with a JSON body instead.
+          non-browser clients. Credentials travel in the URL query string here (access logs,
+          browser and proxy history), so use POST /auth with a JSON body instead. Browser
+          requests and OAuth code logins are rejected to prevent login CSRF.
         parameters:
-        - in: query
-          name: code
-          required: false
-          schema:
-            type: string
-        - in: query
-          name: client_id
-          required: false
-          schema:
-            type: string
         - in: query
           name: access_token
           required: false
@@ -703,9 +697,28 @@ class OAuthLogin(aiohttp.web.View):
               application/json:
                 schema:
                   $ref: '#/components/schemas/AuthToken'
+          "400":
+            description: >
+              The request was sent by a browser or contains an OAuth code (use POST /auth).
           "401":
             description: The provided auth information is not valid.
         """
+        # browsers attach `Sec-Fetch-*` headers to every request (incl. top-level navigations);
+        # rejecting them prevents login CSRF via crafted links, as the session cookies of a
+        # navigation response would be stored despite `SameSite=Strict`
+        if 'Sec-Fetch-Mode' in self.request.headers or 'Sec-Fetch-Site' in self.request.headers:
+            raise aiohttp.web.HTTPBadRequest(
+                text='GET /auth is not supported for browsers, use POST /auth instead',
+            )
+
+        params = self.request.rel_url.query
+
+        # only the browser-based OAuth callback used to send the code -> never accept it via GET
+        if 'code' in params or 'client_id' in params:
+            raise aiohttp.web.HTTPBadRequest(
+                text='OAuth code login is only supported via POST /auth',
+            )
+
         logger.warning(
             'deprecated login via GET /auth: credentials travel in the URL query string, '
             'use POST /auth with a JSON body instead',
@@ -715,14 +728,13 @@ class OAuthLogin(aiohttp.web.View):
         issuer = self.request.app[consts.APP_BASE_URL]
         db_session: sqlasync.session.AsyncSession = self.request[consts.REQUEST_DB_SESSION]
 
-        params = self.request.rel_url.query
         access_token = util.param(params, 'access_token')
 
         response = await self._do_authenticate(
             issuer=issuer,
             db_session=db_session,
-            code=util.param(params, 'code'),
-            client_id=util.param(params, 'client_id'),
+            code=None,
+            client_id=None,
             access_token=access_token,
             api_url=util.param(params, 'api_url'),
             use_refresh_token=util.param_as_bool(
@@ -733,7 +745,8 @@ class OAuthLogin(aiohttp.web.View):
             ),
         )
 
-        response.headers['Deprecation'] = 'true'
+        # RFC 9745: structured-field date (unix timestamp) since when the endpoint is deprecated
+        response.headers['Deprecation'] = GET_AUTH_DEPRECATION
 
         return response
 

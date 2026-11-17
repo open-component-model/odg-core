@@ -1,5 +1,5 @@
-import requests.adapters
 import pytest
+import requests.adapters
 
 import delivery.client
 import odg_client
@@ -34,6 +34,11 @@ def test_odg_client_auth_route_retries_post(routes, max_retries):
     other_retry = client._session.get_adapter(f'{BASE_URL}/other').max_retries
     assert 'POST' not in other_retry.allowed_methods
 
+    # /auth/refresh rotates single-use refresh tokens -> must not be retried for POST
+    refresh_retry = client._session.get_adapter(f'{routes.auth()}/refresh').max_retries
+    assert 'POST' not in refresh_retry.allowed_methods
+    assert refresh_retry.total == expected_retry.total
+
 
 @pytest.mark.parametrize('max_retries', (None, 0, 5))
 def test_delivery_client_auth_route_retries_post(max_retries):
@@ -53,3 +58,8 @@ def test_delivery_client_auth_route_retries_post(max_retries):
 
     other_retry = client._session.get_adapter(f'{BASE_URL}/other').max_retries
     assert 'POST' not in other_retry.allowed_methods
+
+    # /auth/refresh rotates single-use refresh tokens -> must not be retried for POST
+    refresh_retry = client._session.get_adapter(f'{routes.auth()}/refresh').max_retries
+    assert 'POST' not in refresh_retry.allowed_methods
+    assert refresh_retry.total == expected_retry.total
