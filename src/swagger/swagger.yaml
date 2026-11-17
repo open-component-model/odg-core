@@ -2,6 +2,7 @@ components:
   schemas:
     AuthRequest:
       type: object
+      additionalProperties: false
       properties:
         code:
           type: string

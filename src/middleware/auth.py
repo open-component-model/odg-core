@@ -5,7 +5,6 @@ import datetime
 import enum
 import functools
 import hashlib
-import json
 import re
 import urllib.parse
 import uuid
@@ -19,6 +18,7 @@ import dacite
 import jsonschema
 import jsonschema.exceptions
 import jwt
+import orjson
 import sqlalchemy.ext.asyncio as sqlasync
 import sqlalchemy.orm
 import structlog
@@ -45,9 +45,6 @@ REFRESH_TOKEN_MAX_AGE = datetime.timedelta(days=183)
 # POST /auth requires no authentication -> bound its body size (16 KiB is generous for login
 # payloads, incl. OIDC JWTs) so unauthenticated clients cannot force unbounded buffering
 POST_AUTH_BODY_MAX_SIZE = 16 * 1024
-
-# date of the deprecation of GET /auth (2026-11-17) as RFC 9745 `Deprecation` header value
-GET_AUTH_DEPRECATION = '@1794873600'
 
 
 class GithubRoutes:
@@ -164,8 +161,7 @@ class OAuthCfgs(aiohttp.web.View):
 
             # note: no `redirect_uri`/`oauth_url_with_redirect` here on purpose: the OAuth
             # callback is owned by the UI (its landing page POSTs the code to /auth); GET
-            # /auth (the former callback target) only remains as a deprecated alias for
-            # old clients and must not be used as redirect target again
+            # /auth (the former callback target) returns 410 Gone
             return {
                 'name': oauth_cfg.name,
                 'github_host': github_host,
@@ -239,8 +235,8 @@ async def find_github_identifier(
     github_code: str | None = None,
 ) -> dm.GitHubAppIdentifier | dm.GitHubUserIdentifier:
     if github_code:
-        # pass the OAuth parameters in the POST body (RFC 6749), not in the URL query string,
-        # so the client secret does not end up in (access) logs of proxies/gateways along the way
+        # pass the OAuth parameters in the POST body (RFC 6749), so the client secret does not
+        # end up in (access) logs of proxies/gateways along the way
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 url=oauth_cfg.token_url,
@@ -647,7 +643,7 @@ class AuthRequest:
     client_id: str | None = None
     access_token: str | None = None
     api_url: str | None = None
-    use_refresh_token: bool | str | None = None
+    use_refresh_token: bool | None = None
 
 
 @noauth
@@ -659,96 +655,19 @@ class OAuthLogin(aiohttp.web.View):
         - Authentication
         deprecated: true
         description: >
-          Deprecated alias for POST /auth kept for backwards compatibility of older
-          non-browser clients. Credentials travel in the URL query string here (access logs,
-          browser and proxy history), so use POST /auth with a JSON body instead. Browser
-          requests and OAuth code logins are rejected to prevent login CSRF.
-        parameters:
-        - in: query
-          name: access_token
-          required: false
-          schema:
-            type: string
-          description: >
-            GitHub access token (requires api_url) or OIDC bearer token (without api_url).
-        - in: query
-          name: api_url
-          required: false
-          schema:
-            type: string
-        - in: query
-          name: use_refresh_token
-          required: false
-          schema:
-            type: boolean
-        - in: header
-          name: Authorization
-          required: false
-          schema:
-            type: string
-          description: >
-            OIDC bearer token in the form "Bearer <token>". Alternative to passing the
-            token as access_token without api_url. No refresh token is issued for OIDC
-            logins.
+          Removed. Credentials in the URL query string end up in access logs and browser
+          history, so login is POST /auth with a JSON body.
         responses:
-          "200":
-            description: Successfully logged in.
-            content:
-              application/json:
-                schema:
-                  $ref: '#/components/schemas/AuthToken'
-          "400":
-            description: >
-              The request was sent by a browser or contains an OAuth code (use POST /auth).
-          "401":
-            description: The provided auth information is not valid.
+          "410":
+            description: Login via GET is gone, use POST /auth with a JSON body.
         """
-        # browsers attach `Sec-Fetch-*` headers to every request (incl. top-level navigations);
-        # rejecting them prevents login CSRF via crafted links, as the session cookies of a
-        # navigation response would be stored despite `SameSite=Strict`
-        if 'Sec-Fetch-Mode' in self.request.headers or 'Sec-Fetch-Site' in self.request.headers:
-            raise aiohttp.web.HTTPBadRequest(
-                text='GET /auth is not supported for browsers, use POST /auth instead',
-            )
-
-        params = self.request.rel_url.query
-
-        # only the browser-based OAuth callback used to send the code -> never accept it via GET
-        if 'code' in params or 'client_id' in params:
-            raise aiohttp.web.HTTPBadRequest(
-                text='OAuth code login is only supported via POST /auth',
-            )
-
-        logger.warning(
-            'deprecated login via GET /auth: credentials travel in the URL query string, '
-            'use POST /auth with a JSON body instead',
-            user_agent=self.request.headers.get('User-Agent'),
-        )
-
-        issuer = self.request.app[consts.APP_BASE_URL]
-        db_session: sqlasync.session.AsyncSession = self.request[consts.REQUEST_DB_SESSION]
-
-        access_token = util.param(params, 'access_token')
-
-        response = await self._do_authenticate(
-            issuer=issuer,
-            db_session=db_session,
-            code=None,
-            client_id=None,
-            access_token=access_token,
-            api_url=util.param(params, 'api_url'),
-            use_refresh_token=util.param_as_bool(
-                params=params,
-                name='use_refresh_token',
-                # if login via access-token, don't use refresh tokens
-                default=not bool(access_token),
+        raise aiohttp.web.HTTPGone(
+            text=(
+                'Login is POST /auth with a JSON body: GitHub login: "code" and '
+                '"client_id" (or "access_token" and "api_url"); OIDC login: bearer token '
+                'in the Authorization header or "access_token" in the JSON body.'
             ),
         )
-
-        # RFC 9745: structured-field date (unix timestamp) since when the endpoint is deprecated
-        response.headers['Deprecation'] = GET_AUTH_DEPRECATION
-
-        return response
 
     async def post(self):
         """
@@ -815,16 +734,20 @@ class OAuthLogin(aiohttp.web.View):
                 )
 
         try:
-            body = json.loads(bytes(body_bytes))
-        except json.JSONDecodeError:
-            raise aiohttp.web.HTTPBadRequest(text='POST /auth requires a JSON object body')
+            body = orjson.loads(body_bytes)
+        except orjson.JSONDecodeError:  # also raised for invalid UTF-8
+            raise aiohttp.web.HTTPBadRequest(text='POST /auth requires a JSON object body') from None
 
         # dacite silently accepts non-dict iterables (e.g. JSON lists/strings) as empty instances
         if not isinstance(body, dict):
             raise aiohttp.web.HTTPBadRequest(text='POST /auth requires a JSON object body')
 
         try:
-            auth_request = dacite.from_dict(data_class=AuthRequest, data=body)
+            auth_request = dacite.from_dict(
+                data_class=AuthRequest,
+                data=body,
+                config=dacite.Config(strict=True),  # reject unknown (e.g. misspelled) fields
+            )
         except TypeError, dacite.DaciteError:
             # dacite errors contain the offending value (e.g. a token) -> suppress the context so
             # credential values do not end up in the traceback logged by errors_middleware
@@ -832,14 +755,9 @@ class OAuthLogin(aiohttp.web.View):
                 text='POST /auth requires a JSON object body',
             ) from None
 
-        match auth_request.use_refresh_token:
-            case None:
-                # if login via access-token, don't use refresh tokens
-                use_refresh_token = not bool(auth_request.access_token)
-            case bool():
-                use_refresh_token = auth_request.use_refresh_token
-            case str():
-                use_refresh_token = auth_request.use_refresh_token.lower() in {'true', 'yes', '1'}
+        if (use_refresh_token := auth_request.use_refresh_token) is None:
+            # if login via access-token, don't use refresh tokens
+            use_refresh_token = not bool(auth_request.access_token)
 
         return await self._do_authenticate(
             issuer=issuer,

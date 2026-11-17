@@ -459,7 +459,15 @@ async def test_login_rejects_non_json_content_type():
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     'body',
-    (b'', b'{invalid', b'"plain string"', b'[1, 2]'),
+    (
+        b'',
+        b'{invalid',
+        b'"plain string"',
+        b'[1, 2]',
+        b'\xff',  # invalid UTF-8
+        b'{"accessToken": "token"}',  # unknown field
+        b'{"use_refresh_token": "true"}',  # wrong type
+    ),
 )
 async def test_login_rejects_invalid_or_non_object_body(body):
     view = _make_login_view(body=body)
@@ -503,71 +511,19 @@ async def test_login_bad_field_type_does_not_leak_value_in_traceback():
 
 
 @pytest.mark.asyncio
-async def test_login_get_is_deprecated_alias(signing_cfg):
-    view = _make_login_view(
-        query={'access_token': 'token', 'api_url': 'https://github.example.com/api'},
-        user=_make_user_idp(),
-    )
-
-    with (
-        unittest.mock.patch('ctx_util.secret_factory'),
-        unittest.mock.patch.object(
-            middleware.auth,
-            'find_github_oauth_cfg',
-            return_value=unittest.mock.MagicMock(),
-        ),
-        unittest.mock.patch.object(
-            middleware.auth,
-            'find_github_identifier',
-            new=unittest.mock.AsyncMock(),
-        ),
-        unittest.mock.patch.object(
-            middleware.auth,
-            'set_session_and_refresh_token',
-            new=unittest.mock.AsyncMock(return_value=aiohttp.web.json_response()),
-        ),
-    ):
-        response = await view.get()
-
-    # GET /auth must keep working for older clients, but is marked as deprecated
-    assert response.status == 200
-    assert response.headers.get('Deprecation') == middleware.auth.GET_AUTH_DEPRECATION
-
-
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     'query',
     (
+        {},
+        {'access_token': 'token', 'api_url': 'https://github.example.com/api'},
         {'code': 'code', 'client_id': 'id'},
-        {'code': 'code'},
-        {'client_id': 'id'},
     ),
 )
-async def test_login_get_rejects_oauth_code(query):
-    # a crafted link with an attacker's code must not log the victim in (login CSRF)
+async def test_login_get_is_gone(query):
+    # credentials in the URL end up in access logs and browser history -> GET login is removed
     view = _make_login_view(query=query)
 
-    with pytest.raises(aiohttp.web.HTTPBadRequest):
-        await view.get()
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    'headers',
-    (
-        {'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Site': 'cross-site'},
-        {'Sec-Fetch-Mode': 'cors'},
-        {'Sec-Fetch-Site': 'same-origin'},
-    ),
-)
-async def test_login_get_rejects_browser_requests(headers):
-    # browsers would store the session cookies of a top-level navigation (login CSRF)
-    view = _make_login_view(
-        query={'access_token': 'token', 'api_url': 'https://github.example.com/api'},
-        headers=headers,
-    )
-
-    with pytest.raises(aiohttp.web.HTTPBadRequest):
+    with pytest.raises(aiohttp.web.HTTPGone):
         await view.get()
 
 
@@ -620,14 +576,6 @@ async def test_find_github_identifier_sends_client_secret_in_body():
         'client_secret': 'client-secret',
         'code': 'oauth-code',
     }
-
-
-@pytest.mark.asyncio
-async def test_login_get_without_credentials_rejects(signing_cfg):
-    view = _make_login_view()
-
-    with pytest.raises(aiohttp.web.HTTPUnauthorized):
-        await view.get()
 
 
 @pytest.mark.asyncio
