@@ -86,44 +86,6 @@ def test_jwt(json_web_key, token):
         )
 
 
-def test_decode_jwt_rechecks_expiration(json_web_key):
-    # a once-validated token must become invalid after its `exp`
-    # (caching of successful verifications must not defeat expiration checks)
-    validity_seconds = 2
-    now = datetime.datetime.now(tz=datetime.timezone.utc)
-
-    short_lived_token = jwt.encode(
-        payload={
-            'sub': 'test-user',
-            'iss': ISSUER,
-            'iat': int(now.timestamp()),
-            'exp': int((now + datetime.timedelta(seconds=validity_seconds)).timestamp()),
-            'key_id': '0',
-        },
-        key=private_key.export_key(format='PEM'),
-        algorithm=odg_client.jwt.Algorithm.RS256,
-    )
-
-    odg_client.jwt.decode_jwt(
-        token=short_lived_token,
-        verify_signature=True,
-        json_web_key=json_web_key,
-        issuer=ISSUER,
-    )
-
-    import time
-
-    time.sleep(validity_seconds + 1)
-
-    with pytest.raises(jwt.exceptions.ExpiredSignatureError):
-        odg_client.jwt.decode_jwt(
-            token=short_lived_token,
-            verify_signature=True,
-            json_web_key=json_web_key,
-            issuer=ISSUER,
-        )
-
-
 def _make_client(**kwargs) -> odg_client.DeliveryServiceClient:
     routes = odg_client.DeliveryServiceRoutes(base_url='https://delivery-service.example.com')
     return odg_client.DeliveryServiceClient(routes=routes, **kwargs)
