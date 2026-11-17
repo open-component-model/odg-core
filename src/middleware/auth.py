@@ -25,7 +25,7 @@ import consts
 import ctx_util
 import deliverydb.model as dm
 import lookups
-import odg_client.jwt
+import delivery.jwt
 import paths
 import secret_mgmt.oauth_cfg
 import secret_mgmt.rbac
@@ -615,7 +615,7 @@ async def set_session_and_refresh_token(
     )
 
     response.set_cookie(
-        name=odg_client.jwt.JWT_KEY,
+        name=delivery.jwt.JWT_KEY,
         value=jwt.encode(
             session_token,
             _prepared_signing_key(signing_cfg.private_key, signing_cfg.algorithm),
@@ -639,7 +639,7 @@ async def set_session_and_refresh_token(
     }
 
     response.set_cookie(
-        name=odg_client.jwt.REFRESH_TOKEN_KEY,
+        name=delivery.jwt.REFRESH_TOKEN_KEY,
         value=jwt.encode(
             refresh_token,
             _prepared_signing_key(signing_cfg.private_key, signing_cfg.algorithm),
@@ -834,7 +834,7 @@ class OAuthRefresh(aiohttp.web.View):
         issuer = self.request.app[consts.APP_BASE_URL]
         db_session: sqlasync.session.AsyncSession = self.request[consts.REQUEST_DB_SESSION]
 
-        refresh_token = self.request.cookies.get(odg_client.jwt.REFRESH_TOKEN_KEY)
+        refresh_token = self.request.cookies.get(delivery.jwt.REFRESH_TOKEN_KEY)
 
         if not refresh_token:
             raise aiohttp.web.HTTPUnauthorized(
@@ -893,11 +893,11 @@ class OAuthLogout(aiohttp.web.View):
           "200":
             description: Successfully logged out.
         """
-        refresh_token = self.request.cookies.get(odg_client.jwt.REFRESH_TOKEN_KEY)
+        refresh_token = self.request.cookies.get(delivery.jwt.REFRESH_TOKEN_KEY)
 
         response = aiohttp.web.Response()
-        response.del_cookie(name=odg_client.jwt.JWT_KEY, path='/')
-        response.del_cookie(name=odg_client.jwt.REFRESH_TOKEN_KEY, path='/')
+        response.del_cookie(name=delivery.jwt.JWT_KEY, path='/')
+        response.del_cookie(name=delivery.jwt.REFRESH_TOKEN_KEY, path='/')
 
         if not refresh_token:
             return response
@@ -970,7 +970,7 @@ class OpenIDCfg(aiohttp.web.View):
                     'public',
                 ],
                 'id_token_signing_alg_values_supported': [
-                    algorithm for algorithm in odg_client.jwt.Algorithm
+                    algorithm for algorithm in delivery.jwt.Algorithm
                 ],
             },
         )
@@ -1019,18 +1019,18 @@ def _jwt_from_signing_cfg_fields(
     key_id: str,
     algorithm: str,
     public_key: str,
-) -> odg_client.jwt.JSONWebKey:
-    alg = odg_client.jwt.Algorithm(algorithm.upper())
-    use = odg_client.jwt.Use.SIGNATURE
+) -> delivery.jwt.JSONWebKey:
+    alg = delivery.jwt.Algorithm(algorithm.upper())
+    use = delivery.jwt.Use.SIGNATURE
 
-    if alg is odg_client.jwt.Algorithm.RS256:
+    if alg is delivery.jwt.Algorithm.RS256:
         rsa_key = Crypto.PublicKey.RSA.import_key(public_key)
 
-        return odg_client.jwt.RSAPublicKey(
+        return delivery.jwt.RSAPublicKey(
             use=use,
             kid=key_id,
-            n=odg_client.jwt.encodeBase64urlUInt(rsa_key.n),
-            e=odg_client.jwt.encodeBase64urlUInt(rsa_key.e),
+            n=delivery.jwt.encodeBase64urlUInt(rsa_key.n),
+            e=delivery.jwt.encodeBase64urlUInt(rsa_key.e),
         )
 
     raise ValueError(f'unsupported signing {algorithm=}')
@@ -1038,7 +1038,7 @@ def _jwt_from_signing_cfg_fields(
 
 def jwt_from_signing_cfg(
     signing_cfg: secret_mgmt.signing_cfg.SigningCfg,
-) -> odg_client.jwt.JSONWebKey:
+) -> delivery.jwt.JSONWebKey:
     return _jwt_from_signing_cfg_fields(
         key_id=signing_cfg.id,
         algorithm=signing_cfg.algorithm,
@@ -1415,10 +1415,13 @@ def decode_jwt(
         json_web_key = None
 
     try:
-        return odg_client.jwt.decode_jwt(
-            token=token,
-            verify_signature=verify_signature,
-            json_web_key=json_web_key,
+        return jwt.decode(
+            jwt=token,
+            key=json_web_key.key if json_web_key else None,
+            algorithms=[json_web_key.alg if json_web_key else None],
+            options={
+                'verify_signature': verify_signature,
+            },
             issuer=issuer,
         )
     except (ValueError, jwt.exceptions.DecodeError) as e:
@@ -1459,7 +1462,7 @@ def check_jwt_header_content(header: dict[str, str]):
         )
     if algorithm := header.get('alg', ''):
         try:
-            odg_client.jwt.Algorithm(algorithm.upper())
+            delivery.jwt.Algorithm(algorithm.upper())
         except ValueError:
             raise aiohttp.web.HTTPNotImplemented(
                 text=f'Algorithm {algorithm} is not supported',
