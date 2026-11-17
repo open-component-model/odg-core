@@ -889,6 +889,35 @@ class _GitHubDeliveryServiceClient(DeliveryServiceClient):
             timeout=(4, 31),
         )
 
+        if res.status_code == 405:
+            import logging
+            import urllib.parse
+
+            params = {
+                'access_token': self.auth_credentials.auth_token,
+                'api_url': self.auth_credentials.api_url,
+            }
+
+            # do not log query parameters upon connection failures
+            urllib3_logger = logging.getLogger('urllib3.connectionpool')
+            was_disabled = urllib3_logger.disabled
+            urllib3_logger.disabled = True
+            try:
+                res = self._session.get(
+                    url=self._routes.auth(),
+                    params=params,
+                    timeout=(4, 31),
+                )
+            finally:
+                urllib3_logger.disabled = was_disabled
+
+            parsed_url = urllib.parse.urlparse(res.url)
+            parsed_query = urllib.parse.parse_qs(parsed_url.query)
+            parsed_query['access_token'] = ('REDACTED',)
+            query = urllib.parse.urlencode(parsed_query, doseq=True)
+            url = res.url.split('?')[0]
+            res.url = f'{url}?{query}'
+
         if not res.ok:
             logger.warning(
                 'authentication against delivery-service failed: '
@@ -924,6 +953,13 @@ class _OidcDeliveryServiceClient(DeliveryServiceClient):
             headers={'Authorization': f'Bearer {token}'},
             timeout=(4, 31),
         )
+
+        if res.status_code == 405:
+            res = self._session.get(
+                url=self._routes.auth(),
+                headers={'Authorization': f'Bearer {token}'},
+                timeout=(4, 31),
+            )
 
         if not res.ok:
             logger.warning(
