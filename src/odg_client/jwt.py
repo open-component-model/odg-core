@@ -8,6 +8,7 @@ import base64
 import dataclasses
 import datetime
 import enum
+import functools
 import typing
 
 import Crypto.PublicKey.RSA
@@ -102,6 +103,7 @@ def decodeBase64urlUInt(s: str) -> int:
     return Crypto.Util.number.bytes_to_long(b)
 
 
+@functools.cache
 def decode_jwt(
     token: str,
     verify_signature: bool = True,
