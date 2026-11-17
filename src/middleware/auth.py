@@ -706,9 +706,6 @@ class OAuthLogin(aiohttp.web.View):
           "415":
             description: The request body must be sent as "application/json".
         """
-        return await self._post()
-
-    async def _post(self) -> aiohttp.web.StreamResponse:
         issuer = self.request.app[consts.APP_BASE_URL]
         db_session: sqlasync.session.AsyncSession = self.request[consts.REQUEST_DB_SESSION]
 

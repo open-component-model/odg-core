@@ -453,7 +453,7 @@ async def test_login_rejects_non_json_content_type():
     view = _make_login_view(content_type='text/plain')
 
     with pytest.raises(aiohttp.web.HTTPUnsupportedMediaType):
-        await view._post()
+        await view.post()
 
 
 @pytest.mark.asyncio
@@ -473,7 +473,7 @@ async def test_login_rejects_invalid_or_non_object_body(body):
     view = _make_login_view(body=body)
 
     with pytest.raises(aiohttp.web.HTTPBadRequest):
-        await view._post()
+        await view.post()
 
 
 @pytest.mark.asyncio
@@ -494,7 +494,7 @@ async def test_login_rejects_oversized_body(chunks):
         view.request.content.iter_any = lambda: view.request.iter_body(chunks)
 
     with pytest.raises(aiohttp.web.HTTPRequestEntityTooLarge):
-        await view._post()
+        await view.post()
 
 
 @pytest.mark.asyncio
@@ -503,7 +503,7 @@ async def test_login_bad_field_type_does_not_leak_value_in_traceback():
     view = _make_login_view(body=json.dumps({'access_token': [token]}).encode())
 
     with pytest.raises(aiohttp.web.HTTPBadRequest) as excinfo:
-        await view._post()
+        await view.post()
 
     # dacite's error contains the offending value; it must not be retained as exception context
     # (errors_middleware logs the full traceback, including chained exceptions)
@@ -608,7 +608,7 @@ async def test_github_login_via_code_and_client_id(signing_cfg):
             new=unittest.mock.AsyncMock(return_value=aiohttp.web.json_response()),
         ),
     ):
-        response = await view._post()
+        response = await view.post()
 
     assert response.status == 200
 
@@ -638,7 +638,7 @@ async def test_github_login_via_access_token_and_api_url(signing_cfg):
             new=unittest.mock.AsyncMock(return_value=aiohttp.web.json_response()),
         ),
     ):
-        response = await view._post()
+        response = await view.post()
 
     assert response.status == 200
 
@@ -667,7 +667,7 @@ async def test_oidc_login_via_authorization_header():
             new=unittest.mock.AsyncMock(return_value=aiohttp.web.json_response()),
         ),
     ):
-        response = await view._post()
+        response = await view.post()
 
     assert response.status == 200
 
@@ -696,7 +696,7 @@ async def test_oidc_login_via_access_token_in_body():
             new=unittest.mock.AsyncMock(return_value=aiohttp.web.json_response()),
         ),
     ):
-        response = await view._post()
+        response = await view.post()
 
     assert response.status == 200
 
@@ -706,6 +706,6 @@ async def test_login_without_credentials_raises_401():
     view = _make_login_view(body=b'{}')
 
     with pytest.raises(aiohttp.web.HTTPUnauthorized) as excinfo:
-        await view._post()
+        await view.post()
 
     assert 'WWW-Authenticate' in excinfo.value.headers
