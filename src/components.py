@@ -1494,9 +1494,10 @@ class DownloadSBOM(aiohttp.web.View):
         filename = f'{component.name}_{component.version}.sboms.tar'.replace('/', '_')
         response = aiohttp.web.StreamResponse(
             headers={
-                'Content-Type': 'application/x-tar',
-                'Content-Encoding': 'gzip',
                 'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Encoding': 'gzip',
+                'Content-Type': 'application/x-tar',
+                'X-Content-Type-Options': 'nosniff',
             },
         )
         await response.prepare(self.request)
