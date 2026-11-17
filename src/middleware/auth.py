@@ -161,7 +161,8 @@ class OAuthCfgs(aiohttp.web.View):
 
             # note: no `redirect_uri`/`oauth_url_with_redirect` here on purpose: the OAuth
             # callback is owned by the UI (its landing page POSTs the code to /auth); GET
-            # /auth (the former callback target) is gone
+            # /auth (the former callback target) only remains as a deprecated alias for
+            # old clients and must not be used as redirect target again
             return {
                 'name': oauth_cfg.name,
                 'github_host': github_host,
@@ -235,20 +236,17 @@ async def find_github_identifier(
     github_code: str | None = None,
 ) -> dm.GitHubAppIdentifier | dm.GitHubUserIdentifier:
     if github_code:
-        github_token_url = (
-            oauth_cfg.token_url
-            + '?'
-            + urllib.parse.urlencode(
-                {
+        # pass the OAuth parameters in the POST body (RFC 6749), not in the URL query string,
+        # so the client secret does not end up in (access) logs of proxies/gateways along the way
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                url=oauth_cfg.token_url,
+                data={
                     'client_id': oauth_cfg.client_id,
                     'client_secret': oauth_cfg.client_secret,
                     'code': github_code,
                 },
-            )
-        )
-
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url=github_token_url) as res:
+            ) as res:
                 res.raise_for_status()
 
                 parsed = urllib.parse.parse_qs(await res.text())
@@ -656,21 +654,88 @@ class OAuthLogin(aiohttp.web.View):
         ---
         tags:
         - Authentication
+        deprecated: true
+        description: >
+          Deprecated alias for POST /auth kept for backwards compatibility of older
+          clients. Credentials travel in the URL query string here (access logs, browser
+          and proxy history), so use POST /auth with a JSON body instead.
+        parameters:
+        - in: query
+          name: code
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: client_id
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: access_token
+          required: false
+          schema:
+            type: string
+          description: >
+            GitHub access token (requires api_url) or OIDC bearer token (without api_url).
+        - in: query
+          name: api_url
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: use_refresh_token
+          required: false
+          schema:
+            type: boolean
+        - in: header
+          name: Authorization
+          required: false
+          schema:
+            type: string
+          description: >
+            OIDC bearer token in the form "Bearer <token>". Alternative to passing the
+            token as access_token without api_url. No refresh token is issued for OIDC
+            logins.
         responses:
-          "410":
-            description: >
-              Login via GET with credentials in the URL query string is gone.
-              Login is POST /auth with a JSON body (GitHub: "code" and "client_id" or
-              "access_token" and "api_url"; OIDC: Authorization bearer header or
-              "access_token" in the JSON body).
+          "200":
+            description: Successfully logged in.
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/AuthToken'
+          "401":
+            description: The provided auth information is not valid.
         """
-        raise aiohttp.web.HTTPGone(
-            text=(
-                'Login is POST /auth with a JSON body: GitHub login: "code" and '
-                '"client_id" (or "access_token" and "api_url"); OIDC login: bearer token '
-                'in the Authorization header or "access_token" in the JSON body.'
+        logger.warning(
+            'deprecated login via GET /auth: credentials travel in the URL query string, '
+            'use POST /auth with a JSON body instead',
+            user_agent=self.request.headers.get('User-Agent'),
+        )
+
+        issuer = self.request.app[consts.APP_BASE_URL]
+        db_session: sqlasync.session.AsyncSession = self.request[consts.REQUEST_DB_SESSION]
+
+        params = self.request.rel_url.query
+        access_token = util.param(params, 'access_token')
+
+        response = await self._do_authenticate(
+            issuer=issuer,
+            db_session=db_session,
+            code=util.param(params, 'code'),
+            client_id=util.param(params, 'client_id'),
+            access_token=access_token,
+            api_url=util.param(params, 'api_url'),
+            use_refresh_token=util.param_as_bool(
+                params=params,
+                name='use_refresh_token',
+                # if login via access-token, don't use refresh tokens
+                default=not bool(access_token),
             ),
         )
+
+        response.headers['Deprecation'] = 'true'
+
+        return response
 
     async def post(self):
         """

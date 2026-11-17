@@ -504,10 +504,42 @@ async def test_login_bad_field_type_does_not_leak_value_in_traceback():
 
 
 @pytest.mark.asyncio
-async def test_login_get_rejects_with_410():
-    view = _make_login_view(query={'code': 'code', 'client_id': 'id'})
+async def test_login_get_is_deprecated_alias(signing_cfg):
+    view = _make_login_view(
+        query={'code': 'code', 'client_id': 'id'},
+        user=_make_user_idp(),
+    )
 
-    with pytest.raises(aiohttp.web.HTTPGone):
+    with (
+        unittest.mock.patch('ctx_util.secret_factory'),
+        unittest.mock.patch.object(
+            middleware.auth,
+            'find_github_oauth_cfg',
+            return_value=unittest.mock.MagicMock(),
+        ),
+        unittest.mock.patch.object(
+            middleware.auth,
+            'find_github_identifier',
+            new=unittest.mock.AsyncMock(),
+        ),
+        unittest.mock.patch.object(
+            middleware.auth,
+            'set_session_and_refresh_token',
+            new=unittest.mock.AsyncMock(return_value=aiohttp.web.json_response()),
+        ),
+    ):
+        response = await view.get()
+
+    # GET /auth must keep working for older clients, but is marked as deprecated
+    assert response.status == 200
+    assert response.headers.get('Deprecation') == 'true'
+
+
+@pytest.mark.asyncio
+async def test_login_get_without_credentials_rejects(signing_cfg):
+    view = _make_login_view()
+
+    with pytest.raises(aiohttp.web.HTTPUnauthorized):
         await view.get()
 
 
