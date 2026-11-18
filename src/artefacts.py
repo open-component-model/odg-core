@@ -150,8 +150,9 @@ class ArtefactBlob(aiohttp.web.View):
         if unzip and access.mediaType == 'application/gzip':
             response = aiohttp.web.StreamResponse(
                 headers={
-                    'Content-Type': artefact.type,
                     'Content-Disposition': f'attachment; filename="{fname}"',
+                    'Content-Type': artefact.type,
+                    'X-Content-Type-Options': 'nosniff',
                 },
             )
             await response.prepare(self.request)
@@ -163,8 +164,9 @@ class ArtefactBlob(aiohttp.web.View):
         else:
             response = aiohttp.web.StreamResponse(
                 headers={
-                    'Content-Type': access.mediaType,
                     'Content-Disposition': f'attachment; filename="{fname}"',
+                    'Content-Type': access.mediaType,
+                    'X-Content-Type-Options': 'nosniff',
                 },
             )
             await response.prepare(self.request)

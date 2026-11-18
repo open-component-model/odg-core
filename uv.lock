@@ -273,30 +273,30 @@ wheels = [
 
 [[package]]
 name = "boto3"
-version = "1.43.127"
+version = "1.44.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "botocore" },
     { name = "jmespath" },
     { name = "s3transfer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ca/6b/2bc953d6f0b87505636d0a7c16e46a47ab6c49df4a278ac9c0b1c1732e65/boto3-1.43.127.tar.gz", hash = "sha256:b5417e81d439b35ccf3a1eb51fa06cf9c97167c9a6beaa1929175ee9840d505a", size = 112783, upload-time = "2026-11-09T20:52:17.411Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e7/b4/da0e5fd912f51d04e9f019fea50cbb859a4ba07947c6e28262ff59c98360/boto3-1.44.0.tar.gz", hash = "sha256:5d311d2988ae560f83e5fb8a284cb57b48e2c8d444ecb78a6d6752ae1740e04a", size = 112741, upload-time = "2026-11-10T20:22:34.536Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/40/48/f562f1240da499614a19bdf5d54dbdbfea5cffabbdd2703c3a413e0c13a1/boto3-1.43.127-py3-none-any.whl", hash = "sha256:47f87f89b10e62f5191bd98674beb0dd52ed368c19fcdfef2ef38ead31126f49", size = 140187, upload-time = "2026-11-09T20:52:15.845Z" },
+    { url = "https://files.pythonhosted.org/packages/e2/53/9c2ca547dc9fa1e9e2a0fec0096b9e25277f6864faba580ace75e0db5585/boto3-1.44.0-py3-none-any.whl", hash = "sha256:ae3009db1294fd4ca2e30d9592ead8ab56f0e270bcad0b95e555f03f7875716d", size = 140153, upload-time = "2026-11-10T20:22:31.736Z" },
 ]
 
 [[package]]
 name = "botocore"
-version = "1.43.127"
+version = "1.44.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jmespath" },
     { name = "python-dateutil" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8f/45/b4e606b0f66c11c6bd44e91381aa562c6b4dacf478b97b461a429036a89a/botocore-1.43.127.tar.gz", hash = "sha256:93bae360fb3a6f1b8e36593faa8bbbfa05b19866f7a37e9606a98f13394156f8", size = 16559749, upload-time = "2026-11-09T20:52:12.475Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/09/f4/ca9bcb9774e8d0a903b95743abb252c78d05d80faa97eb6ee7f9c7167e0b/botocore-1.44.5.tar.gz", hash = "sha256:a988f39e3a4484def0b8010f41128f71157da0515a4804fccce4739aa8f216da", size = 16859049, upload-time = "2026-11-17T20:24:18.73Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4b/db/bee0401fd3f8cf1e2404044a4e3156dc7e064c2b1fc7162df2d795941cd8/botocore-1.43.127-py3-none-any.whl", hash = "sha256:aa0e3188679a2164a2098a14ea9b59520520cb573aaee9999d852480691e134a", size = 16257630, upload-time = "2026-11-09T20:52:09.488Z" },
+    { url = "https://files.pythonhosted.org/packages/73/0b/9f5dad3e0acf5307f34e38fa9a3c3e93f3e4da51667a5939846015269587/botocore-1.44.5-py3-none-any.whl", hash = "sha256:8f16a56d1dff125dd65322ae021efa7ba5195a6db5102b96862566055b748921", size = 16555415, upload-time = "2026-11-17T20:24:14.604Z" },
 ]
 
 [[package]]
@@ -807,7 +807,7 @@ wheels = [
 
 [[package]]
 name = "gardener-cicd-libs"
-version = "1.2866.0"
+version = "1.2872.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cachecontrol" },
@@ -847,7 +847,7 @@ dependencies = [
     { name = "yamllint" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/40/c0/e68d837d6cea6723ea20d9e8ab0c1e1abeb65015996104d78c7fb1d60bcc/gardener_cicd_libs-1.2866.0-py3-none-any.whl", hash = "sha256:1dd9b8af16460303c646e2e6f8f30b7d6871b5a7b1645d4982ca216b53ba19b7", size = 258498, upload-time = "2026-10-27T12:26:34.395Z" },
+    { url = "https://files.pythonhosted.org/packages/5d/ce/58c6058b03bde58fcc60f09f5974e503bc138f1e3606e649fa710fb14b47/gardener_cicd_libs-1.2872.0-py3-none-any.whl", hash = "sha256:6a41dc095ca53add964057054e268654e30ee2309c097c514d65643b6c7aa9a9", size = 274663, upload-time = "2026-11-10T14:13:22.214Z" },
 ]
 
 [[package]]
@@ -866,7 +866,7 @@ wheels = [
 
 [[package]]
 name = "gardener-ocm"
-version = "1.2866.0"
+version = "1.2872.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cachetools" },
@@ -880,7 +880,7 @@ dependencies = [
     { name = "semver" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/74/e7/1615bf432eff7831c5775ec6a270c95102977c90c062e07057d160fef39c/gardener_ocm-1.2866.0-py3-none-any.whl", hash = "sha256:be76d480bd1c3e71ce57f7ca712b83cbf645715efabe0f39b0ac4e1a54452f82", size = 169820, upload-time = "2026-10-27T12:26:39.226Z" },
+    { url = "https://files.pythonhosted.org/packages/1f/4c/8d748e82ea23adb3dbace6815393e81767a7831f48ba371085aca961fb95/gardener_ocm-1.2872.0-py3-none-any.whl", hash = "sha256:75a5dd9bbff16a163e1567759bf08994e5bcd7b27650c20a53a92f4ac98a1e21", size = 176990, upload-time = "2026-11-10T14:13:26.785Z" },
 ]
 
 [[package]]
@@ -1571,7 +1571,7 @@ wheels = [
 
 [[package]]
 name = "odg-client"
-version = "0.15.0"
+version = "0.18.0"
 source = { editable = "packages/odg-client" }
 dependencies = [
     { name = "dacite" },
@@ -1579,15 +1579,17 @@ dependencies = [
     { name = "pycryptodome" },
     { name = "pyjwt" },
     { name = "requests" },
+    { name = "structlog" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "dacite", specifier = "==1.9.2" },
-    { name = "gardener-ocm", specifier = "==1.2866.0" },
+    { name = "gardener-ocm", specifier = "==1.2872.0" },
     { name = "pycryptodome", specifier = "==3.24.1" },
     { name = "pyjwt", specifier = "==2.15.1" },
     { name = "requests", specifier = "==2.34.2" },
+    { name = "structlog", specifier = "==26.1.0" },
 ]
 
 [[package]]
@@ -1656,13 +1658,13 @@ requires-dist = [
     { name = "alembic", specifier = "==1.20.1" },
     { name = "awesomeversion", specifier = "==25.8.0" },
     { name = "bdba-client", editable = "packages/bdba-client" },
-    { name = "boto3", specifier = "==1.43.127" },
+    { name = "boto3", specifier = "==1.44.0" },
     { name = "brotli", specifier = "==1.2.1" },
     { name = "cachetools", specifier = "==7.3.0" },
     { name = "cyclonedx-python-lib", specifier = "==11.12.0" },
     { name = "dacite", specifier = "==1.9.2" },
     { name = "dataclasses-json", specifier = "==0.6.7" },
-    { name = "gardener-cicd-libs", specifier = "==1.2866.0" },
+    { name = "gardener-cicd-libs", specifier = "==1.2872.0" },
     { name = "github3-py", specifier = "==4.0.1" },
     { name = "greenlet", specifier = "==3.5.6" },
     { name = "jsonpath-ng", specifier = "==1.16.0" },

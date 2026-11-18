@@ -1,10 +1,8 @@
 import collections.abc
 import dataclasses
 import datetime
-import logging
 import time
 import typing
-import urllib.parse
 import warnings
 
 import dacite
@@ -176,6 +174,24 @@ class DeliveryServiceClient:
         self._session = requests.sessions.Session()
         self._max_retries = max_retries or 0
         self._session.mount('https://', requests.adapters.HTTPAdapter(max_retries=max_retries))
+
+        # POST is not in urllib3's default allowed-methods for retries; /auth is
+        # idempotent and was retried when it was still a GET, so keep retrying it
+        default_retry = requests.adapters.HTTPAdapter(max_retries=max_retries).max_retries
+        self._session.mount(
+            self._routes.auth(),  # longest prefix wins over the generic 'https://' adapter
+            requests.adapters.HTTPAdapter(
+                max_retries=default_retry.new(
+                    allowed_methods=default_retry.allowed_methods | {'POST'},
+                ),
+            ),
+        )
+        # sub-routes (e.g. /auth/refresh rotates single-use refresh tokens) are not idempotent
+        # -> restore default retry behaviour for them (prefix matching would include them)
+        self._session.mount(
+            f'{self._routes.auth().rstrip("/")}/',
+            requests.adapters.HTTPAdapter(max_retries=max_retries),
+        )
 
     @classmethod
     def for_github(
@@ -864,36 +880,49 @@ class _GitHubDeliveryServiceClient(DeliveryServiceClient):
                 auth_token=auth_token,
             )
 
-        params = {
-            'access_token': self.auth_credentials.auth_token,
-            'api_url': self.auth_credentials.api_url,
-        }
+        res = self._session.post(
+            url=self._routes.auth(),
+            json={
+                'access_token': self.auth_credentials.auth_token,
+                'api_url': self.auth_credentials.api_url,
+            },
+            timeout=(4, 31),
+        )
 
-        # do not log query parameters upon connection failures
-        urllib3_logger = logging.getLogger('urllib3.connectionpool')
-        was_disabled = urllib3_logger.disabled
-        urllib3_logger.disabled = True
-        try:
-            res = self._session.get(
-                url=self._routes.auth(),
-                params=params,
-                timeout=(4, 31),
-            )
-        finally:
-            urllib3_logger.disabled = was_disabled
+        if res.status_code == 405:
+            import logging
+            import urllib.parse
+
+            params = {
+                'access_token': self.auth_credentials.auth_token,
+                'api_url': self.auth_credentials.api_url,
+            }
+
+            # do not log query parameters upon connection failures
+            urllib3_logger = logging.getLogger('urllib3.connectionpool')
+            was_disabled = urllib3_logger.disabled
+            urllib3_logger.disabled = True
+            try:
+                res = self._session.get(
+                    url=self._routes.auth(),
+                    params=params,
+                    timeout=(4, 31),
+                )
+            finally:
+                urllib3_logger.disabled = was_disabled
+
+            parsed_url = urllib.parse.urlparse(res.url)
+            parsed_query = urllib.parse.parse_qs(parsed_url.query)
+            parsed_query['access_token'] = ('REDACTED',)
+            query = urllib.parse.urlencode(parsed_query, doseq=True)
+            url = res.url.split('?')[0]
+            res.url = f'{url}?{query}'
 
         if not res.ok:
             logger.warning(
                 'authentication against delivery-service failed: '
                 f'{res.status_code=} {res.reason=} {res.content=}',
             )
-
-        parsed_url = urllib.parse.urlparse(res.url)
-        parsed_query = urllib.parse.parse_qs(parsed_url.query)
-        parsed_query['access_token'] = ('REDACTED',)
-        query = urllib.parse.urlencode(parsed_query, doseq=True)
-        url = res.url.split('?')[0]
-        res.url = f'{url}?{query}'
 
         res.raise_for_status()
 
@@ -918,11 +947,19 @@ class _OidcDeliveryServiceClient(DeliveryServiceClient):
 
     def _do_authenticate(self):
         token = self.oidc_token_lookup() if self.oidc_token_lookup else self.oidc_token
-        res = self._session.get(
+        res = self._session.post(
             url=self._routes.auth(),
+            json={},
             headers={'Authorization': f'Bearer {token}'},
             timeout=(4, 31),
         )
+
+        if res.status_code == 405:
+            res = self._session.get(
+                url=self._routes.auth(),
+                headers={'Authorization': f'Bearer {token}'},
+                timeout=(4, 31),
+            )
 
         if not res.ok:
             logger.warning(

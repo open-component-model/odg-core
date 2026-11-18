@@ -172,6 +172,26 @@ class DeliveryServiceClient:
             max_retries=max_retries,
         )
         self._session.mount('https://', adapter)
+        self._mount_auth_retry_adapter(max_retries=max_retries)
+
+    def _mount_auth_retry_adapter(self, max_retries: int | None):
+        # POST is not in urllib3's default allowed-methods for retries; /auth is
+        # idempotent and was retried when it was still a GET, so keep retrying it
+        default_retry = requests.adapters.HTTPAdapter(max_retries=max_retries).max_retries
+        self._session.mount(
+            self._routes.auth(),  # longest prefix wins over the generic 'https://' adapter
+            requests.adapters.HTTPAdapter(
+                max_retries=default_retry.new(
+                    allowed_methods=default_retry.allowed_methods | {'POST'},
+                ),
+            ),
+        )
+        # sub-routes (e.g. /auth/refresh rotates single-use refresh tokens) are not idempotent
+        # -> restore default retry behaviour for them (prefix matching would include them)
+        self._session.mount(
+            f'{self._routes.auth().rstrip("/")}/',
+            requests.adapters.HTTPAdapter(max_retries=max_retries),
+        )
 
     def _openid_configuration(self):
         """
@@ -254,9 +274,9 @@ class DeliveryServiceClient:
             'api_url': self.auth_credentials.api_url,
         }
 
-        res = self._session.get(
+        res = self._session.post(
             url=self._routes.auth(),
-            params=params,
+            json=params,
             timeout=(4, 31),
         )
 

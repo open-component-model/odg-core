@@ -1,5 +1,6 @@
 import asyncio
 import collections.abc
+import dataclasses
 import datetime
 import enum
 import functools
@@ -13,9 +14,11 @@ import aiohttp.typedefs
 import aiohttp.web
 import Crypto.PublicKey.RSA
 import cryptography.hazmat.primitives.asymmetric.rsa
+import dacite
 import jsonschema
 import jsonschema.exceptions
 import jwt
+import orjson
 import sqlalchemy.ext.asyncio as sqlasync
 import sqlalchemy.orm
 import structlog
@@ -38,6 +41,10 @@ SESSION_TOKEN_MAX_AGE = datetime.timedelta(minutes=5)
 
 _jwks_clients: dict[str, jwt.PyJWKClient] = {}
 REFRESH_TOKEN_MAX_AGE = datetime.timedelta(days=183)
+
+# POST /auth requires no authentication -> bound its body size (16 KiB is generous for login
+# payloads, incl. OIDC JWTs) so unauthenticated clients cannot force unbounded buffering
+POST_AUTH_BODY_MAX_SIZE = 16 * 1024
 
 
 class GithubRoutes:
@@ -152,38 +159,15 @@ class OAuthCfgs(aiohttp.web.View):
         def oauth_cfg_to_dict(oauth_cfg: secret_mgmt.oauth_cfg.OAuthCfg):
             github_host = urllib.parse.urlparse(oauth_cfg.api_url).hostname.lower()
 
-            redirect_uri = (
-                util.urljoin(
-                    self.request.app[consts.APP_BASE_URL],
-                    'auth',
-                )
-                + '?'
-                + urllib.parse.urlencode(
-                    {
-                        'client_id': oauth_cfg.client_id,
-                    },
-                )
-            )
-
-            oauth_url = (
-                oauth_cfg.oauth_url.rstrip('?')
-                + '?'
-                + urllib.parse.urlencode(
-                    {
-                        'client_id': oauth_cfg.client_id,
-                        'redirect_uri': redirect_uri,
-                    },
-                )
-            )
-
+            # note: no `redirect_uri`/`oauth_url_with_redirect` here on purpose: the OAuth
+            # callback is owned by the UI (its landing page POSTs the code to /auth); GET
+            # /auth (the former callback target) returns 410 Gone
             return {
                 'name': oauth_cfg.name,
                 'github_host': github_host,
                 'api_url': oauth_cfg.api_url,
                 'oauth_url': oauth_cfg.oauth_url,
                 'client_id': oauth_cfg.client_id,
-                'redirect_uri': redirect_uri,
-                'oauth_url_with_redirect': oauth_url,
             }
 
         secret_factory = ctx_util.secret_factory()
@@ -251,20 +235,17 @@ async def find_github_identifier(
     github_code: str | None = None,
 ) -> dm.GitHubAppIdentifier | dm.GitHubUserIdentifier:
     if github_code:
-        github_token_url = (
-            oauth_cfg.token_url
-            + '?'
-            + urllib.parse.urlencode(
-                {
+        # pass the OAuth parameters in the POST body (RFC 6749), so the client secret does not
+        # end up in (access) logs of proxies/gateways along the way
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                url=oauth_cfg.token_url,
+                data={
                     'client_id': oauth_cfg.client_id,
                     'client_secret': oauth_cfg.client_secret,
                     'code': github_code,
                 },
-            )
-        )
-
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url=github_token_url) as res:
+            ) as res:
                 res.raise_for_status()
 
                 parsed = urllib.parse.parse_qs(await res.text())
@@ -654,6 +635,17 @@ async def set_session_and_refresh_token(
     return response
 
 
+@dataclasses.dataclass
+class AuthRequest:
+    """request body of `POST /auth` (mirror of the `AuthRequest` schema in swagger.yaml)"""
+
+    code: str | None = None
+    client_id: str | None = None
+    access_token: str | None = None
+    api_url: str | None = None
+    use_refresh_token: bool | None = None
+
+
 @noauth
 class OAuthLogin(aiohttp.web.View):
     async def get(self):
@@ -661,29 +653,28 @@ class OAuthLogin(aiohttp.web.View):
         ---
         tags:
         - Authentication
+        deprecated: true
+        description: >
+          Removed. Credentials in the URL query string end up in access logs and browser
+          history, so login is POST /auth with a JSON body.
+        responses:
+          "410":
+            description: Login via GET is gone, use POST /auth with a JSON body.
+        """
+        raise aiohttp.web.HTTPGone(
+            text=(
+                'Login is POST /auth with a JSON body: GitHub login: "code" and '
+                '"client_id" (or "access_token" and "api_url"); OIDC login: bearer token '
+                'in the Authorization header or "access_token" in the JSON body.'
+            ),
+        )
+
+    async def post(self):
+        """
+        ---
+        tags:
+        - Authentication
         parameters:
-        - in: query
-          name: code
-          required: false
-          schema:
-            type: string
-        - in: query
-          name: client_id
-          required: false
-          schema:
-            type: string
-        - in: query
-          name: access_token
-          required: false
-          schema:
-            type: string
-          description: >
-            GitHub access token (requires api_url) or OIDC bearer token (without api_url).
-        - in: query
-          name: api_url
-          required: false
-          schema:
-            type: string
         - in: header
           name: Authorization
           required: false
@@ -692,6 +683,12 @@ class OAuthLogin(aiohttp.web.View):
           description: >
             OIDC bearer token in the form "Bearer <token>". Alternative to passing the
             token as access_token without api_url. No refresh token is issued for OIDC logins.
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthRequest'
         responses:
           "200":
             description: Successfully logged in.
@@ -699,22 +696,87 @@ class OAuthLogin(aiohttp.web.View):
               application/json:
                 schema:
                   $ref: '#/components/schemas/AuthToken'
+          "400":
+            description: The request body was empty, not valid JSON, or not a JSON object.
           "401":
             description: The provided auth information is not valid.
+          "413":
+            description: >
+              The request body exceeds the maximum size of 16 KiB.
+          "415":
+            description: The request body must be sent as "application/json".
         """
         issuer = self.request.app[consts.APP_BASE_URL]
         db_session: sqlasync.session.AsyncSession = self.request[consts.REQUEST_DB_SESSION]
 
-        params = self.request.rel_url.query
-        code = util.param(params, 'code')
-        client_id = util.param(params, 'client_id')
-        access_token = util.param(params, 'access_token')
-        api_url = util.param(params, 'api_url')
-        use_refresh_token = util.param_as_bool(
-            params=params,
-            name='use_refresh_token',
-            default=not bool(access_token),  # if login via access-token, don't use refresh tokens
+        if self.request.content_type != 'application/json':
+            raise aiohttp.web.HTTPUnsupportedMediaType(
+                text='POST /auth requires an "application/json" body',
+            )
+
+        if self.request.content_length and self.request.content_length > POST_AUTH_BODY_MAX_SIZE:
+            raise aiohttp.web.HTTPRequestEntityTooLarge(
+                max_size=POST_AUTH_BODY_MAX_SIZE,
+                actual_size=self.request.content_length,
+            )
+
+        body_bytes = bytearray()
+        async for chunk in self.request.content.iter_any():
+            body_bytes.extend(chunk)
+            if len(body_bytes) > POST_AUTH_BODY_MAX_SIZE:
+                # also bound chunked bodies (they bypass the Content-Length check above)
+                raise aiohttp.web.HTTPRequestEntityTooLarge(
+                    max_size=POST_AUTH_BODY_MAX_SIZE,
+                    actual_size=len(body_bytes),
+                )
+
+        try:
+            body = orjson.loads(body_bytes)
+        except orjson.JSONDecodeError:  # also raised for invalid UTF-8
+            raise aiohttp.web.HTTPBadRequest(text='POST /auth requires a JSON object body') from None
+
+        # dacite silently accepts non-dict iterables (e.g. JSON lists/strings) as empty instances
+        if not isinstance(body, dict):
+            raise aiohttp.web.HTTPBadRequest(text='POST /auth requires a JSON object body')
+
+        try:
+            auth_request = dacite.from_dict(
+                data_class=AuthRequest,
+                data=body,
+                config=dacite.Config(strict=True),  # reject unknown (e.g. misspelled) fields
+            )
+        except TypeError, dacite.DaciteError:
+            # dacite errors contain the offending value (e.g. a token) -> suppress the context so
+            # credential values do not end up in the traceback logged by errors_middleware
+            raise aiohttp.web.HTTPBadRequest(
+                text='POST /auth requires a JSON object body',
+            ) from None
+
+        if (use_refresh_token := auth_request.use_refresh_token) is None:
+            # if login via access-token, don't use refresh tokens
+            use_refresh_token = not bool(auth_request.access_token)
+
+        return await self._do_authenticate(
+            issuer=issuer,
+            db_session=db_session,
+            code=auth_request.code,
+            client_id=auth_request.client_id,
+            access_token=auth_request.access_token,
+            api_url=auth_request.api_url,
+            use_refresh_token=use_refresh_token,
         )
+
+    async def _do_authenticate(
+        self,
+        *,
+        issuer: str,
+        db_session: sqlasync.session.AsyncSession,
+        code: str | None,
+        client_id: str | None,
+        access_token: str | None,
+        api_url: str | None,
+        use_refresh_token: bool,
+    ) -> aiohttp.web.StreamResponse:
 
         if (access_token and api_url) or (client_id and code):
             idp_type = secret_mgmt.oauth_cfg.OAuthCfgTypes.GITHUB
@@ -732,9 +794,9 @@ class OAuthLogin(aiohttp.web.View):
             raise aiohttp.web.HTTPUnauthorized(
                 headers={
                     'WWW-Authenticate': (
-                        'Add either the url query params "code" and "client_id" '
-                        'or a valid "access_token" with a github "api_url"'
-                        'or a Bearer token in the Authorization header for OIDC'
+                        'POST a JSON body with either "code" and "client_id" '
+                        'or a valid "access_token" with a github "api_url" '
+                        'or pass a Bearer token in the Authorization header for OIDC'
                     ),
                 },
             )
