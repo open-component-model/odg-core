@@ -3,6 +3,7 @@ import argparse
 import asyncio
 import concurrent.futures
 import os
+import tempfile
 
 import aiohttp.web
 import aiohttp_swagger3
@@ -36,8 +37,10 @@ import sprints
 
 logger = structlog.get_logger(__name__)
 
-own_dir = os.path.abspath(os.path.dirname(__file__))
-default_cache_dir = os.path.join(own_dir, '.cache')
+# cache lives in tmp: workloads run with a read-only root filesystem, so the
+# source tree (previous location) is not writable at runtime
+#
+default_cache_dir = os.path.join(tempfile.gettempdir(), 'odg-cache')
 
 
 def parse_args():

@@ -1,6 +1,8 @@
 import http
 import json
 import logging
+import os
+import tempfile
 import threading
 import time
 import traceback
@@ -23,7 +25,9 @@ MAX_TRACEBACK_BYTES = 100000
 
 
 def log_filename_for_level(level: int) -> str:
-    return f'logs-{logging._levelToName[level].lower()}.log'
+    # tmp instead of cwd: workloads run with a read-only root filesystem and
+    # cwd is the (read-only) image root
+    return os.path.join(tempfile.gettempdir(), f'logs-{logging._levelToName[level].lower()}.log')
 
 
 def read_logs_and_remove(level: int) -> list[dict]:

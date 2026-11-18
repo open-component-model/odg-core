@@ -13,8 +13,6 @@ import syft
 
 logger = structlog.get_logger(__name__)
 
-own_dir = os.path.abspath(os.path.dirname(__file__))
-
 
 def create_cbom(
     image: str | None = None,
@@ -67,7 +65,7 @@ def find_cbom_or_create(
     Looks up an existing CBOM document (to be implemented once it is aligned on target picture) or
     creates a CBOM ad-hoc using `syft` and `cbomkit-theia`.
     """
-    with tempfile.TemporaryDirectory(dir=own_dir) as tmp_dir:
+    with tempfile.TemporaryDirectory() as tmp_dir:
         file_path = os.path.join(tmp_dir, 'artefact')
 
         sbom_raw = syft.generate_raw_sbom_for_artefact(

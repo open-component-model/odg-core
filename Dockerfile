@@ -34,8 +34,10 @@ RUN apk add --no-cache \
  && curl https://aia.pki.co.sap.com/aia/SAPNetCA_G2_2.crt -o \
     /usr/local/share/ca-certificates/SAPNetCA_G2_2.crt \
  && update-ca-certificates \
- && mkdir /freshclam \
- && chown clamav /freshclam
+ && addgroup -g 10000 odg \
+ && adduser -D -u 10000 -G odg odg \
+ && mkdir -p /freshclam /www /run/clamav /var/log/clamav \
+ && chown -R odg:odg /freshclam /www /run/clamav /var/log/clamav /var/lib/clamav
 
 COPY --from=aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb /usr/local/bin/trivy /usr/local/bin/trivy
 # Alpine's syft (1.42) predates native Go FIPS 140 detection (`goCryptoSettings`, syft >= 1.51)
@@ -57,3 +59,12 @@ RUN --mount=type=bind,source=dist/,target=/dist \
         odg-core-libs==${ODG_CORE_LIBS_VERSION} \
  && ln -sf /etc/ssl/certs/ca-certificates.crt "$(python -m certifi)" \
  && python -m compileall -q "$VIRTUAL_ENV/lib"
+
+# runtime-writable paths live in tmpfs/emptyDir mounts (/tmp covers caches via
+# XDG_CACHE_HOME/TRIVY_CACHE_DIR); HOME itself stays read-only under
+# readOnlyRootFilesystem
+ENV HOME=/home/odg
+ENV XDG_CACHE_HOME=/tmp/.cache
+ENV TRIVY_CACHE_DIR=/tmp/.cache/trivy
+
+USER 10000:10000
