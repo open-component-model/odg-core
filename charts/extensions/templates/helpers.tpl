@@ -169,10 +169,11 @@ dns              UDP/TCP 53 to the cluster DNS namespace (default kube-system,
                  openshift-dns). Pod DNS resolution breaks without this.
 delivery-service TCP 8080+5000 to the delivery-service pods in the release
                  namespace (Service port pre-DNAT vs container port post-DNAT).
-postgres         (optional, needs.postgres) TCP 5432 to the delivery DB. CIDRs from
-                 global.netpol.postgresCidrs; if unset, falls back to the default
-                 route CIDR so an out-of-cluster database stays reachable. Narrow
-                 per deployment once the database address range is known.
+postgres         (optional, needs.postgres) TCP 5432 to the delivery DB. Matches
+                 the in-cluster postgres pods by default (label pair
+                 app.kubernetes.io/name=postgresql + component=primary is stable
+                 across delivery-db deployments); out-of-cluster databases stay
+                 reachable by adding CIDRs via global.netpol.postgresCidrs.
 internet         (optional, needs.internet) TCP 443 to 0.0.0.0/0. Without L7/DNS-aware
                  egress filtering in the CNI this cannot be narrowed by hostname; the
                  port restriction still blocks non-443 exfil channels. Kubernetes API
@@ -194,7 +195,7 @@ extra egress rules merged as additional tiers (delivery-db-backup's storage targ
 {{- $needs := index . 2 | default dict -}}
 {{- $ns := $ctx.Values.target_namespace | default $ctx.Release.Namespace -}}
 {{- $dnsLabels := dict "kubernetes.io/metadata.name" "kube-system" -}}
-{{- $postgresCidrs := list "0.0.0.0/0" -}}
+{{- $postgresCidrs := list -}}
 {{- with ($ctx.Values.global).netpol -}}
 {{- with .dnsNamespaceLabels -}}{{- $dnsLabels = . -}}{{- end -}}
 {{- with .postgresCidrs -}}{{- $postgresCidrs = . -}}{{- end -}}
@@ -245,9 +246,14 @@ spec:
         - port: 6443
           protocol: TCP
     {{- if $needs.postgres }}
-    # delivery-database (may run out-of-cluster; narrow via
-    # global.netpol.postgresCidrs once the address range is known)
+    # delivery-database: in-cluster postgres pods by default (label pair is
+    # stable across environments); external database hosts via
+    # global.netpol.postgresCidrs
     - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+              app.kubernetes.io/component: primary
         {{- range $cidr := $postgresCidrs }}
         - ipBlock:
             cidr: {{ $cidr | quote }}

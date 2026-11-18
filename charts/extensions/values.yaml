@@ -13,8 +13,9 @@ global:
     # labels selecting the cluster DNS namespace (default kube-system);
     # OpenShift example: {kubernetes.io/metadata.name: openshift-dns}
     dnsNamespaceLabels: {}
-    # CIDRs the delivery database listens on (port 5432). Defaults to
-    # 0.0.0.0/0 because the database may run out-of-cluster; narrow once known.
+    # CIDRs of database hosts outside the cluster (port 5432). Without entries,
+    # only the in-cluster postgres pods (label pair app.kubernetes.io/name=postgresql
+    # + component=primary, stable across deployments) are reachable.
     postgresCidrs: []
 
 # OTLP gRPC endpoint for trace export. Resolution order in odg.otelEnv

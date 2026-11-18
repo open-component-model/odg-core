@@ -263,10 +263,14 @@ spec:
           protocol: UDP
         - port: 53
           protocol: TCP
-    # delivery-database (may run out-of-cluster; narrow via netpol.postgresCidrs
-    # once the database address range is known)
+    # delivery-database: in-cluster postgres pods by default (label pair is
+    # stable across environments); external database hosts via netpol.postgresCidrs
     - to:
-        {{- range $cidr := ($np.postgresCidrs | default (list "0.0.0.0/0")) }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+              app.kubernetes.io/component: primary
+        {{- range $cidr := ($np.postgresCidrs | default (list)) }}
         - ipBlock:
             cidr: {{ $cidr | quote }}
         {{- end }}
@@ -306,12 +310,14 @@ spec:
   - from:
     # workloads in the same namespace (extensions, dashboard)
     - podSelector: {}
-    {{- $gatewayNs := $np.gatewayNamespaceLabels -}}
-    {{- with $gatewayNs }}
-    # ingress gateway namespace (e.g. envoy); traffic arrives via the Gateway/HTTPRoute
+    # ingress gateway namespaces (e.g. envoy-gateway-system on OpenShift); traffic
+    # arrives via the Gateway/HTTPRoute. Not needed where the gateway data plane
+    # runs in the same namespace (matched by the podSelector above) — matched via
+    # the standard kubernetes.io/metadata.name label every namespace carries
+    {{- range $gwNs := ($np.gatewayNamespaceNames | default (list "envoy-gateway-system")) }}
     - namespaceSelector:
         matchLabels:
-          {{- toYaml . | nindent 10 }}
+          kubernetes.io/metadata.name: {{ $gwNs }}
     {{- end }}
     # kubelet probes arrive as host/node traffic and bypass pod network policy on
     # CNIs with host connectivity semantics (calico, cilium); probes remain healthy
