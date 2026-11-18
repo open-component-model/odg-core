@@ -58,6 +58,31 @@ jobs:
         with:
           name: distribution-package
           path: dist/
+      - name: Smoke Test
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          wheel=$(ls dist/*.whl | head -1)
+          echo "Testing wheel: ${wheel}"
+
+          # derive top-level module names from the include patterns in pyproject.toml
+          # patterns look like "bdba*", "delivery*" — strip the trailing glob
+          modules=$(python3 -c "
+          import tomllib
+          with open('packages/${{ inputs.client }}-client/pyproject.toml', 'rb') as f:
+              patterns = tomllib.load(f)['tool']['setuptools']['packages']['find']['include']
+          print(' '.join(p.rstrip('*') for p in patterns))
+          ")
+
+          uv venv --no-project .venv-smoke-test
+          uv pip install --python .venv-smoke-test/bin/python --no-deps "${wheel}"
+          .venv-smoke-test/bin/python -c "
+          import importlib
+          for mod in '${modules}'.split():
+              importlib.import_module(mod)
+              print(f'ok: {mod}')
+          "
       - name: Retrieve Version
         id: version
         shell: uv run --no-project --with semver python {0}
