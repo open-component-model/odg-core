@@ -34,7 +34,7 @@ dependencies = [
     "psycopg[binary]==3.3.8",
     "pyjwt==2.15.1",
     "requests==2.34.2",
-    "sqlalchemy==2.0.46",
+    "sqlalchemy==2.1.8",
     "starlette==1.10.0",
     "urllib3==2.8.0",
     "uvicorn==0.54.0",
