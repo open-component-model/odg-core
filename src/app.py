@@ -19,6 +19,7 @@ import features
 import k8s.util
 import lookups
 import metadata
+import middleware.audit
 import middleware.auth
 import middleware.cors
 import middleware.db_session
@@ -360,6 +361,8 @@ async def initialise_app():
     middlewares = [
         middleware.cors.cors_middleware(),
         middleware.errors.errors_middleware(),
+        # registered before the auth middleware so auth rejections (401/403) are also audited
+        middleware.audit.audit_middleware(),
         middleware.auth.auth_middleware(default_auth=default_auth),
         middleware.db_session.db_session_middleware(db_url=parsed_arguments.delivery_db_url),
         rfc.feature_check_middleware(),
