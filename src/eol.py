@@ -1,3 +1,5 @@
+import re
+
 import requests
 
 import util
@@ -53,6 +55,10 @@ class EolClient:
         Returns release_cycles as described here https://endoflife.date/docs/api.
         If `absent_ok`, HTTP 404 returns `None`.
         """
+        # Validate product to prevent path traversal / SSRF
+        if not re.fullmatch(r'[a-zA-Z0-9._-]+', product):
+            raise ValueError(f'Invalid product identifier: {product!r}')
+
         res = requests.get(
             self._routes.cycles(product),
             timeout=(4, 31),
