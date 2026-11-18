@@ -83,7 +83,7 @@ skips = [
   'B404', # we know how to call subprocesses
   'B413', # false-positive: we do not use pyCrypto, but pycryptodome
   'B603', # we know how to call subprocesses
-  'B702', # the input of Mako templates is trusted
+  'B702', # sla-report.mako uses explicit | h filters and html.escape() for all scanner-derived values
 ]
 
 [tool.ruff]
