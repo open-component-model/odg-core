@@ -186,10 +186,12 @@ def _create_response_header(
 ) -> dict[str, str]:
 
     return {
-        'Digest': blob_digest,
-        'Created': creation_date.strftime(format='%d/%m/%y %H:%M:%S %z'),
-        'Content-Type': mime_type,
+        'Content-Disposition': 'attachment',
         'Content-Length': str(size),
+        'Content-Type': mime_type,
+        'Created': creation_date.strftime(format='%d/%m/%y %H:%M:%S %z'),
+        'Digest': blob_digest,
+        'X-Content-Type-Options': 'nosniff',
     }
 
 

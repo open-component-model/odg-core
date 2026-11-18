@@ -108,11 +108,15 @@ def test_oidc_token_calls_auth_with_bearer_header():
     client = _make_oidc_client(token='changeme')
     mock_response = _mock_auth_response('session-jwt')
 
-    with unittest.mock.patch.object(client._session, 'get', return_value=mock_response) as mock_get:
+    with unittest.mock.patch.object(
+        client._session,
+        'post',
+        return_value=mock_response,
+    ) as mock_post:
         client._authenticate()
 
-    mock_get.assert_called_once()
-    _, kwargs = mock_get.call_args
+    mock_post.assert_called_once()
+    _, kwargs = mock_post.call_args
     assert kwargs['headers']['Authorization'] == 'Bearer changeme'
     assert client._bearer_token == 'session-jwt'
 
@@ -128,7 +132,7 @@ def test_oidc_token_lookup_calls_lookup_on_each_auth():
     client = _make_oidc_client(token_lookup=fresh_token)
     mock_response = _mock_auth_response('session-jwt')
 
-    with unittest.mock.patch.object(client._session, 'get', return_value=mock_response):
+    with unittest.mock.patch.object(client._session, 'post', return_value=mock_response):
         client._authenticate()
         client._bearer_token = None  # force re-auth
         client._authenticate()
