@@ -179,6 +179,13 @@ internet         (optional, needs.internet) TCP 443 to 0.0.0.0/0. Without L7/DNS
                  port restriction still blocks non-443 exfil channels. Kubernetes API
                  server access rides this tier (endpoint IPs unknown at chart time), so
                  workloads using the Kubernetes API must keep needs.internet enabled.
+otlp             TCP 4317+4318 (gRPC+HTTP) to the in-namespace OpenTelemetry collector.
+                 Every workload emits the odg.otelEnv endpoint env vars; without this tier
+                 tracing/metrics export to the same-namespace collector breaks under the
+                 default-deny policy. Collector matched by pod labels (default
+                 app.kubernetes.io/name=opentelemetry-collector, stable across installs
+                 and independent of the helm release naming); override via
+                 global.netpol.otlpCollectorLabels.
 
 Intended use from an extension sub-chart template:
 
@@ -221,9 +228,11 @@ Intended use inside the pod template's labels of DB-consuming workloads:
 {{- $ns := $ctx.Values.target_namespace | default $ctx.Release.Namespace -}}
 {{- $dnsLabels := dict "kubernetes.io/metadata.name" "kube-system" -}}
 {{- $postgresCidrs := list -}}
+{{- $otlpLabels := dict "app.kubernetes.io/name" "opentelemetry-collector" -}}
 {{- with ($ctx.Values.global).netpol -}}
 {{- with .dnsNamespaceLabels -}}{{- $dnsLabels = . -}}{{- end -}}
 {{- with .postgresCidrs -}}{{- $postgresCidrs = . -}}{{- end -}}
+{{- with .otlpCollectorLabels -}}{{- $otlpLabels = . -}}{{- end -}}
 {{- end -}}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -258,6 +267,18 @@ spec:
         - port: 8080
           protocol: TCP
         - port: 5000
+          protocol: TCP
+    # OpenTelemetry collector in the release namespace (gRPC 4317 + HTTP 4318):
+    # every workload carries the odg.otelEnv endpoint env vars; if no collector
+    # matches the selector this tier is inert
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- toYaml $otlpLabels | nindent 14 }}
+      ports:
+        - port: 4317
+          protocol: TCP
+        - port: 4318
           protocol: TCP
     # Kubernetes API server access: destination is the kubernetes.default
     # ClusterIP:443 pre-DNAT but the translated endpoint IP:6443 post-DNAT;

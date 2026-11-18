@@ -20,8 +20,16 @@ global:
     # client label rendered onto DB-consuming pods, required once the database
     # chart's network policy runs with primary.networkPolicy.allowExternal=false
     # (upstream then admits only <fullname>-client=true pods in its namespace).
+    # NOTE: when the database chart is rendered without fullnameOverride (e.g.
+    # odg-operator's default helm template name), the upstream client's label
+    # key becomes `release-name-postgresql-client` — set it here accordingly.
     dbClientLabelKey: "delivery-db-client"
     dbClientLabelValue: "true"
+    # pod labels selecting the in-namespace OpenTelemetry collector as an egress
+    # target for trace/metric export (TCP 4317+4318); a selector that matches
+    # nothing is harmless.
+    otlpCollectorLabels:
+      app.kubernetes.io/name: opentelemetry-collector
 
 # OTLP gRPC endpoint for trace export. Resolution order in odg.otelEnv
 # (charts/extensions/templates/helpers.tpl) — key semantics depend on the

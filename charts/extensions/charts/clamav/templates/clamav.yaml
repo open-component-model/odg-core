@@ -122,4 +122,7 @@ spec:
           configMap:
             name: clamav-freshclam-config
 ---
-{{- include "odg.netpol.egress" (list $podName . (dict "internet" true)) }}
+# clamav scanners pull virus definitions from the freshclam private-mirror
+# Service on 8080 (PrivateMirror in freshclam-config.yaml; service port equals
+# container port, so pre-/post-DNAT coincide) in addition to the standard tiers
+{{ include "odg.netpol.egress" (list $podName . (dict "internet" true "targets" (list (dict "to" (list (dict "podSelector" (dict "matchLabels" (dict "app" "freshclam")))) "ports" (list (dict "port" 8080 "protocol" "TCP")))))) }}

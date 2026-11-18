@@ -291,6 +291,19 @@ spec:
       ports:
         - port: 443
           protocol: TCP
+    # OpenTelemetry collector in the release namespace (gRPC 4317 + HTTP 4318):
+    # the delivery-service carries the OTEL endpoint env vars; if no collector
+    # matches the selector this tier is inert. Override the selector via
+    # netpol.otlpCollectorLabels
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- toYaml ($np.otlpCollectorLabels | default (dict "app.kubernetes.io/name" "opentelemetry-collector")) | nindent 14 }}
+      ports:
+        - port: 4317
+          protocol: TCP
+        - port: 4318
+          protocol: TCP
     # Kubernetes API server: destination is the kubernetes.default ClusterIP:443
     # pre-DNAT but the translated endpoint IP:6443 post-DNAT; CNIs differ on
     # which side they enforce egress policy, so allow 6443 explicitly too
