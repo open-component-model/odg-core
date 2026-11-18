@@ -6,10 +6,6 @@ global:
     tag: null
   imagePullSecrets: []
 
-# OTLP gRPC endpoint for trace export (e.g. http://collector.my-ns:4317).
-# Empty disables tracing. The ODG operator sets this per extension release via spec.context.otlp_endpoint.
-otlpEndpoint: ""
-
 access-manager:
   cronjob:
     resources:

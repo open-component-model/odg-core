@@ -30,48 +30,28 @@ deployments); `patch` is only granted where `patch_namespaced_*` is actually cal
 (artefact-enumerator priority bump).
 */}}
 {{/*
-Renders the OTel env vars shared by all ODG workloads. The endpoint is either
-taken from `otlpEndpoint` (set via the ODG CR's `otlp_endpoint`, empty
-disables tracing) or derived from the target namespace: the telemetry chart
-ships the collector Service `telemetry-opentelemetry-collector` into the same
-namespace (charts pinned via fullnameOverride), so pods resolve it via
-namespace-local DNS.
-
-The app code treats an empty OTEL_EXPORTER_OTLP_ENDPOINT as "tracing
-off" (odg.telemetry.configure_telemetry no-ops), so this renders an empty
-value with no further gating in every template.
+Renders the OTel env vars shared by all ODG workloads. `otlpEndpoint` is always
+injected explicitly by the operator or service-provider-odg controller (empty
+disables tracing, non-empty exports to that collector). Absent = empty = off.
 
 Intended use inside each workload's env: block:
 
   {{- include "odg.otelEnv" . | nindent 12 }}
 
-OTEL_SERVICE_NAME defaults to the sub-chart name and is the single service
-identity for traces AND logs (configure_logging() falls back to it, so entry
-points no longer hardcode service names). Workloads whose process name differs
-from the chart name — charts shipping more than one process, e.g. clamav
-(malware) + freshclam — pass an override:
+OTEL_SERVICE_NAME defaults to the sub-chart name. Workloads whose process name
+differs from the chart name pass an override:
 
   {{- include "odg.otelEnv" (mergeOverwrite (deepCopy .) (dict "serviceName" "malware")) | nindent 12 }}
 
-`odg.otelResourceAttrs` additionally injects k8s metadata (pod name / uid /
-namespace) via the downward API into OTEL_RESOURCE_ATTRIBUTES. Prefer it for
-workloads whose traces must carry exact pod identity (server-side spans); the
-collector's k8sattributes pod_association only resolves reliably for incoming
-traffic, so client-side spans otherwise lack k8s.* resource attrs.
+`odg.otelResourceAttrs` additionally injects k8s pod identity via the downward
+API into OTEL_RESOURCE_ATTRIBUTES. Defined separately because it uses valueFrom
+entries, which make it unusable inline with `- name: X` entries.
 
-Intended use (or combine both into one include — see artefact-enumerator):
-
-  {{- include "odg.otelEnv" . | nindent 12 }}
-  {{- include "odg.otelResourceAttrs" . | nindent 12 }}
-
-Implementation note: ternary+hasKey rather than `default` because an explicitly
-set empty otlpEndpoint must disable tracing — `default` and `empty`
-treat "" as missing and would fall through to the derived URL. All content
-inside the define renders into pod manifests, so no YAML comments in the body.
+  {{- include "odg.otelResourceAttrs" (mergeOverwrite (deepCopy .) (dict "containerName" "freshclam")) | nindent 12 }}
 */}}
 {{- define "odg.otelEnv" -}}
 - name: OTEL_EXPORTER_OTLP_ENDPOINT
-  value: {{ ternary (.Values.otlpEndpoint) (printf "http://telemetry-opentelemetry-collector.%s:4317" (.Values.target_namespace | default .Release.Namespace)) (hasKey .Values "otlpEndpoint") | quote }}
+  value: {{ .Values.otlpEndpoint | default "" | quote }}
 - name: OTEL_SERVICE_NAME
   value: {{ .serviceName | default .Chart.Name | quote }}
 - name: OTEL_SEMCONV_STABILITY_OPT_IN
