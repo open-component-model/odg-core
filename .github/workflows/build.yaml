@@ -17,7 +17,7 @@ on:
 
 jobs:
   prepare:
-    uses: gardener/cc-utils/.github/workflows/prepare.yaml@v1
+    uses: gardener/cc-utils/.github/workflows/prepare.yaml@1f5f408a236f484bb0f34ff0b4bf2b4e015c9561 # v1
     permissions:
       id-token: write
     with:
@@ -35,8 +35,8 @@ jobs:
     steps:
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-      - uses: gardener/cc-utils/.github/actions/trusted-checkout@v1
-      - uses: gardener/cc-utils/.github/actions/install-gardener-gha-libs@v1
+      - uses: gardener/cc-utils/.github/actions/trusted-checkout@1f5f408a236f484bb0f34ff0b4bf2b4e015c9561 # v1
+      - uses: gardener/cc-utils/.github/actions/install-gardener-gha-libs@1f5f408a236f484bb0f34ff0b4bf2b4e015c9561 # v1
       - name: create distribution packages
         id: packages
         run: |
@@ -101,7 +101,7 @@ jobs:
           cp "${resources_file}" dist/ocm_resources.yaml
           tar czf distribution-packages.tar.gz dist
       - name: export-ocm-fragments
-        uses: gardener/cc-utils/.github/actions/export-ocm-fragments@v1
+        uses: gardener/cc-utils/.github/actions/export-ocm-fragments@1f5f408a236f484bb0f34ff0b4bf2b4e015c9561 # v1
         with:
           ocm-resources-file: dist/ocm_resources.yaml
           blobs-directory: dist/blobs.d
@@ -118,7 +118,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: gardener/cc-utils/.github/actions/trusted-checkout@v1
+      - uses: gardener/cc-utils/.github/actions/trusted-checkout@1f5f408a236f484bb0f34ff0b4bf2b4e015c9561 # v1
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
       - name: Export odg-extension-definitions
@@ -129,7 +129,7 @@ jobs:
 
           mkdir blobs.d
           tar czf blobs.d/extension_definitions.tar.gz extension-definitions.yaml
-      - uses: gardener/cc-utils/.github/actions/export-ocm-fragments@v1
+      - uses: gardener/cc-utils/.github/actions/export-ocm-fragments@1f5f408a236f484bb0f34ff0b4bf2b4e015c9561 # v1
         with:
           ocm-resources: |
             name: odg-extension-definitions
@@ -147,14 +147,14 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: gardener/cc-utils/.github/actions/trusted-checkout@v1
+      - uses: gardener/cc-utils/.github/actions/trusted-checkout@1f5f408a236f484bb0f34ff0b4bf2b4e015c9561 # v1
       - name: Export Helmchart-Imagemap
         run: |
           set -eu
 
           mkdir blobs.d
           mv postgresql-helmchart-imagemap.json blobs.d
-      - uses: gardener/cc-utils/.github/actions/export-ocm-fragments@v1
+      - uses: gardener/cc-utils/.github/actions/export-ocm-fragments@1f5f408a236f484bb0f34ff0b4bf2b4e015c9561 # v1
         with:
           ocm-resources: |
             name: postgresql
@@ -174,7 +174,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: gardener/cc-utils/.github/actions/trusted-checkout@v1
+      - uses: gardener/cc-utils/.github/actions/trusted-checkout@1f5f408a236f484bb0f34ff0b4bf2b4e015c9561 # v1
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
       - name: Retrieve Distribution Packages
@@ -202,7 +202,7 @@ jobs:
 
           echo "running format checker"
           make format
-      - uses: gardener/cc-utils/.github/actions/export-ocm-fragments@v1
+      - uses: gardener/cc-utils/.github/actions/export-ocm-fragments@1f5f408a236f484bb0f34ff0b4bf2b4e015c9561 # v1
         with:
           ocm-resources: |
             name: sast-linting-evidence
@@ -229,7 +229,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: gardener/cc-utils/.github/actions/trusted-checkout@v1
+      - uses: gardener/cc-utils/.github/actions/trusted-checkout@1f5f408a236f484bb0f34ff0b4bf2b4e015c9561 # v1
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
       - name: Retrieve Distribution Packages
@@ -249,7 +249,7 @@ jobs:
 
   oci-image:
     name: Build OCI-Image
-    uses: gardener/cc-utils/.github/workflows/oci-ocm.yaml@v1
+    uses: gardener/cc-utils/.github/workflows/oci-ocm.yaml@1f5f408a236f484bb0f34ff0b4bf2b4e015c9561 # v1
     needs:
       - packages # needed indirectly (python-packages artefact)
       - prepare
@@ -281,7 +281,7 @@ jobs:
 
   helmcharts:
     name: Build Helmcharts
-    uses: gardener/cc-utils/.github/workflows/helmchart-ocm.yaml@v1
+    uses: gardener/cc-utils/.github/workflows/helmchart-ocm.yaml@1f5f408a236f484bb0f34ff0b4bf2b4e015c9561 # v1
     needs:
       - prepare
       - oci-image

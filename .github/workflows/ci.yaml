@@ -20,7 +20,7 @@ jobs:
       version-prerelease: ${{ (github.event_name == 'pull_request_target' || (github.event_name == 'push' && github.ref_name != github.event.repository.default_branch)) && '0' || '${epoch}' }}
 
   component-descriptor:
-    uses: gardener/cc-utils/.github/workflows/post-build.yaml@v1
+    uses: gardener/cc-utils/.github/workflows/post-build.yaml@1f5f408a236f484bb0f34ff0b4bf2b4e015c9561 # v1
     needs:
       - build
     permissions:
