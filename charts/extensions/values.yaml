@@ -17,6 +17,11 @@ global:
     # only the in-cluster postgres pods (label pair app.kubernetes.io/name=postgresql
     # + component=primary, stable across deployments) are reachable.
     postgresCidrs: []
+    # client label rendered onto DB-consuming pods, required once the database
+    # chart's network policy runs with primary.networkPolicy.allowExternal=false
+    # (upstream then admits only <fullname>-client=true pods in its namespace).
+    dbClientLabelKey: "delivery-db-client"
+    dbClientLabelValue: "true"
 
 # OTLP gRPC endpoint for trace export. Resolution order in odg.otelEnv
 # (charts/extensions/templates/helpers.tpl) — key semantics depend on the

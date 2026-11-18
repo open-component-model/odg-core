@@ -34,6 +34,11 @@ netpol:
   # conventional namespace; matches nothing where the gateway data plane runs
   # inside the release namespace (then the same-namespace rule covers it).
   gatewayNamespaceNames: []
+  # client label rendered onto the pods, required to reach a database whose
+  # chart network policy runs with primary.networkPolicy.allowExternal=false
+  # (upstream admits only <fullname>-client=true pods in its namespace).
+  dbClientLabelKey: "delivery-db-client"
+  dbClientLabelValue: "true"
   enableTls: true
   fullnameOverride: open-delivery-gear
 host: delivery-service

@@ -189,6 +189,31 @@ ports to 0.0.0.0/0 (freshclam's plain-HTTP ClamAV CDN mirror). `targets` may car
 extra egress rules merged as additional tiers (delivery-db-backup's storage target):
 `targets` is a list of full egress rule dicts rendered verbatim.
 */}}
+{{/*
+Renders the postgresql client label pair for workloads that talk to the delivery
+database. Required once the database chart's network policy is tightened
+(primary.networkPolicy.allowExternal: false): the upstream chart then only admits
+pods labelled `<fullname>-client=true` in the database's own namespace. ODG pins
+the database chart via fullnameOverride: delivery-db, hence the default
+`delivery-db-client`; override global.netpol.dbClientLabelKey / dbClientLabelValue
+in deployments whose database fullname differs.
+
+Intended use inside the pod template's labels of DB-consuming workloads:
+
+  labels:
+    app: {{ $podName }}
+    {{- include "odg.labels.dbClient" . | nindent 12 }}
+*/}}
+{{- define "odg.labels.dbClient" -}}
+{{- $key := "delivery-db-client" -}}
+{{- $val := "true" -}}
+{{- with .Values.global.netpol -}}
+{{- with .dbClientLabelKey -}}{{- $key = . -}}{{- end -}}
+{{- with .dbClientLabelValue -}}{{- $val = . -}}{{- end -}}
+{{- end -}}
+{{ $key }}: {{ $val | quote }}
+{{- end -}}
+
 {{- define "odg.netpol.egress" -}}
 {{- $podName := index . 0 -}}
 {{- $ctx := index . 1 -}}

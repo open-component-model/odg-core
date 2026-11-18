@@ -27,6 +27,12 @@ spec:
       {{- end }}
       labels:
         app: {{ $podName }}
+        {{- $dsNp := .Values.netpol | default dict }}
+        # required once the database chart tightens its network policy
+        # (primary.networkPolicy.allowExternal: false → only labelled client pods
+        # in the database namespace are admitted); key matches the database
+        # chart's fullname, override if release/chart name differ
+        {{ $dsNp.dbClientLabelKey | default "delivery-db-client" }}: {{ $dsNp.dbClientLabelValue | default "true" | quote }}
       {{- if default dict (.Values.pod).labels }}
       {{- range $annotation, $value := .Values.pod.labels }}
         {{ $annotation }}: {{ $value }}

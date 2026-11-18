@@ -21,6 +21,7 @@ spec:
         metadata:
           labels:
             app: {{ $podName }}
+            {{- include "odg.labels.dbClient" . | nindent 12 }}
         spec:
           {{- with .Values.global.imagePullSecrets }}
           imagePullSecrets:
