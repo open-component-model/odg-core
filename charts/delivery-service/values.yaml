@@ -18,6 +18,19 @@ gateway:
   annotations: {}
   className: envoy-gateway
   enabled: false
+# Tiered NetworkPolicy knobs (delivery-service chart). The shipped policies
+# restrict egress to DNS, the delivery database (5432) and HTTPS (443), and
+# ingress to same-namespace pods plus an optional gateway namespace.
+netpol:
+  # labels selecting the cluster DNS namespace (default kube-system);
+  # OpenShift example: {kubernetes.io/metadata.name: openshift-dns}
+  dnsNamespaceLabels: {}
+  # CIDRs the delivery database listens on (port 5432). Defaults to 0.0.0.0/0
+  # because the database may run out-of-cluster; narrow once known.
+  postgresCidrs: []
+  # labels selecting the ingress gateway namespace (e.g. envoy-gateway's);
+  # empty = no cross-namespace ingress allowed beyond same-namespace pods
+  gatewayNamespaceLabels: {}
   enableTls: true
   fullnameOverride: open-delivery-gear
 host: delivery-service

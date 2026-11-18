@@ -5,6 +5,17 @@ global:
     repository: null
     tag: null
   imagePullSecrets: []
+  # Tiered egress NetworkPolicy knobs, shared by all extensions via
+  # odg.netpol.egress (charts/extensions/templates/helpers.tpl). Egress is
+  # restricted to DNS, the delivery-service API (in-cluster), the delivery
+  # database (5432, DB-consumers only) and HTTPS (443, everywhere).
+  netpol:
+    # labels selecting the cluster DNS namespace (default kube-system);
+    # OpenShift example: {kubernetes.io/metadata.name: openshift-dns}
+    dnsNamespaceLabels: {}
+    # CIDRs the delivery database listens on (port 5432). Defaults to
+    # 0.0.0.0/0 because the database may run out-of-cluster; narrow once known.
+    postgresCidrs: []
 
 # OTLP gRPC endpoint for trace export. Resolution order in odg.otelEnv
 # (charts/extensions/templates/helpers.tpl) — key semantics depend on the

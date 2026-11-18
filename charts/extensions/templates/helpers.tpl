@@ -156,3 +156,125 @@ metadata:
   namespace: {{ .context.Values.target_namespace | default .context.Release.Namespace }}
 automountServiceAccountToken: false
 {{- end -}}
+
+{{/*
+Renders the tiered egress NetworkPolicy for a single extension workload. Replaces the
+former blanket `egress: - {}` carve-outs (all destinations, all ports), which rendered
+the shipped default-deny policy a no-op for egress.
+
+Tiers, in order:
+
+dns              UDP/TCP 53 to the cluster DNS namespace (default kube-system,
+                 override via global.netpol.dnsNamespaceLabels, e.g. OpenShift's
+                 openshift-dns). Pod DNS resolution breaks without this.
+delivery-service TCP 8080+5000 to the delivery-service pods in the release
+                 namespace (Service port pre-DNAT vs container port post-DNAT).
+postgres         (optional, needs.postgres) TCP 5432 to the delivery DB. CIDRs from
+                 global.netpol.postgresCidrs; if unset, falls back to the default
+                 route CIDR so an out-of-cluster database stays reachable. Narrow
+                 per deployment once the database address range is known.
+internet         (optional, needs.internet) TCP 443 to 0.0.0.0/0. Without L7/DNS-aware
+                 egress filtering in the CNI this cannot be narrowed by hostname; the
+                 port restriction still blocks non-443 exfil channels. Kubernetes API
+                 server access rides this tier (endpoint IPs unknown at chart time), so
+                 workloads using the Kubernetes API must keep needs.internet enabled.
+
+Intended use from an extension sub-chart template:
+
+  {{- include "odg.netpol.egress" (list $podName . (dict "postgres" true)) }}
+
+`needs` keys: postgres, internet — absence means false. `anywherePorts` adds extra TCP
+ports to 0.0.0.0/0 (freshclam's plain-HTTP ClamAV CDN mirror). `targets` may carry raw
+extra egress rules merged as additional tiers (delivery-db-backup's storage target):
+`targets` is a list of full egress rule dicts rendered verbatim.
+*/}}
+{{- define "odg.netpol.egress" -}}
+{{- $podName := index . 0 -}}
+{{- $ctx := index . 1 -}}
+{{- $needs := index . 2 | default dict -}}
+{{- $ns := $ctx.Values.target_namespace | default $ctx.Release.Namespace -}}
+{{- $dnsLabels := dict "kubernetes.io/metadata.name" "kube-system" -}}
+{{- $postgresCidrs := list "0.0.0.0/0" -}}
+{{- with ($ctx.Values.global).netpol -}}
+{{- with .dnsNamespaceLabels -}}{{- $dnsLabels = . -}}{{- end -}}
+{{- with .postgresCidrs -}}{{- $postgresCidrs = . -}}{{- end -}}
+{{- end -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-from-{{ $podName }}
+  namespace: {{ $ctx.Values.namespaceOverride | default $ns }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ $podName }}
+  policyTypes:
+    - Egress
+  egress:
+    # cluster DNS — pod name resolution breaks without this
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml $dnsLabels | nindent 14 }}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # delivery-service API (in release namespace): destination is the
+    # Service ClusterIP:8080 pre-DNAT but the pod IP:5000 post-DNAT; CNIs
+    # differ on which side they enforce egress policy, so allow both ports
+    - to:
+        - podSelector:
+            matchLabels:
+              app: delivery-service
+      ports:
+        - port: 8080
+          protocol: TCP
+        - port: 5000
+          protocol: TCP
+    # Kubernetes API server access: destination is the kubernetes.default
+    # ClusterIP:443 pre-DNAT but the translated endpoint IP:6443 post-DNAT;
+    # CNIs differ on which side they enforce egress policy, so allow both ports
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - port: 443
+          protocol: TCP
+        - port: 6443
+          protocol: TCP
+    {{- if $needs.postgres }}
+    # delivery-database (may run out-of-cluster; narrow via
+    # global.netpol.postgresCidrs once the address range is known)
+    - to:
+        {{- range $cidr := $postgresCidrs }}
+        - ipBlock:
+            cidr: {{ $cidr | quote }}
+        {{- end }}
+      ports:
+        - port: 5432
+          protocol: TCP
+    {{- end }}
+    {{- if $needs.internet }}
+    # HTTPS to arbitrary external endpoints (registries, APIs, CDNs)
+    # cannot be narrowed by hostname without L7/DNS-aware egress filtering
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - port: 443
+          protocol: TCP
+    {{- end }}
+    {{- range $port := $needs.anywherePorts }}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - port: {{ $port }}
+          protocol: TCP
+    {{- end }}
+    {{- if $needs.targets }}
+    {{- toYaml $needs.targets | nindent 4 }}
+    {{- end }}
+{{- end -}}

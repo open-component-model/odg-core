@@ -252,7 +252,44 @@ spec:
   policyTypes:
     - Egress
   egress:
-    - {}  # Allows all egress traffic to any destination and port
+    # cluster DNS — pod name resolution breaks without this
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              {{- $np := .Values.netpol | default dict -}}
+              {{- toYaml ($np.dnsNamespaceLabels | default (dict "kubernetes.io/metadata.name" "kube-system")) | nindent 14 }}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # delivery-database (may run out-of-cluster; narrow via netpol.postgresCidrs
+    # once the database address range is known)
+    - to:
+        {{- range $cidr := ($np.postgresCidrs | default (list "0.0.0.0/0")) }}
+        - ipBlock:
+            cidr: {{ $cidr | quote }}
+        {{- end }}
+      ports:
+        - port: 5432
+          protocol: TCP
+    # HTTPS to arbitrary external endpoints (registries, APIs, CDNs)
+    # cannot be narrowed by hostname without L7/DNS-aware egress filtering
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - port: 443
+          protocol: TCP
+    # Kubernetes API server: destination is the kubernetes.default ClusterIP:443
+    # pre-DNAT but the translated endpoint IP:6443 post-DNAT; CNIs differ on
+    # which side they enforce egress policy, so allow 6443 explicitly too
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - port: 6443
+          protocol: TCP
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -266,7 +303,19 @@ spec:
   policyTypes:
     - Ingress
   ingress:
-  - ports:
+  - from:
+    # workloads in the same namespace (extensions, dashboard)
+    - podSelector: {}
+    {{- $gatewayNs := $np.gatewayNamespaceLabels -}}
+    {{- with $gatewayNs }}
+    # ingress gateway namespace (e.g. envoy); traffic arrives via the Gateway/HTTPRoute
+    - namespaceSelector:
+        matchLabels:
+          {{- toYaml . | nindent 10 }}
+    {{- end }}
+    # kubelet probes arrive as host/node traffic and bypass pod network policy on
+    # CNIs with host connectivity semantics (calico, cilium); probes remain healthy
+    ports:
     - protocol: TCP
       port: 8080
     - protocol: TCP
