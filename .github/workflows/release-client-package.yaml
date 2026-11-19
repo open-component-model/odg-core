@@ -27,7 +27,7 @@ jobs:
             echo "Error: this workflow must be dispatched from 'master', got: $GITHUB_REF_NAME"
             exit 1
           fi
-      - uses: gardener/cc-utils/.github/actions/trusted-checkout@f9ca64c4cc009c5fc3a55fb3642316ff294bfb42 # v1
+      - uses: gardener/cc-utils/.github/actions/trusted-checkout@bce63f62928717a11f610ec8022af9feb497d5df # v1
         id: token
         with:
           token-server: ${{ vars.FEDERATED_GITHUB_ACCESS_TOKEN_SERVER }}
