@@ -8,6 +8,8 @@ on:
         description: |
           Optional commit SHA to create the release branch from (defaults to HEAD)
 
+permissions: {}
+
 jobs:
   prepare-release-candidate:
     runs-on: ubuntu-latest
