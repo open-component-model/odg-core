@@ -1516,6 +1516,7 @@ def decode_jwt(
             reason='Unauthorized, issuer not accepted',
         )
 
+
 def check_jwt_header_content(header: dict[str, str]):
     if (typ := header.get('typ', '')).lower() != 'jwt':
         raise aiohttp.web.HTTPUnauthorized(
