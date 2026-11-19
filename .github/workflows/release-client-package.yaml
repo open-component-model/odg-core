@@ -12,6 +12,8 @@ concurrency:
   group: release-${{ inputs.client }}-client
   cancel-in-progress: false
 
+permissions: {}
+
 jobs:
   build:
     runs-on: ubuntu-latest

@@ -15,6 +15,8 @@ on:
         required: true
         type: string
 
+permissions: {}
+
 jobs:
   prepare:
     uses: gardener/cc-utils/.github/workflows/prepare.yaml@1f5f408a236f484bb0f34ff0b4bf2b4e015c9561 # v1

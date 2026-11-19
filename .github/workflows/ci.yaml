@@ -4,6 +4,8 @@ on:
   push:
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   build:
     uses: ./.github/workflows/build.yaml
