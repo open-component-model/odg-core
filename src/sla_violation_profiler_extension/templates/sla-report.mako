@@ -1,10 +1,11 @@
+<%! import html %>
 # 📋 SLA Violation Report
 
 % if delivery_service_url:
-Source: ODG api at ${delivery_service_url}.
+Source: ODG api at ${delivery_service_url | h}.
 % endif
 
-Report for component **${component_name}**, version **${selected_version}**.
+Report for component **${component_name | h}**, version **${selected_version | h}**.
 
 % if not profiled:
 ⚠️ The SLA violation profiler has not run for this version yet, so there is no data to report. Once the profiler has processed this version, re-run this report.
@@ -33,10 +34,10 @@ Each artefact below carries the listed CVEs; fix or rescore them. Responsibles a
 
 % for section in artefact_sections:
 <details>
-  <summary><h1>📦 ${section.component_name} / ${section.artefact_name} @ ${section.version} (${section.violation_count})</h1></summary>
+  <summary><h1>📦 ${section.component_name | h} / ${section.artefact_name | h} @ ${section.version | h} (${section.violation_count})</h1></summary>
 
 % if section.responsibles:
-Responsibles: ${', '.join(section.responsibles)}
+Responsibles: ${', '.join(section.responsibles) | h}
 % else:
 Responsibles: _none resolved_
 % endif
@@ -48,14 +49,14 @@ Responsibles: _none resolved_
 <tbody>
 % for row in section.cve_rows:
 <tr>
-<td>${row.emoji} ${row.severity}</td>
-<td>${row.cve}</td>
-<td>${row.package}</td>
+<td>${row.emoji} ${row.severity | h}</td>
+<td>${row.cve | h}</td>
+<td>${row.package | h}</td>
 <td>\
 % if row.events:
-<details><summary>${row.summary}</summary><br>${'<br>'.join(f'{ev.emoji} {ev.comment}' for ev in row.events)}</details>\
+<details><summary>${row.summary | h}</summary><br>${'<br>'.join(f"{ev.emoji} {html.escape(ev.comment)}" for ev in row.events)}</details>\
 % else:
-${row.summary}\
+${row.summary | h}\
 % endif
 </td>
 </tr>
