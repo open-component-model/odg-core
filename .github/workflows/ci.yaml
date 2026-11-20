@@ -1,32 +1,104 @@
 name: CI
 on:
-  pull_request_target:
+  pull_request:
   push:
   workflow_dispatch:
 
 permissions: {}
 
 jobs:
-  build:
+  preprocess:
+    name: Preprocess
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-tags: true
+      - name: Determine version
+        id: version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # greatest_tag <pattern> — finds the highest full-release tag matching glob <pattern>
+          # rc tags are excluded since CI only needs the last stable baseline to increment from
+          greatest_tag() {
+            git tag --list "$1" \
+              | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
+              | sort -V \
+              | tail -1 || true
+          }
+
+          if [[ "$GITHUB_REF_NAME" =~ ^release-([0-9]+\.[0-9]+)$ ]]; then
+            # release branch: greatest full-release tag with matching major.minor, bump patch
+            major_minor="${BASH_REMATCH[1]}"
+            last_tag=$(greatest_tag "${major_minor}.*")
+            if [[ -z "${last_tag}" ]]; then
+              base_version="${major_minor}.0"
+            else
+              patch=$(echo "${last_tag}" | cut -d. -f3)
+              base_version="${major_minor}.$(( patch + 1 ))"
+            fi
+          else
+            # master / other: greatest release-<major>.<minor> branch, bump minor
+            branches=$(gh api "/repos/${{ github.repository }}/branches" \
+              --paginate --jq '.[].name')
+            last_branch=$(printf '%s\n' "$branches" \
+              | grep -E '^release-[0-9]+\.[0-9]+$' \
+              | sed 's/release-//' \
+              | sort -V \
+              | tail -1 || true)
+            if [[ -z "${last_branch}" ]]; then
+              base_version="0.1.0"
+            else
+              major=$(echo "${last_branch}" | cut -d. -f1)
+              minor=$(echo "${last_branch}" | cut -d. -f2)
+              base_version="${major}.$(( minor + 1 )).0"
+            fi
+          fi
+
+          if [[ "$GITHUB_REF_NAME" == "master" || "$GITHUB_REF_NAME" =~ ^release- ]]; then
+            prerelease="$(date +%s)"
+          else
+            prerelease="0"
+          fi
+
+          version="${base_version}-${prerelease}"
+
+          echo "Determined version: ${version} (last tag: ${last_tag:-none}, last branch: ${last_branch:-none})"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+  build-and-publish-artifacts:
+    name: Build and publish OCI artifacts
+    needs:
+      - preprocess
     uses: ./.github/workflows/build.yaml
     permissions:
-      contents: write
+      contents: read
       packages: write
-      id-token: write
     with:
-      mode: snapshot
-      # Condition: is this a PR or a non-default-branch push?
-      # - pull_request_target event → '0'
-      # - push to a non-default branch → '0'
-      # - anything else (e.g. push to main, workflow_dispatch) → '${epoch}'
-      version-prerelease: ${{ (github.event_name == 'pull_request_target' || (github.event_name == 'push' && github.ref_name != github.event.repository.default_branch)) && '0' || '${epoch}' }}
+      version: ${{ needs.preprocess.outputs.version }}
+      publish: ${{ github.event_name != 'pull_request' && (github.ref_name == 'master' || startsWith(github.ref_name, 'release-')) }}
 
-  component-descriptor:
-    uses: gardener/cc-utils/.github/workflows/post-build.yaml@bce63f62928717a11f610ec8022af9feb497d5df # v1
+  publish-component:
+    name: Publish OCM component
+    if: github.event_name != 'pull_request' && (github.ref_name == 'master' || startsWith(github.ref_name, 'release-'))
     needs:
-      - build
+      - build-and-publish-artifacts
+      - preprocess
+    uses: ./.github/workflows/publish-component.yaml
     permissions:
-      contents: write
-      id-token: write
+      contents: read
+      packages: write
     with:
-      github-release-notes-recursion-depth: -1
+      version: ${{ needs.preprocess.outputs.version }}
+      core-image-digest: ${{ needs.build-and-publish-artifacts.outputs.core-image-digest }}
+      bootstrapping-chart-digest: ${{ needs.build-and-publish-artifacts.outputs.bootstrapping-chart-digest }}
+      delivery-service-chart-digest: ${{ needs.build-and-publish-artifacts.outputs.delivery-service-chart-digest }}
+      extensions-chart-digest: ${{ needs.build-and-publish-artifacts.outputs.extensions-chart-digest }}

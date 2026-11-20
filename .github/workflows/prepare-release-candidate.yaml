@@ -7,59 +7,91 @@ on:
         required: false
         description: |
           Optional commit SHA to create the release branch from (defaults to HEAD)
+      version:
+        type: string
+        required: false
+        description: |
+          Optional <major>.<minor> version for the release branch (e.g. 0.1).
+          If not set, the version is determined from existing branches/tags.
 
 permissions: {}
 
 jobs:
   prepare-release-candidate:
+    name: Prepare release candidate
     runs-on: ubuntu-latest
+    environment:
+      name: release-branch
+      deployment: false
     permissions:
-      id-token: write
+      contents: read
     steps:
-      - uses: gardener/cc-utils/.github/actions/trusted-checkout@bce63f62928717a11f610ec8022af9feb497d5df # v1
+      - name: Generate app token
+        id: token
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
         with:
-          token-server: ${{ vars.FEDERATED_GITHUB_ACCESS_TOKEN_SERVER }}
-          github-auth-token-permissions: |
-            contents: write
-            workflows: write
-          init-git-identity: true
-          remove-trusted-label: false
-          fetch-depth: 0
-      - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-      - name: Create release branch and bump default branch
-        shell: bash
+          client-id: ${{ vars.RELEASE_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-tags: true
+          token: ${{ steps.token.outputs.token }}
+          persist-credentials: false
+      - name: Determine version
+        id: version
+        if: ${{ inputs.version == '' }}
         env:
-          COMMIT_SHA: ${{ inputs.commit-sha }}
+          GH_TOKEN: ${{ steps.token.outputs.token }}
         run: |
-          default_branch="$(git remote show origin | awk '/HEAD branch/ {print $NF}')"
-          git checkout "$default_branch"
+          set -euo pipefail
 
-          # Derive major.minor from VERSION on the default branch
-          raw_version="$(cat VERSION)"
-          version="${raw_version%%.*}.$(echo "${raw_version}" | cut -d. -f2)"
+          # prefer highest existing release-<major>.<minor> branch
+          branches=$(gh api "/repos/${{ github.repository }}/branches" \
+            --paginate --jq '.[].name')
+          last_branch=$(printf '%s\n' "$branches" \
+            | grep -E '^release-[0-9]+\.[0-9]+$' \
+            | sed 's/release-//' \
+            | sort -V \
+            | tail -1 || true)
 
-          major="${version%%.*}"
-          minor="${version##*.}"
-          next_minor=$((minor + 1))
-
-          # Create release branch from the specified commit or HEAD
-          if [[ -n "$COMMIT_SHA" ]]; then
-            git checkout -b "release-${version}" "$COMMIT_SHA"
+          if [[ -n "${last_branch}" ]]; then
+            major=$(echo "${last_branch}" | cut -d. -f1)
+            minor=$(echo "${last_branch}" | cut -d. -f2)
+            version="${major}.$(( minor + 1 ))"
           else
-            git checkout -b "release-${version}"
+            # fallback: use greatest full-release tag
+            last_tag=$(git tag --list "*.*.*" \
+              | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
+              | sort -V \
+              | tail -1 || true)
+
+            if [[ -z "${last_tag}" ]]; then
+              version="0.1"
+            else
+              major=$(echo "${last_tag}" | cut -d. -f1)
+              minor=$(echo "${last_tag}" | cut -d. -f2)
+              version="${major}.$(( minor + 1 ))"
+            fi
           fi
 
-          rc_version="${version}.0-rc.0"
-          echo "$rc_version" | uv run .ci/write-version
-          git commit --all -m "prepare release candidate: ${rc_version}"
-          release_candidate_commit="$(git rev-parse HEAD)"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+      - name: Create release branch
+        env:
+          COMMIT_SHA: ${{ inputs.commit-sha }}
+          VERSION: ${{ inputs.version || steps.version.outputs.version }}
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+        run: |
+          set -euo pipefail
 
-          # Bump default branch to next dev version
-          git checkout "$default_branch"
-          next_dev_version="${major}.${next_minor}.0-dev"
-          echo "$next_dev_version" | uv run .ci/write-version
-          git commit --all -m "next version: ${next_dev_version}"
-          git push --atomic origin \
-            "${release_candidate_commit}:refs/heads/release-${version}" \
-            "HEAD:refs/heads/${default_branch}"
+          target="${COMMIT_SHA:-${GITHUB_SHA}}"
+
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/git/refs \
+            -f "ref=refs/heads/release-${VERSION}" \
+            -f "sha=${target}"
+
+          echo "Created branch release-${VERSION} at ${target}"

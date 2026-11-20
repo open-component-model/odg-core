@@ -1,0 +1,110 @@
+name: Publish OCM component
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Bare semver, no leading 'v' (0.7.0 or 0.7.0-rc.1)
+        required: true
+        type: string
+      core-image-digest:
+        description: Digest of the already published full multi-arch core OCI image
+        required: true
+        type: string
+      bootstrapping-chart-digest:
+        description: Digest of the already published bootstrapping Helm chart
+        required: true
+        type: string
+      delivery-service-chart-digest:
+        description: Digest of the already published delivery-service Helm chart
+        required: true
+        type: string
+      extensions-chart-digest:
+        description: Digest of the already published extensions Helm chart
+        required: true
+        type: string
+
+permissions: {}
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  publish:
+    name: Publish ${{ inputs.version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    env:
+      OWNER: ${{ github.repository_owner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install OCM CLI
+        id: ocm
+        uses: open-component-model/ocm-setup-action@585a852942b7fb3a1171c02eeb2d24e8deace9e6 # v2.0.0
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - name: Compute OCI refs
+        env:
+          VERSION: ${{ inputs.version }}
+          CORE_IMAGE_DIGEST: ${{ inputs.core-image-digest }}
+          BOOTSTRAPPING_CHART_DIGEST: ${{ inputs.bootstrapping-chart-digest }}
+          DELIVERY_SERVICE_CHART_DIGEST: ${{ inputs.delivery-service-chart-digest }}
+          EXTENSIONS_CHART_DIGEST: ${{ inputs.extensions-chart-digest }}
+        run: |
+          set -euo pipefail
+
+          OWNER="${OWNER,,}"
+          echo "OWNER=$OWNER" >> "$GITHUB_ENV"
+
+          {
+            echo "CORE_IMAGE_REF=$REGISTRY/$OWNER/odg/images/core:$VERSION@$CORE_IMAGE_DIGEST"
+            echo "BOOTSTRAPPING_CHART_REF=$REGISTRY/$OWNER/odg/charts/bootstrapping:$VERSION@$BOOTSTRAPPING_CHART_DIGEST"
+            echo "DELIVERY_SERVICE_CHART_REF=$REGISTRY/$OWNER/odg/charts/delivery-service:$VERSION@$DELIVERY_SERVICE_CHART_DIGEST"
+            echo "EXTENSIONS_CHART_REF=$REGISTRY/$OWNER/odg/charts/extensions:$VERSION@$EXTENSIONS_CHART_DIGEST"
+          } >> "$GITHUB_ENV"
+      - name: Log in to GHCR
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Write OCM config
+        run: |
+          cat > "$HOME/.ocmconfig" <<EOF
+          type: generic.config.ocm.software/v1
+          configurations:
+            - type: credentials.config.ocm.software
+              repositories:
+                - repository:
+                    type: DockerConfig/v1
+                    dockerConfigFile: $HOME/.docker/config.json
+                    propagateConsumerIdentity: true
+          EOF
+      - name: Write version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          echo "$VERSION" | uv run .ci/write-version
+      - name: Create component version
+        env:
+          VERSION: ${{ inputs.version }}
+          CONSTRUCTOR: ${{ github.workspace }}/.ocm/component-constructor.yaml
+        run: |
+          ocm add componentversion \
+            --config "$HOME/.ocmconfig" \
+            --repository "ctf::transport-archive" \
+            --constructor "$CONSTRUCTOR" \
+            --working-directory "${{ github.workspace }}"
+      - name: Publish component version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          ocm transfer componentversion \
+            --config "$HOME/.ocmconfig" \
+            "ctf::transport-archive//ocm.software/open-delivery-gear/core:$VERSION" \
+            "oci::$REGISTRY/$OWNER"

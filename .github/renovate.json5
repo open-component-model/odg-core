@@ -75,15 +75,6 @@
     },
     {
       matchManagers: [
-        'github-actions',
-      ],
-      matchDepNames: [
-        'gardener/cc-utils',
-      ],
-      enabled: false,
-    },
-    {
-      matchManagers: [
         'pep621',
         'uv',
       ],

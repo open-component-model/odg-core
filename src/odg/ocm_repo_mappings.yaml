@@ -6,3 +6,5 @@
   prefixes: ocm.software/ocmcli
 - repository: europe-docker.pkg.dev/gardener-project/releases
 - repository: europe-docker.pkg.dev/gardener-project/snapshots
+- repository: ghcr.io/open-component-model
+  prefixes: ocm.software/open-delivery-gear

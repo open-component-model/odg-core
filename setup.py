@@ -1,16 +1,7 @@
 import os
 
-import semver
 import setuptools
 import setuptools.discovery
-
-
-own_dir = os.path.abspath(os.path.dirname(__file__))
-
-
-def finalize_version() -> str:
-    with open(os.path.join(own_dir, 'VERSION')) as f:
-        return semver.finalize_version(f.read().strip())
 
 
 def modules() -> list[str]:
@@ -46,7 +37,7 @@ def package_data() -> dict[str, list[str]]:
 
 
 setuptools.setup(
-    version=os.environ.get('ODG_CORE_LIBS_VERSION', finalize_version()),
+    version=os.environ.get('ODG_CORE_LIBS_VERSION', '0.1.0'),
     package_dir={'': 'src'},
     py_modules=modules(),
     packages=packages(),
