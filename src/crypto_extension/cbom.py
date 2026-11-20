@@ -45,7 +45,18 @@ def create_cbom(
 
     logger.info(f'run cmd "{" ".join(cbom_cmd)}"')
     try:
-        cbom_raw = subprocess.run(cbom_cmd, check=True, capture_output=True, text=True).stdout
+        # cbomkit-theia writes ~/.cbomkit-theia/config.yaml on every run; with
+        # a read-only root filesystem (HOME points at the image layer) that
+        # write fails and its error lands on stdout ahead of the JSON, so
+        # point HOME at writable scratch for the subprocess
+        with tempfile.TemporaryDirectory() as home_dir:
+            cbom_raw = subprocess.run(
+                cbom_cmd,
+                check=True,
+                capture_output=True,
+                text=True,
+                env=os.environ | {'HOME': home_dir},
+            ).stdout
     except subprocess.CalledProcessError as e:
         e.add_note(f'{e.stdout=}')
         e.add_note(f'{e.stderr=}')

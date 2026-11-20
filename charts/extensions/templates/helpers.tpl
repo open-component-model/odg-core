@@ -148,31 +148,6 @@ capabilities:
     - ALL
 {{- end -}}
 
-{{/*
-/tmp as tmpfs-style writable scratch for workloads running with
-readOnlyRootFilesystem. Pair the volume with the mount in each container:
-
-  container volumeMounts:
-    - name: tmp
-      mountPath: /tmp
-
-  pod volumes:
-    - name: tmp
-      emptyDir: {}
-
-(kept as two includes so each composes into existing volumeMounts/volumes
-lists)
-*/}}
-{{- define "odg.tmpVolumeMount" -}}
-- name: tmp
-  mountPath: /tmp
-{{- end -}}
-
-{{- define "odg.tmpVolume" -}}
-- name: tmp
-  emptyDir: {}
-{{- end -}}
-
 {{- define "odg.rbac" -}}
 {{- $ns := .Values.target_namespace | default .Release.Namespace -}}
 apiVersion: v1
