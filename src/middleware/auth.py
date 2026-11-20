@@ -1480,10 +1480,13 @@ def decode_jwt(
         json_web_key = None
 
     try:
-        return odg_client.jwt.decode_jwt(
-            token=token,
-            verify_signature=verify_signature,
-            json_web_key=json_web_key,
+        return jwt.decode(
+            jwt=token,
+            key=json_web_key.key if json_web_key else None,
+            algorithms=[json_web_key.alg if json_web_key else None],
+            options={
+                'verify_signature': verify_signature,
+            },
             issuer=issuer,
         )
     except (ValueError, jwt.exceptions.DecodeError) as e:
