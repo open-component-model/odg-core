@@ -807,7 +807,7 @@ wheels = [
 
 [[package]]
 name = "gardener-cicd-libs"
-version = "1.2872.0"
+version = "1.2873.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cachecontrol" },
@@ -847,7 +847,7 @@ dependencies = [
     { name = "yamllint" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5d/ce/58c6058b03bde58fcc60f09f5974e503bc138f1e3606e649fa710fb14b47/gardener_cicd_libs-1.2872.0-py3-none-any.whl", hash = "sha256:6a41dc095ca53add964057054e268654e30ee2309c097c514d65643b6c7aa9a9", size = 274663, upload-time = "2026-11-10T14:13:22.214Z" },
+    { url = "https://files.pythonhosted.org/packages/e6/19/aa4f45d8377ead85dbda43fd8b231361f24b9d5b123a9d07cc425765ab36/gardener_cicd_libs-1.2873.0-py3-none-any.whl", hash = "sha256:7581b678a02d1807ad686a4cd6302497b6cab17ffb75058e6fffb7c7c2111f24", size = 276517, upload-time = "2026-11-11T10:23:55.444Z" },
 ]
 
 [[package]]
@@ -866,7 +866,7 @@ wheels = [
 
 [[package]]
 name = "gardener-ocm"
-version = "1.2872.0"
+version = "1.2873.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cachetools" },
@@ -880,7 +880,7 @@ dependencies = [
     { name = "semver" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1f/4c/8d748e82ea23adb3dbace6815393e81767a7831f48ba371085aca961fb95/gardener_ocm-1.2872.0-py3-none-any.whl", hash = "sha256:75a5dd9bbff16a163e1567759bf08994e5bcd7b27650c20a53a92f4ac98a1e21", size = 176990, upload-time = "2026-11-10T14:13:26.785Z" },
+    { url = "https://files.pythonhosted.org/packages/aa/93/cb1af4f33af5254d9db3e6fa44a4da5bc5eb6c94ea936a29a3ce35aa3a9d/gardener_ocm-1.2873.0-py3-none-any.whl", hash = "sha256:324d15102cedcea9604cbfd4c4b33b2b28e1a2b1eee94e2641763da8d029f97b", size = 177543, upload-time = "2026-11-11T10:23:59.421Z" },
 ]
 
 [[package]]
@@ -1585,7 +1585,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "dacite", specifier = "==1.9.2" },
-    { name = "gardener-ocm", specifier = "==1.2872.0" },
+    { name = "gardener-ocm", specifier = "==1.2873.0" },
     { name = "pycryptodome", specifier = "==3.24.1" },
     { name = "pyjwt", specifier = "==2.15.1" },
     { name = "requests", specifier = "==2.34.2" },
@@ -1664,7 +1664,7 @@ requires-dist = [
     { name = "cyclonedx-python-lib", specifier = "==11.12.0" },
     { name = "dacite", specifier = "==1.9.2" },
     { name = "dataclasses-json", specifier = "==0.6.7" },
-    { name = "gardener-cicd-libs", specifier = "==1.2872.0" },
+    { name = "gardener-cicd-libs", specifier = "==1.2873.0" },
     { name = "github3-py", specifier = "==4.0.1" },
     { name = "greenlet", specifier = "==3.5.6" },
     { name = "jsonpath-ng", specifier = "==1.16.0" },
