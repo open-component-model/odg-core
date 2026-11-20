@@ -164,9 +164,13 @@ the shipped default-deny policy a no-op for egress.
 
 Tiers, in order:
 
-dns              UDP/TCP 53 to the cluster DNS namespace (default kube-system,
+dns              UDP/TCP to the cluster DNS namespace (default kube-system,
                  override via global.netpol.dnsNamespaceLabels, e.g. OpenShift's
-                 openshift-dns). Pod DNS resolution breaks without this.
+                 openshift-dns). Pod DNS resolution breaks without this. Ports
+                 default to [53, 8053, 5353] — CNIs differ on pre-DNAT (Service
+                 port 53) vs post-DNAT (pod port: Gardener CoreDNS serves on
+                 8053, OpenShift dns-default on 5353) enforcement; override via
+                 global.netpol.dnsPorts.
 delivery-service TCP 8080+5000 to the delivery-service pods in the release
                  namespace (Service port pre-DNAT vs container port post-DNAT).
 postgres         (optional, needs.postgres) TCP 5432 to the delivery DB. Matches
@@ -186,6 +190,13 @@ otlp             TCP 4317+4318 (gRPC+HTTP) to the in-namespace OpenTelemetry col
                  app.kubernetes.io/name=opentelemetry-collector, stable across installs
                  and independent of the helm release naming); override via
                  global.netpol.otlpCollectorLabels.
+extra            raw egress rules appended verbatim from global.netpol.extraEgress
+                 for targets the tiers cannot express (cross-namespace/external
+                 collectors, egress proxies, non-443 registries, non-5432 DBs).
+
+The policy lands in `namespaceOverride | default target_namespace | default
+Release.Namespace` — matching the extension sub-charts (target_namespace) and
+the odg-operator sub-chart (namespaceOverride) alike.
 
 Intended use from an extension sub-chart template:
 
@@ -225,20 +236,24 @@ Intended use inside the pod template's labels of DB-consuming workloads:
 {{- $podName := index . 0 -}}
 {{- $ctx := index . 1 -}}
 {{- $needs := index . 2 | default dict -}}
-{{- $ns := $ctx.Values.target_namespace | default $ctx.Release.Namespace -}}
+{{- $ns := $ctx.Values.namespaceOverride | default $ctx.Values.target_namespace | default $ctx.Release.Namespace -}}
 {{- $dnsLabels := dict "kubernetes.io/metadata.name" "kube-system" -}}
+{{- $dnsPorts := list 53 8053 5353 -}}
 {{- $postgresCidrs := list -}}
 {{- $otlpLabels := dict "app.kubernetes.io/name" "opentelemetry-collector" -}}
+{{- $extraEgress := list -}}
 {{- with ($ctx.Values.global).netpol -}}
 {{- with .dnsNamespaceLabels -}}{{- $dnsLabels = . -}}{{- end -}}
+{{- with .dnsPorts -}}{{- $dnsPorts = . -}}{{- end -}}
 {{- with .postgresCidrs -}}{{- $postgresCidrs = . -}}{{- end -}}
 {{- with .otlpCollectorLabels -}}{{- $otlpLabels = . -}}{{- end -}}
+{{- with .extraEgress -}}{{- $extraEgress = . -}}{{- end -}}
 {{- end -}}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-egress-from-{{ $podName }}
-  namespace: {{ $ctx.Values.namespaceOverride | default $ns }}
+  namespace: {{ $ns }}
 spec:
   podSelector:
     matchLabels:
@@ -246,16 +261,20 @@ spec:
   policyTypes:
     - Egress
   egress:
-    # cluster DNS — pod name resolution breaks without this
+    # cluster DNS — pod name resolution breaks without this; ports default to
+    # [53, 8053, 5353] (Service port 53 pre-DNAT vs pod port post-DNAT:
+    # Gardener CoreDNS serves on 8053, OpenShift dns-default on 5353)
     - to:
         - namespaceSelector:
             matchLabels:
               {{- toYaml $dnsLabels | nindent 14 }}
       ports:
-        - port: 53
+        {{- range $port := $dnsPorts }}
+        - port: {{ $port }}
           protocol: UDP
-        - port: 53
+        - port: {{ $port }}
           protocol: TCP
+        {{- end }}
     # delivery-service API (in release namespace): destination is the
     # Service ClusterIP:8080 pre-DNAT but the pod IP:5000 post-DNAT; CNIs
     # differ on which side they enforce egress policy, so allow both ports
@@ -280,15 +299,14 @@ spec:
           protocol: TCP
         - port: 4318
           protocol: TCP
-    # Kubernetes API server access: destination is the kubernetes.default
-    # ClusterIP:443 pre-DNAT but the translated endpoint IP:6443 post-DNAT;
-    # CNIs differ on which side they enforce egress policy, so allow both ports
+    # Kubernetes API server access post-DNAT: the translated endpoint IP:6443.
+    # The pre-DNAT path (kubernetes.default ClusterIP:443) is covered by the
+    # internet tier, so workloads using the Kubernetes API must keep
+    # needs.internet enabled
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
       ports:
-        - port: 443
-          protocol: TCP
         - port: 6443
           protocol: TCP
     {{- if $needs.postgres }}
@@ -328,5 +346,9 @@ spec:
     {{- end }}
     {{- if $needs.targets }}
     {{- toYaml $needs.targets | nindent 4 }}
+    {{- end }}
+    {{- if $extraEgress }}
+    # verbatim extra egress rules from global.netpol.extraEgress
+    {{- toYaml $extraEgress | nindent 4 }}
     {{- end }}
 {{- end -}}

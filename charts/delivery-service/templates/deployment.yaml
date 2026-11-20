@@ -28,10 +28,10 @@ spec:
       labels:
         app: {{ $podName }}
         {{- $dsNp := .Values.netpol | default dict }}
-        # required once the database chart tightens its network policy
-        # (primary.networkPolicy.allowExternal: false → only labelled client pods
-        # in the database namespace are admitted); key matches the database
-        # chart's fullname, override if release/chart name differ
+        {{/* required once the database chart tightens its network policy
+        (primary.networkPolicy.allowExternal: false → only labelled client pods
+        in the database namespace are admitted); key matches the database
+        chart's fullname, override it if the release/chart name differ */}}
         {{ $dsNp.dbClientLabelKey | default "delivery-db-client" }}: {{ $dsNp.dbClientLabelValue | default "true" | quote }}
       {{- if default dict (.Values.pod).labels }}
       {{- range $annotation, $value := .Values.pod.labels }}
@@ -258,17 +258,21 @@ spec:
   policyTypes:
     - Egress
   egress:
-    # cluster DNS — pod name resolution breaks without this
+    # cluster DNS — pod name resolution breaks without this; ports default to
+    # [53, 8053, 5353] (Service port 53 pre-DNAT vs pod port post-DNAT:
+    # Gardener CoreDNS serves on 8053, OpenShift dns-default on 5353)
     - to:
         - namespaceSelector:
             matchLabels:
               {{- $np := .Values.netpol | default dict -}}
               {{- toYaml ($np.dnsNamespaceLabels | default (dict "kubernetes.io/metadata.name" "kube-system")) | nindent 14 }}
       ports:
-        - port: 53
+        {{- range $port := $np.dnsPorts | default (list 53 8053 5353) }}
+        - port: {{ $port }}
           protocol: UDP
-        - port: 53
+        - port: {{ $port }}
           protocol: TCP
+        {{- end }}
     # delivery-database: in-cluster postgres pods by default (label pair is
     # stable across environments); external database hosts via netpol.postgresCidrs
     - to:
@@ -305,14 +309,18 @@ spec:
         - port: 4318
           protocol: TCP
     # Kubernetes API server: destination is the kubernetes.default ClusterIP:443
-    # pre-DNAT but the translated endpoint IP:6443 post-DNAT; CNIs differ on
-    # which side they enforce egress policy, so allow 6443 explicitly too
+    # pre-DNAT (covered by the 0.0.0.0/0:443 tier above) but the translated
+    # endpoint IP:6443 post-DNAT, which needs this explicit tier
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
       ports:
         - port: 6443
           protocol: TCP
+    {{- if $np.extraEgress }}
+    # verbatim extra egress rules from netpol.extraEgress
+    {{- toYaml $np.extraEgress | nindent 4 }}
+    {{- end }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -333,7 +341,13 @@ spec:
     # arrives via the Gateway/HTTPRoute. Not needed where the gateway data plane
     # runs in the same namespace (matched by the podSelector above) — matched via
     # the standard kubernetes.io/metadata.name label every namespace carries
-    {{- range $gwNs := ($np.gatewayNamespaceNames | default (list "envoy-gateway-system")) }}
+    {{- $gwNamespaces := list "envoy-gateway-system" }}
+    {{/* hasKey instead of default: an explicitly empty list must render no
+    extra namespaces; only an unset key falls back to envoy-gateway-system */}}
+    {{- if hasKey $np "gatewayNamespaceNames" }}
+    {{- $gwNamespaces = $np.gatewayNamespaceNames }}
+    {{- end }}
+    {{- range $gwNs := $gwNamespaces }}
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: {{ $gwNs }}

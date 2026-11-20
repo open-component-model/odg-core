@@ -13,6 +13,11 @@ global:
     # labels selecting the cluster DNS namespace (default kube-system);
     # OpenShift example: {kubernetes.io/metadata.name: openshift-dns}
     dnsNamespaceLabels: {}
+    # ports offered to the DNS resolver's pods (UDP+TCP each): 53 covers
+    # upstream CoreDNS, 8053 Gardener shoots (coredns PortServer), 5353
+    # OpenShift dns-default — CNIs differ on whether they enforce pre-DNAT
+    # (Service port 53) or post-DNAT (pod port), so list all that may apply
+    dnsPorts: [53, 8053, 5353]
     # CIDRs of database hosts outside the cluster (port 5432). Without entries,
     # only the in-cluster postgres pods (label pair app.kubernetes.io/name=postgresql
     # + component=primary, stable across deployments) are reachable.
@@ -30,6 +35,11 @@ global:
     # nothing is harmless.
     otlpCollectorLabels:
       app.kubernetes.io/name: opentelemetry-collector
+    # extra egress rules rendered verbatim into EVERY extension's policy (list
+    # of full NetworkPolicy egress rule dicts) — for targets the tiers cannot
+    # express: cross-namespace/external collectors, egress proxies,
+    # registries on non-443 ports, databases on non-5432 ports
+    extraEgress: []
 
 # OTLP gRPC endpoint for trace export. Resolution order in odg.otelEnv
 # (charts/extensions/templates/helpers.tpl) — key semantics depend on the
