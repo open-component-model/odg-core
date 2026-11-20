@@ -13,11 +13,13 @@ name: "CodeQL Advanced"
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "release-*", "hotfix-*" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "master", "release-*", "hotfix-*" ]
   schedule:
     - cron: '22 1 * * 2'
+
+permissions: {}
 
 jobs:
   analyze:
@@ -39,7 +41,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-        - language: actions, python
+        - language: python
+          build-mode: none
+        - language: actions
           build-mode: none
         # CodeQL supports the following values keywords for 'language': 'actions', 'c-cpp', 'csharp', 'go', 'java-kotlin', 'javascript-typescript', 'python', 'ruby', 'rust', 'swift'
         # Use `c-cpp` to analyze code written in C, C++ or both

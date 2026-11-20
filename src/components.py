@@ -474,8 +474,8 @@ class ComponentResponsibles(aiohttp.web.View):
                 component=component,
                 artifact_name=artifact_name,
             )
-        except ValueError as e:
-            raise aiohttp.web.HTTPNotFound(text=str(e))
+        except ValueError:
+            raise aiohttp.web.HTTPNotFound(text='Responsibles label not found')
         except (
             dacite.exceptions.UnionMatchError,
             dacite.exceptions.WrongTypeError,

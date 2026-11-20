@@ -24,8 +24,7 @@ def retrieve_version(
         )
         raise aiohttp.web.HTTPUnprocessableEntity(
             reason=f'Failed to retrieve version for special component {component_id!r}',
-            text=f'Check GitHub app permissions for currentVersion.source.repo'
-            f' "{version_cfg.source.repo}": {e}',
+            text='Check GitHub app permissions for currentVersion.source.repo',
         )
 
 

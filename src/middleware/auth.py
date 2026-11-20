@@ -1462,6 +1462,9 @@ def get_signing_cfg_for_key(
     raise aiohttp.web.HTTPUnauthorized(text='key_id is unknown')
 
 
+logger = structlog.get_logger(__name__)
+
+
 def decode_jwt(
     token: str,
     issuer: str,
@@ -1484,33 +1487,33 @@ def decode_jwt(
             issuer=issuer,
         )
     except (ValueError, jwt.exceptions.DecodeError) as e:
+        logger.warning('JWT decode failed', error=str(e))
         raise aiohttp.web.HTTPUnauthorized(
             reason='Unauthorized, invalid JWT signature',
-            text=str(e),
         )
 
     except jwt.exceptions.ExpiredSignatureError as e:
+        logger.debug('JWT expired', error=str(e))
         raise aiohttp.web.HTTPUnauthorized(
             reason='Unauthorized, token expired',
-            text=str(e),
         )
 
     except jwt.exceptions.InvalidIssuedAtError as e:
+        logger.warning('JWT iat in future', error=str(e))
         raise aiohttp.web.HTTPUnauthorized(
             reason='Bad Request, iat is in future',
-            text=str(e),
         )
 
     except jwt.exceptions.ImmatureSignatureError as e:
+        logger.debug('JWT not yet valid', error=str(e))
         raise aiohttp.web.HTTPUnauthorized(
             reason='Bad Request, token not yet valid',
-            text=str(e),
         )
 
     except jwt.exceptions.InvalidIssuerError as e:
+        logger.warning('JWT issuer not accepted', error=str(e))
         raise aiohttp.web.HTTPUnauthorized(
             reason='Unauthorized, issuer not accepted',
-            text=str(e),
         )
 
 

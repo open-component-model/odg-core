@@ -8,13 +8,15 @@ on:
         description: |
           Optional commit SHA to create the release branch from (defaults to HEAD)
 
+permissions: {}
+
 jobs:
   prepare-release-candidate:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
     steps:
-      - uses: gardener/cc-utils/.github/actions/trusted-checkout@v1
+      - uses: gardener/cc-utils/.github/actions/trusted-checkout@bce63f62928717a11f610ec8022af9feb497d5df # v1
         with:
           token-server: ${{ vars.FEDERATED_GITHUB_ACCESS_TOKEN_SERVER }}
           github-auth-token-permissions: |
