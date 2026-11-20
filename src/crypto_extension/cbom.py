@@ -13,8 +13,6 @@ import syft
 
 logger = structlog.get_logger(__name__)
 
-own_dir = os.path.abspath(os.path.dirname(__file__))
-
 
 def create_cbom(
     image: str | None = None,
@@ -47,7 +45,18 @@ def create_cbom(
 
     logger.info(f'run cmd "{" ".join(cbom_cmd)}"')
     try:
-        cbom_raw = subprocess.run(cbom_cmd, check=True, capture_output=True, text=True).stdout
+        # cbomkit-theia writes ~/.cbomkit-theia/config.yaml on every run; with
+        # a read-only root filesystem (HOME points at the image layer) that
+        # write fails and its error lands on stdout ahead of the JSON, so
+        # point HOME at writable scratch for the subprocess
+        with tempfile.TemporaryDirectory() as home_dir:
+            cbom_raw = subprocess.run(
+                cbom_cmd,
+                check=True,
+                capture_output=True,
+                text=True,
+                env=os.environ | {'HOME': home_dir},
+            ).stdout
     except subprocess.CalledProcessError as e:
         e.add_note(f'{e.stdout=}')
         e.add_note(f'{e.stderr=}')
@@ -67,7 +76,7 @@ def find_cbom_or_create(
     Looks up an existing CBOM document (to be implemented once it is aligned on target picture) or
     creates a CBOM ad-hoc using `syft` and `cbomkit-theia`.
     """
-    with tempfile.TemporaryDirectory(dir=own_dir) as tmp_dir:
+    with tempfile.TemporaryDirectory() as tmp_dir:
         file_path = os.path.join(tmp_dir, 'artefact')
 
         sbom_raw = syft.generate_raw_sbom_for_artefact(

@@ -6,6 +6,7 @@ import datetime
 import os
 import signal
 import sys
+import tempfile
 import time
 import traceback
 import uuid
@@ -30,9 +31,10 @@ import secret_mgmt
 
 logger = structlog.get_logger(__name__)
 
-own_dir = os.path.abspath(os.path.dirname(__file__))
-root_dir = os.path.join(own_dir, os.pardir)
-default_cache_dir = os.path.join(root_dir, '.cache')
+# cache lives in tmp: workloads run with a read-only root filesystem, so the
+# source tree (previous location) is not writable at runtime
+#
+default_cache_dir = os.path.join(tempfile.gettempdir(), 'odg-cache')
 
 ready_to_terminate = True
 wants_to_terminate = False

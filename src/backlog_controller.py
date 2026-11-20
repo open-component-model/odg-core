@@ -70,7 +70,7 @@ def on_backlog_change(
 
         # backwards compatibility (bofore BLI status was used):
         if not status:
-            annotations = backlog_crd.get('metadata').get('annotations')
+            annotations = backlog_crd.get('metadata').get('annotations') or {}
             claimed_by = annotations.get(f'{k8s.model.BacklogItemCrd.DOMAIN}/claimed-by')
             claimed_at_raw = annotations.get(f'{k8s.model.BacklogItemCrd.DOMAIN}/claimed-at')
             claimed_at = dateutil.parser.parse(claimed_at_raw) if claimed_at_raw else None

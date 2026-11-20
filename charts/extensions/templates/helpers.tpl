@@ -110,6 +110,44 @@ differs (freshclam, sla-report) pass an override like odg.otelEnv's serviceName:
   value: k8s.pod.name=$(K8S_POD_NAME),k8s.pod.uid=$(K8S_POD_UID),k8s.namespace.name=$(K8S_POD_NAMESPACE),k8s.container.name={{ .containerName | default .Chart.Name }}
 {{- end -}}
 
+{{/*
+Pod-level security context shared by all ODG workloads. Matches the image's
+dedicated user (uid/gid 10000, see Dockerfile); fsGroup makes emptyDir mounts
+(notably /tmp, and the clamav dirs) writable for the container user.
+
+Intended use at pod-spec level:
+
+  securityContext:
+    {{- include "odg.podSecurityContext" . | nindent 8 }}
+*/}}
+{{- define "odg.podSecurityContext" -}}
+runAsNonRoot: true
+runAsUser: 10000
+runAsGroup: 10000
+fsGroup: 10000
+seccompProfile:
+  type: RuntimeDefault
+{{- end -}}
+
+{{/*
+Container-level security context shared by all ODG workloads. All runtime
+writes go to the /tmp emptyDir mount (caches are pointed there via
+XDG_CACHE_HOME/TRIVY_CACHE_DIR in the image) or dedicated emptyDir mounts
+(clamav pods).
+
+Intended use at container level:
+
+  securityContext:
+    {{- include "odg.containerSecurityContext" . | nindent 12 }}
+*/}}
+{{- define "odg.containerSecurityContext" -}}
+allowPrivilegeEscalation: false
+readOnlyRootFilesystem: true
+capabilities:
+  drop:
+    - ALL
+{{- end -}}
+
 {{- define "odg.rbac" -}}
 {{- $ns := .Values.target_namespace | default .Release.Namespace -}}
 apiVersion: v1

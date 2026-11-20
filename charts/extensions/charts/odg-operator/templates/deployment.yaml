@@ -29,6 +29,8 @@ spec:
       {{- end }}
     spec:
       serviceAccountName: odg-operator
+      securityContext:
+        {{- include "odg.podSecurityContext" . | nindent 8 }}
       {{- with .Values.global.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -47,7 +49,7 @@ spec:
             - /extension-definitions/extension_definitions.yaml
           {{- end}}
           securityContext:
-            allowPrivilegeEscalation: false
+            {{- include "odg.containerSecurityContext" . | nindent 12 }}
           args:
           {{- range $arg := default list .Values.args }}
             - {{ $arg }}
@@ -70,6 +72,8 @@ spec:
           {{- end }}
           {{- end }}
           volumeMounts:
+            - name: tmp
+              mountPath: /tmp
             - name: ocm-repo-mappings
               mountPath: /ocm_repo_mappings
             - name: oci-registry
@@ -85,6 +89,8 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
       volumes:
+        - name: tmp
+          emptyDir: {}
         - name: ocm-repo-mappings
           configMap:
             name: ocm-repo-mappings

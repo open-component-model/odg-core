@@ -16,6 +16,9 @@ import k8s.logging as kl
 
 def _setup_crd_handlers(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
+    # log files now live in the tmp dir (read-only root fs at runtime) — point
+    # it at the per-test tmp_path to keep tests isolated
+    monkeypatch.setattr(kl.tempfile, 'gettempdir', lambda: str(tmp_path))
     for h in list(logging.root.handlers):
         logging.root.removeHandler(h)
     kl.configure_kubernetes_logging()
