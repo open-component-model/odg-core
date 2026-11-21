@@ -67,6 +67,23 @@ installation:
     helm_chart_name: postgresql
     value: delivery-db
     value_type: literal
+  # tighten the delivery-db network policy: only the DB's own pods and
+  # same-namespace pods labelled delivery-db-client=true (delivery-service,
+  # access-manager, cache-manager, delivery-db-backup) may connect; DB egress
+  # restricted to DNS and read-replicas. Pairs with odg.labels.dbClient in
+  # the odg-core charts. Rollout: the lockdown lands with the database chart
+  # reconcile while the client labels arrive with the workload rollouts of
+  # the same release — delivery-service pods (and CronJob pods started
+  # between the two) lose database access until they restart. Accept the
+  # short window, or ship the labels one release ahead to avoid it.
+  - helm_attribute: primary.networkPolicy.allowExternal
+    helm_chart_name: postgresql
+    value: false
+    value_type: literal
+  - helm_attribute: primary.networkPolicy.allowExternalEgress
+    helm_chart_name: postgresql
+    value: false
+    value_type: literal
   - helm_attribute: namespaceOverride
     helm_chart_name: postgresql
     value: ${target_namespace}

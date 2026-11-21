@@ -5,6 +5,46 @@ global:
     repository: null
     tag: null
   imagePullSecrets: []
+  # Tiered egress NetworkPolicy knobs, shared by all extensions via
+  # odg.netpol.egress (charts/extensions/templates/helpers.tpl). Egress is
+  # restricted to DNS, the delivery-service API (in-cluster), the delivery
+  # database (5432, DB-consumers only) and HTTPS (443, everywhere).
+  netpol:
+    # labels selecting the cluster DNS namespace (default kube-system);
+    # OpenShift example: {kubernetes.io/metadata.name: openshift-dns}
+    dnsNamespaceLabels: {}
+    # ports offered to the DNS resolver's pods (UDP+TCP each): 53 covers
+    # upstream CoreDNS, 8053 Gardener shoots (coredns PortServer), 5353
+    # OpenShift dns-default — CNIs differ on whether they enforce pre-DNAT
+    # (Service port 53) or post-DNAT (pod port), so list all that may apply
+    dnsPorts: [53, 8053, 5353]
+    # NodeLocal DNSCache link-local IPs (default [169.254.20.10], kubernetes'
+    # default): pods on clusters with NodeLocal DNS (e.g. gardener shoots)
+    # query this IP directly, so each entry becomes a /32 ipBlock in the DNS
+    # rule. Set [] on clusters without NodeLocal DNS (harmless default).
+    dnsNodeLocalIps: [169.254.20.10]
+    # CIDRs of database hosts outside the cluster (port 5432). Without entries,
+    # only the in-cluster postgres pods (label pair app.kubernetes.io/name=postgresql
+    # + component=primary, stable across deployments) are reachable.
+    postgresCidrs: []
+    # client label rendered onto DB-consuming pods, required once the database
+    # chart's network policy runs with primary.networkPolicy.allowExternal=false
+    # (upstream then admits only <fullname>-client=true pods in its namespace).
+    # NOTE: when the database chart is rendered without fullnameOverride (e.g.
+    # odg-operator's default helm template name), the upstream client's label
+    # key becomes `release-name-postgresql-client` — set it here accordingly.
+    dbClientLabelKey: "delivery-db-client"
+    dbClientLabelValue: "true"
+    # pod labels selecting the in-namespace OpenTelemetry collector as an egress
+    # target for trace/metric export (TCP 4317+4318); a selector that matches
+    # nothing is harmless.
+    otlpCollectorLabels:
+      app.kubernetes.io/name: opentelemetry-collector
+    # extra egress rules rendered verbatim into EVERY extension's policy (list
+    # of full NetworkPolicy egress rule dicts) — for targets the tiers cannot
+    # express: cross-namespace/external collectors, egress proxies,
+    # registries on non-443 ports, databases on non-5432 ports
+    extraEgress: []
 
 # OTLP gRPC endpoint for trace export. Resolution order in odg.otelEnv
 # (charts/extensions/templates/helpers.tpl) — key semantics depend on the
