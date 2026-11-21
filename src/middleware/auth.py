@@ -5,6 +5,7 @@ import datetime
 import enum
 import functools
 import hashlib
+import http
 import re
 import urllib.parse
 import uuid
@@ -28,6 +29,7 @@ import consts
 import ctx_util
 import deliverydb.model as dm
 import lookups
+import odg.audit
 import odg_client.jwt
 import paths
 import secret_mgmt.oauth_cfg
@@ -635,6 +637,41 @@ async def set_session_and_refresh_token(
     return response
 
 
+def _emit_auth_failure(
+    *,
+    action: str,
+    request: aiohttp.web.Request,
+    error: BaseException,
+) -> None:
+    """
+    Emit a failed-authentication audit event (`auth_login` / `auth_token_refresh`). Rejection
+    reasons are operator-facing texts (no credential values; compare `OAuthLogin.post`), so
+    they are safe to record; they let SIEM distinguish wrong credentials from service errors.
+    """
+    if isinstance(error, aiohttp.web.HTTPException):
+        status = error.status
+        reason = error.text or error.reason
+        if status in (http.HTTPStatus.UNAUTHORIZED, http.HTTPStatus.FORBIDDEN):
+            outcome = odg.audit.Outcome.DENIED
+        else:
+            outcome = odg.audit.Outcome.ERROR
+    else:
+        status = None
+        reason = str(error)
+        outcome = odg.audit.Outcome.ERROR
+
+    odg.audit.emit(
+        action=action,
+        msg=f'{action.replace("_", " ")} failed',
+        network_peer_address=request.remote,
+        odg_audit_outcome=outcome,
+        odg_audit_detail={
+            'http_status': status,
+            'reason': str(reason)[:500],
+        },
+    )
+
+
 @dataclasses.dataclass
 class AuthRequest:
     """request body of `POST /auth` (mirror of the `AuthRequest` schema in swagger.yaml)"""
@@ -777,6 +814,39 @@ class OAuthLogin(aiohttp.web.View):
         api_url: str | None,
         use_refresh_token: bool,
     ) -> aiohttp.web.StreamResponse:
+        """
+        Emits an `auth_login` audit event for every failed login attempt (SIEM: brute-force
+        detection); the success event is emitted by `_authenticate`, where the user id is known.
+        """
+        try:
+            return await self._authenticate(
+                issuer=issuer,
+                db_session=db_session,
+                code=code,
+                client_id=client_id,
+                access_token=access_token,
+                api_url=api_url,
+                use_refresh_token=use_refresh_token,
+            )
+        except Exception as e:
+            _emit_auth_failure(
+                action='auth_login',
+                request=self.request,
+                error=e,
+            )
+            raise
+
+    async def _authenticate(
+        self,
+        *,
+        issuer: str,
+        db_session: sqlasync.session.AsyncSession,
+        code: str | None,
+        client_id: str | None,
+        access_token: str | None,
+        api_url: str | None,
+        use_refresh_token: bool,
+    ) -> aiohttp.web.StreamResponse:
 
         if (access_token and api_url) or (client_id and code):
             idp_type = secret_mgmt.oauth_cfg.OAuthCfgTypes.GITHUB
@@ -882,17 +952,42 @@ class OAuthLogin(aiohttp.web.View):
                 await db_session.rollback()
                 raise
 
-        return await set_session_and_refresh_token(
+        response = await set_session_and_refresh_token(
             user_id=user_id,
             issuer=issuer,
             db_session=db_session,
             use_refresh_token=use_refresh_token,
         )
 
+        odg.audit.emit(
+            action='auth_login',
+            msg='login succeeded',
+            user_id=user_id,
+            network_peer_address=self.request.remote,
+            odg_audit_outcome=odg.audit.Outcome.ALLOWED,
+            odg_audit_detail={
+                'idp_type': str(idp_type),
+                'use_refresh_token': use_refresh_token,
+            },
+        )
+
+        return response
+
 
 @noauth
 class OAuthRefresh(aiohttp.web.View):
     async def post(self):
+        try:
+            return await self._do_refresh()
+        except Exception as e:
+            _emit_auth_failure(
+                action='auth_token_refresh',
+                request=self.request,
+                error=e,
+            )
+            raise
+
+    async def _do_refresh(self):
         issuer = self.request.app[consts.APP_BASE_URL]
         db_session: sqlasync.session.AsyncSession = self.request[consts.REQUEST_DB_SESSION]
 
@@ -936,12 +1031,22 @@ class OAuthRefresh(aiohttp.web.View):
             )
         refresh_token_identifier = decoded_refresh_token['identifier']
 
-        return await set_session_and_refresh_token(
+        response = await set_session_and_refresh_token(
             user_id=user_id,
             issuer=issuer,
             db_session=db_session,
             existing_refresh_token_identifier=refresh_token_identifier,
         )
+
+        odg.audit.emit(
+            action='auth_token_refresh',
+            msg='session token refreshed',
+            user_id=user_id,
+            network_peer_address=self.request.remote,
+            odg_audit_outcome=odg.audit.Outcome.ALLOWED,
+        )
+
+        return response
 
 
 @noauth
@@ -961,8 +1066,33 @@ class OAuthLogout(aiohttp.web.View):
         response.del_cookie(name=odg_client.jwt.JWT_KEY, path='/')
         response.del_cookie(name=odg_client.jwt.REFRESH_TOKEN_KEY, path='/')
 
+        user_id, refresh_token_revoked = await self._revoke_refresh_token(
+            refresh_token=refresh_token,
+        )
+
+        odg.audit.emit(
+            action='auth_logout',
+            msg='logout',
+            user_id=user_id,
+            network_peer_address=self.request.remote,
+            odg_audit_outcome=odg.audit.Outcome.ALLOWED,
+            odg_audit_detail={'refresh_token_revoked': refresh_token_revoked},
+        )
+
+        return response
+
+    async def _revoke_refresh_token(
+        self,
+        *,
+        refresh_token: str | None,
+    ) -> tuple[str | None, bool]:
+        """
+        Removes the (still valid) refresh token from the persisted tokens of the user;
+        returns (user_id, revoked). Logout stays silent on invalid/absent tokens, so callers
+        cannot probe token validity — the audit event records what happened either way.
+        """
         if not refresh_token:
-            return response
+            return None, False
 
         issuer = self.request.app[consts.APP_BASE_URL]
         db_session: sqlasync.session.AsyncSession = self.request[consts.REQUEST_DB_SESSION]
@@ -974,28 +1104,28 @@ class OAuthLogout(aiohttp.web.View):
                 verify_signature=False,
             )
         except aiohttp.web.HTTPUnauthorized:
-            return response
+            return None, False
 
         user_id = decoded_refresh_token['sub']
 
         if 'identifier' not in decoded_refresh_token:
-            return response
-
-        refresh_token_identifier = decoded_refresh_token['identifier']
+            return user_id, False
 
         if not (user := await db_session.get(dm.User, user_id)):
-            return response
+            return user_id, False
 
-        identifier_hash = hash_refresh_token_identifier(refresh_token_identifier)
+        identifier_hash = hash_refresh_token_identifier(
+            decoded_refresh_token['identifier'],
+        )
         user.refresh_tokens = [
-            refresh_token
-            for refresh_token in user.refresh_tokens
-            if refresh_token['identifier'] != identifier_hash
+            persisted_token
+            for persisted_token in user.refresh_tokens
+            if persisted_token['identifier'] != identifier_hash
         ]
         db_session.add(user)
         await db_session.commit()
 
-        return response
+        return user_id, True
 
 
 @noauth

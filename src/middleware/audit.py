@@ -69,6 +69,7 @@ def audit_middleware() -> aiohttp.typedefs.Middleware:
                 msg=f'audit {request.method} {route}',
                 # the inner auth middleware sets the user id; absent for rejected/anonymous requests
                 user_id=request.get(consts.REQUEST_USER_ID),
+                network_peer_address=request.remote,
                 url_full=route,
                 odg_audit_target=f'{request.method.upper()} {route}',
                 odg_audit_outcome=outcome,

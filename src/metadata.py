@@ -1401,6 +1401,11 @@ class ArtefactMetadata(aiohttp.web.View):
                 odg_audit_detail={
                     'entries': len(rescorings),
                     'keys': odg.audit.capped(rescoring.key for rescoring in rescorings),
+                    # full proposed payloads (item- and length-capped) so SIEM can alert on
+                    # severity downgrades; the complete value lives in the delivery-db
+                    'rescorings': odg.audit.capped(
+                        odg.audit.stringify(rescoring.data) for rescoring in rescorings
+                    ),
                 },
             )
 
