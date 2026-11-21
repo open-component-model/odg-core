@@ -114,7 +114,7 @@ class TestScanFile:
                     'https://dl.k8s.io/release/v1.24.0/bin/linux/amd64/kubectl',
                     cls._KUBECTL_PATH,
                 )
-                os.chmod(cls._KUBECTL_PATH, 0o755)
+                os.chmod(cls._KUBECTL_PATH, 0o700)
         return cls._KUBECTL_PATH
 
     @pytest.fixture(scope='session')

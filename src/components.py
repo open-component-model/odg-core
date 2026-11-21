@@ -474,8 +474,8 @@ class ComponentResponsibles(aiohttp.web.View):
                 component=component,
                 artifact_name=artifact_name,
             )
-        except ValueError as e:
-            raise aiohttp.web.HTTPNotFound(text=str(e))
+        except ValueError:
+            raise aiohttp.web.HTTPNotFound(text='Responsibles label not found')
         except (
             dacite.exceptions.UnionMatchError,
             dacite.exceptions.WrongTypeError,
@@ -1494,9 +1494,10 @@ class DownloadSBOM(aiohttp.web.View):
         filename = f'{component.name}_{component.version}.sboms.tar'.replace('/', '_')
         response = aiohttp.web.StreamResponse(
             headers={
-                'Content-Type': 'application/x-tar',
-                'Content-Encoding': 'gzip',
                 'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Encoding': 'gzip',
+                'Content-Type': 'application/x-tar',
+                'X-Content-Type-Options': 'nosniff',
             },
         )
         await response.prepare(self.request)

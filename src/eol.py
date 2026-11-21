@@ -1,3 +1,5 @@
+import re
+
 import requests
 
 import util
@@ -27,6 +29,9 @@ class EolRoutes:
         self,
         product: str,
     ):
+        # Validate product to prevent path traversal / SSRF
+        if not re.fullmatch(r'[a-zA-Z0-9._-]+', product):
+            raise ValueError(f'Invalid product identifier: {product!r}')
         return util.urljoin(
             self._base_url,
             f'{product}.json',
