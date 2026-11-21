@@ -27,3 +27,11 @@ limitRange:
     cpu: 100m
   default:
     memory: 500Mi
+# OTLP gRPC endpoint for trace and metrics export. Empty disables telemetry.
+# Breaking change: previously the deployment derived
+# `http://telemetry-opentelemetry-collector.<target-namespace>:4317` when this
+# value was absent; that derivation was removed, so an absent endpoint now
+# means no telemetry. Set it explicitly to keep exporting to the collector.
+# When deployed via the ODG operator, this value is injected from the ODG CR
+# context's `otlp_endpoint` (see extension-definitions.yaml).
+# otlpEndpoint: 'http://telemetry-opentelemetry-collector.<target-namespace>:4317'
