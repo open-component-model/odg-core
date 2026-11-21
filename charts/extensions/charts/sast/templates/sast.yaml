@@ -92,14 +92,17 @@ spec:
         - name: github
           secret:
             secretName: secret-factory-github
+            defaultMode: 288 # octal 0440: owner+group read-only
             optional: true
         - name: github-app
           secret:
             secretName: secret-factory-github-app
+            defaultMode: 288 # octal 0440: owner+group read-only
             optional: true
         - name: oci-registry
           secret:
             secretName: secret-factory-oci-registry
+            defaultMode: 288 # octal 0440: owner+group read-only
             optional: true # oci authentication is optional
         - name: extensions-cfg
           configMap:
