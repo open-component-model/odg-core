@@ -12,6 +12,7 @@ import requests.adapters
 import structlog
 import urllib3.util.retry
 
+import odg.audit
 import secret_mgmt
 import secret_mgmt.github
 import util
@@ -95,6 +96,16 @@ def find_token_for_repo_url(
         secret_factory=secret_factory,
         repo_url=repo_url,
         absent_ok=True,
+    )
+
+    # emitted only on cache misses (functools.cache), i.e. once per factory+repo pair; the
+    # caller identity lies outside this function (extension service accounts) and is covered
+    # by the request-level audit events of the calling extension
+    odg.audit.emit(
+        action='secret_use',
+        msg='github token lookup for repo url',
+        odg_audit_target=repo_url,
+        odg_audit_outcome=(odg.audit.Outcome.ALLOWED if github_api else odg.audit.Outcome.NOT_FOUND),
     )
 
     if not github_api:

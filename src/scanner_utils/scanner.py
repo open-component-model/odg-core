@@ -11,6 +11,7 @@ import ocm.iter
 import structlog
 
 import ocm_util
+import odg.audit
 import scanner_utils.model
 import secret_mgmt
 
@@ -43,6 +44,18 @@ _SBOM_LAYER_MEDIA_TYPES = frozenset(
         'text/spdx+json',
     },
 )
+
+
+def _access_reference(access: ocm.Access) -> str:
+    """
+    Extract the identifying reference (registry image, repo URL, ...) from an OCM access for
+    audit purposes.
+    """
+    for attribute in ('imageReference', 'repoUrl', 'url', 'localReference'):
+        if reference := getattr(access, attribute, None):
+            return str(reference)
+
+    return access.type.value
 
 
 class Scanner(abc.ABC):
@@ -99,6 +112,24 @@ class Scanner(abc.ABC):
             access_type=access.type,
             access_media_type=getattr(access, 'mediaType', None),
             artefact_type=resource_node.resource.type,
+        )
+
+        # one audit event per scanned artefact: records which repo/registry the scanner
+        # extension pulled from (e.g. after a credential leak). The outcome records
+        # that the scan was dispatched; scan failures surface in the scanner's error logs.
+        odg.audit.emit(
+            action='scan_artefact_pull',
+            component=(
+                f'{resource_node.component.component.name}'
+                f':{resource_node.component.component.version}'
+            ),
+            artefact=f'{resource_node.resource.name}:{resource_node.resource.version}',
+            odg_audit_target=_access_reference(access=access),
+            odg_audit_outcome=odg.audit.Outcome.ALLOWED,
+            odg_audit_detail={
+                'access_type': access.type.value,
+                'scanner': type(self).__name__,
+            },
         )
 
         if access.type is ocm.AccessType.OCI_REGISTRY:
