@@ -203,10 +203,9 @@ def find_github_oauth_cfg(
             if oauth_cfg.api_url == api_url:
                 return oauth_cfg
 
-        api_urls = [oauth_cfg.api_url for oauth_cfg in filtered_oauth_cfgs]
         raise aiohttp.web.HTTPUnauthorized(
             headers={
-                'WWW-Authenticate': f'no such api-url: {api_url}; available api-urls: {api_urls}',
+                'WWW-Authenticate': 'invalid api_url or client_id',
             },
         )
 
@@ -214,10 +213,9 @@ def find_github_oauth_cfg(
         if oauth_cfg.client_id == client_id:
             return oauth_cfg
 
-    client_ids = [oauth_cfg.client_id for oauth_cfg in filtered_oauth_cfgs]
     raise aiohttp.web.HTTPUnauthorized(
         headers={
-            'WWW-Authenticate': f'no such client: {client_id}; available clients: {client_ids}',
+            'WWW-Authenticate': 'invalid api_url or client_id',
         },
     )
 
