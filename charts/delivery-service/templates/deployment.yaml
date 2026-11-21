@@ -266,6 +266,17 @@ spec:
             matchLabels:
               {{- $np := .Values.netpol | default dict -}}
               {{- toYaml ($np.dnsNamespaceLabels | default (dict "kubernetes.io/metadata.name" "kube-system")) | nindent 14 }}
+        {{/* NodeLocal DNSCache: pods query the link-local IP on the node
+        (default 169.254.20.10), which namespace selectors can never match —
+        set netpol.dnsNodeLocalIps: [] on clusters without NodeLocal DNS */}}
+        {{- $dnsNodeLocalIps := list "169.254.20.10" }}
+        {{- if hasKey $np "dnsNodeLocalIps" }}
+        {{- $dnsNodeLocalIps = $np.dnsNodeLocalIps }}
+        {{- end }}
+        {{- range $ip := $dnsNodeLocalIps }}
+        - ipBlock:
+            cidr: {{ $ip }}/32
+        {{- end }}
       ports:
         {{- range $port := $np.dnsPorts | default (list 53 8053 5353) }}
         - port: {{ $port }}

@@ -239,12 +239,14 @@ Intended use inside the pod template's labels of DB-consuming workloads:
 {{- $ns := $ctx.Values.namespaceOverride | default $ctx.Values.target_namespace | default $ctx.Release.Namespace -}}
 {{- $dnsLabels := dict "kubernetes.io/metadata.name" "kube-system" -}}
 {{- $dnsPorts := list 53 8053 5353 -}}
+{{- $dnsNodeLocalIps := list "169.254.20.10" -}}
 {{- $postgresCidrs := list -}}
 {{- $otlpLabels := dict "app.kubernetes.io/name" "opentelemetry-collector" -}}
 {{- $extraEgress := list -}}
 {{- with ($ctx.Values.global).netpol -}}
 {{- with .dnsNamespaceLabels -}}{{- $dnsLabels = . -}}{{- end -}}
 {{- with .dnsPorts -}}{{- $dnsPorts = . -}}{{- end -}}
+{{- if hasKey . "dnsNodeLocalIps" -}}{{- $dnsNodeLocalIps = .dnsNodeLocalIps -}}{{- end -}}
 {{- with .postgresCidrs -}}{{- $postgresCidrs = . -}}{{- end -}}
 {{- with .otlpCollectorLabels -}}{{- $otlpLabels = . -}}{{- end -}}
 {{- with .extraEgress -}}{{- $extraEgress = . -}}{{- end -}}
@@ -268,6 +270,13 @@ spec:
         - namespaceSelector:
             matchLabels:
               {{- toYaml $dnsLabels | nindent 14 }}
+        {{- range $ip := $dnsNodeLocalIps }}
+        # NodeLocal DNSCache: pods query the link-local IP on the node (default
+        # 169.254.20.10), which namespace selectors can never match — set
+        # global.netpol.dnsNodeLocalIps: [] on clusters without NodeLocal DNS
+        - ipBlock:
+            cidr: {{ $ip }}/32
+        {{- end }}
       ports:
         {{- range $port := $dnsPorts }}
         - port: {{ $port }}

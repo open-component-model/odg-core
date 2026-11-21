@@ -18,6 +18,11 @@ global:
     # OpenShift dns-default — CNIs differ on whether they enforce pre-DNAT
     # (Service port 53) or post-DNAT (pod port), so list all that may apply
     dnsPorts: [53, 8053, 5353]
+    # NodeLocal DNSCache link-local IPs (default [169.254.20.10], kubernetes'
+    # default): pods on clusters with NodeLocal DNS (e.g. gardener shoots)
+    # query this IP directly, so each entry becomes a /32 ipBlock in the DNS
+    # rule. Set [] on clusters without NodeLocal DNS (harmless default).
+    dnsNodeLocalIps: [169.254.20.10]
     # CIDRs of database hosts outside the cluster (port 5432). Without entries,
     # only the in-cluster postgres pods (label pair app.kubernetes.io/name=postgresql
     # + component=primary, stable across deployments) are reachable.
