@@ -166,8 +166,12 @@ jobs:
     needs:
       - oci-image
     permissions:
+      attestations: write
       contents: read
+      id-token: write
       packages: write
+    env:
+      OWNER: ${{ github.repository_owner }}
     outputs:
       core-image-digest: ${{ steps.manifest.outputs.core-image-digest }}
     steps:
@@ -179,8 +183,6 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Create and push image index
         id: manifest
-        env:
-          OWNER: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
 
@@ -196,6 +198,13 @@ jobs:
             --format '{{json .Manifest}}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["digest"])')
 
           echo "core-image-digest=${digest}" >> "$GITHUB_OUTPUT"
+          echo "OWNER=$OWNER" >> "$GITHUB_ENV"
+      - name: Attest OCI image
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          push-to-registry: true
+          subject-digest: ${{ steps.manifest.outputs.core-image-digest }}
+          subject-name: ${{ env.REGISTRY }}/${{ env.OWNER }}/odg/images/core
 
   helm-chart:
     name: Build Helm chart
@@ -204,8 +213,12 @@ jobs:
     needs:
       - collect-image
     permissions:
+      attestations: write
       contents: read
+      id-token: write
       packages: write
+    env:
+      OWNER: ${{ github.repository_owner }}
     outputs:
       bootstrapping-chart-digest: ${{ steps.push.outputs.bootstrapping-chart-digest }}
       delivery-service-chart-digest: ${{ steps.push.outputs.delivery-service-chart-digest }}
@@ -234,7 +247,6 @@ jobs:
       - name: Package and push chart
         id: push
         env:
-          OWNER: ${{ github.repository_owner }}
           VERSION: ${{ inputs.version }}
           CORE_IMAGE_DIGEST: ${{ needs.collect-image.outputs.core-image-digest }}
         run: |
@@ -258,3 +270,11 @@ jobs:
           digest=$(echo "${output}" | grep '^Digest:' | cut -d' ' -f2)
 
           echo "${{ matrix.chart.name }}-chart-digest=${digest}" >> "$GITHUB_OUTPUT"
+          echo "CHART_DIGEST=${digest}" >> "$GITHUB_ENV"
+          echo "OWNER=$OWNER" >> "$GITHUB_ENV"
+      - name: Attest Helm chart
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          push-to-registry: true
+          subject-digest: ${{ env.CHART_DIGEST }}
+          subject-name: ${{ env.REGISTRY }}/${{ env.OWNER }}/odg/charts/${{ matrix.chart.name }}

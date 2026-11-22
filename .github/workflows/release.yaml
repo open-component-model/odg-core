@@ -119,7 +119,9 @@ jobs:
       - preprocess
     uses: ./.github/workflows/build.yaml
     permissions:
+      attestations: write
       contents: read
+      id-token: write
       packages: write
     with:
       version: ${{ needs.preprocess.outputs.version }}
@@ -132,6 +134,7 @@ jobs:
     uses: ./.github/workflows/publish-component.yaml
     permissions:
       contents: read
+      id-token: write
       packages: write
     with:
       version: ${{ needs.preprocess.outputs.version }}

@@ -37,6 +37,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     env:
       OWNER: ${{ github.repository_owner }}
     steps:
@@ -84,6 +85,9 @@ jobs:
                     type: DockerConfig/v1
                     dockerConfigFile: $HOME/.docker/config.json
                     propagateConsumerIdentity: true
+            - type: signing.config.ocm.software/v1alpha1
+              signer:
+                type: SigstoreSigningConfiguration/v1alpha1
           EOF
       - name: Write version
         env:
@@ -100,6 +104,13 @@ jobs:
             --repository "ctf::transport-archive" \
             --constructor "$CONSTRUCTOR" \
             --working-directory "${{ github.workspace }}"
+      - name: Sign component version (keyless Sigstore)
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          ocm sign componentversion \
+            --config "$HOME/.ocmconfig" \
+            "ctf::transport-archive//ocm.software/open-delivery-gear/core:$VERSION"
       - name: Publish component version
         env:
           VERSION: ${{ inputs.version }}
