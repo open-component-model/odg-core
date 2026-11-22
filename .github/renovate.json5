@@ -76,13 +76,13 @@
     {
       matchManagers: [
         'pep621',
-        'uv',
       ],
       matchDepNames: [
         'bdba-client',
         'odg-client',
       ],
-      enabled: false,
+      automerge: true,
+      minimumReleaseAge: null,
     },
   ],
 }

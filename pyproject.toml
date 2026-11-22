@@ -8,9 +8,6 @@ description = "Mandatory system internals for the Open Delivery Gear"
 requires-python = ">=3.14"
 dynamic = ["version"]
 dependencies = [
-    # bdba-client and odg-client are uv workspace members (wired via [tool.uv.sources]).
-    # Versions are pinned by the release-client-package workflow; do not update via renovate
-    # (see .github/renovate.json5).
     "bdba-client==0.15.0",
     "odg-client==0.18.0",
     "aiohttp==3.14.5",
@@ -52,13 +49,6 @@ dependencies = [
     "opentelemetry-instrumentation-requests==0.66b2",
     "opentelemetry-instrumentation-sqlalchemy==0.66b2",
 ]
-
-[tool.uv.workspace]
-members = ["packages/bdba-client", "packages/odg-client"]
-
-[tool.uv.sources]
-bdba-client = { workspace = true }
-odg-client = { workspace = true }
 
 [dependency-groups]
 dev = [
