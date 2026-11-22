@@ -13,6 +13,7 @@ import yarl
 import deliverydb.model as dm
 import middleware.auth
 import odg_client.jwt
+import secret_mgmt.oauth_cfg
 import secret_mgmt.signing_cfg
 
 ISSUER = 'https://delivery-service.example.com'
@@ -709,3 +710,31 @@ async def test_login_without_credentials_raises_401():
         await view.post()
 
     assert 'WWW-Authenticate' in excinfo.value.headers
+
+
+@pytest.mark.parametrize(
+    'lookup_kwargs',
+    [
+        {'api_url': 'https://unknown.example.com'},
+        {'client_id': 'unknown-client-id'},
+    ],
+)
+def test_find_github_oauth_cfg_does_not_leak_configured_values(lookup_kwargs):
+    oauth_cfg = secret_mgmt.oauth_cfg.OAuthCfg(
+        name='internal',
+        type=secret_mgmt.oauth_cfg.OAuthCfgTypes.GITHUB,
+        api_url='https://github.internal.example.com',
+        client_id='internal-client-id',
+        client_secret='internal-client-secret',
+    )
+
+    with pytest.raises(aiohttp.web.HTTPUnauthorized) as excinfo:
+        middleware.auth.find_github_oauth_cfg(
+            oauth_cfgs=[oauth_cfg],
+            **lookup_kwargs,
+        )
+
+    header = excinfo.value.headers['WWW-Authenticate']
+    assert header == 'invalid api_url or client_id'
+    assert oauth_cfg.api_url not in header
+    assert oauth_cfg.client_id not in header
