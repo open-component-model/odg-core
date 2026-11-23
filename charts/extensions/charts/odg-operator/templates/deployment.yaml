@@ -97,6 +97,7 @@ spec:
         - name: oci-registry
           secret:
             secretName: secret-factory-oci-registry
+            defaultMode: 288 # octal 0440: owner+group read-only
             optional: true # oci authentication is optional
         - name: extensions-cfg
           configMap:

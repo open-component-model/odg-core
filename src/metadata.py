@@ -20,6 +20,7 @@ import deliverydb_cache.util as dcu
 import features
 import lookups
 import middleware.cors
+import odg.audit
 import odg.findings
 import odg.model
 
@@ -1366,6 +1367,48 @@ class ArtefactMetadata(aiohttp.web.View):
 
         logger.info(f'[{correlation_id}] Finished updating artefact metadata')
 
+        counts_by_type = dict(
+            collections.Counter(
+                artefact_metadatum.meta.type for artefact_metadatum in artefact_metadata
+            ),
+        )
+
+        odg.audit.emit(
+            action='findings_write',
+            user_id=self.request.get(consts.REQUEST_USER_ID),
+            odg_audit_outcome=odg.audit.Outcome.ALLOWED,
+            odg_audit_detail={
+                'entries': len(artefact_metadata),
+                'counts_by_type': counts_by_type,
+                # key identifies component/artefact/datasource/type/data-key without payload data
+                'keys': odg.audit.capped(
+                    artefact_metadatum.key for artefact_metadatum in artefact_metadata
+                ),
+            },
+        )
+
+        if rescorings := [
+            artefact_metadatum
+            for artefact_metadatum in artefact_metadata
+            if artefact_metadatum.meta.type == odg.model.Datatype.RESCORING
+        ]:
+            # dedicated rescoring event: re/applied rescorings suppress findings from
+            # compliance tracking and are the highest-risk mutation
+            odg.audit.emit(
+                action='rescoring_write',
+                user_id=self.request.get(consts.REQUEST_USER_ID),
+                odg_audit_outcome=odg.audit.Outcome.ALLOWED,
+                odg_audit_detail={
+                    'entries': len(rescorings),
+                    'keys': odg.audit.capped(rescoring.key for rescoring in rescorings),
+                    # full proposed payloads (item- and length-capped) so SIEM can alert on
+                    # severity downgrades; the complete value lives in the delivery-db
+                    'rescorings': odg.audit.capped(
+                        odg.audit.stringify(rescoring.data) for rescoring in rescorings
+                    ),
+                },
+            )
+
         return aiohttp.web.Response(
             status=http.HTTPStatus.CREATED,
         )
@@ -1397,14 +1440,17 @@ class ArtefactMetadata(aiohttp.web.View):
         db_session: sqlasync.session.AsyncSession = self.request[consts.REQUEST_DB_SESSION]
 
         cache_ids_to_invalidate: set[str] = set()
+        deleted_keys: set[str] = set()
 
         try:
             for entry in entries:
                 entry = _fill_default_values(entry)
 
+                entry_metadata = odg.model.ArtefactMetadata.from_dict(entry)
                 artefact_metadata = du.to_db_artefact_metadata(
-                    artefact_metadata=odg.model.ArtefactMetadata.from_dict(entry),
+                    artefact_metadata=entry_metadata,
                 )
+                deleted_keys.add(entry_metadata.key)
 
                 await db_session.execute(
                     sa.delete(dm.ArtefactMetaData).where(
@@ -1428,6 +1474,16 @@ class ArtefactMetadata(aiohttp.web.View):
         except:
             await db_session.rollback()
             raise
+
+        odg.audit.emit(
+            action='findings_delete',
+            user_id=self.request.get(consts.REQUEST_USER_ID),
+            odg_audit_outcome=odg.audit.Outcome.ALLOWED,
+            odg_audit_detail={
+                'entries': len(deleted_keys),
+                'keys': odg.audit.capped(deleted_keys),
+            },
+        )
 
         return aiohttp.web.Response(
             status=http.HTTPStatus.NO_CONTENT,
