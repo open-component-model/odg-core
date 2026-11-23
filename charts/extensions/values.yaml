@@ -5,6 +5,9 @@ global:
     repository: null
     tag: null
   imagePullSecrets: []
+  # Shared OTLP gRPC endpoint for extension workloads. Empty disables telemetry.
+  # The operator sets this from the ODG CR context's `otlp_endpoint`.
+  otlpEndpoint: ''
 
 access-manager:
   cronjob:

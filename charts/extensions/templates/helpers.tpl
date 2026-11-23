@@ -30,9 +30,10 @@ deployments); `patch` is only granted where `patch_namespaced_*` is actually cal
 (artefact-enumerator priority bump).
 */}}
 {{/*
-Renders the OTel env vars shared by all ODG workloads. `otlpEndpoint` is always
-injected explicitly by the operator or service-provider-odg controller (empty
-disables tracing, non-empty exports to that collector). Absent = empty = off.
+Renders the OTel env vars shared by all ODG workloads. `global.otlpEndpoint` is
+always injected explicitly by the operator or service-provider-odg controller
+(empty disables tracing, non-empty exports to that collector). Helm propagates
+the global value to every extension sub-chart. Absent = empty = off.
 
 Intended use inside each workload's env: block:
 
@@ -51,7 +52,7 @@ entries, which make it unusable inline with `- name: X` entries.
 */}}
 {{- define "odg.otelEnv" -}}
 - name: OTEL_EXPORTER_OTLP_ENDPOINT
-  value: {{ .Values.otlpEndpoint | default "" | quote }}
+  value: {{ .Values.global.otlpEndpoint | default "" | quote }}
 - name: OTEL_SERVICE_NAME
   value: {{ .serviceName | default .Chart.Name | quote }}
 - name: OTEL_SEMCONV_STABILITY_OPT_IN
