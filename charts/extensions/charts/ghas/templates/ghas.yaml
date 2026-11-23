@@ -57,6 +57,8 @@ spec:
               mountPath: /secrets/github
             - name: github-app
               mountPath: /secrets/github-app
+            - name: oci-registry
+              mountPath: /secrets/oci-registry
             - name: extensions-cfg
               mountPath: /extensions_cfg
             - name: findings-cfg
@@ -79,6 +81,11 @@ spec:
                 secretName: secret-factory-github-app
                 defaultMode: 288 # octal 0440: owner+group read-only
                 optional: true
+            - name: oci-registry
+              secret:
+                secretName: secret-factory-oci-registry
+                defaultMode: 288 # octal 0440: owner+group read-only
+                optional: true # oci authentication is optional
             - name: extensions-cfg
               configMap:
                 name: extensions-cfg

@@ -47,6 +47,10 @@ spec:
           volumeMounts:
             - name: extensions-cfg
               mountPath: /extensions_cfg
+            - name: github
+              mountPath: /secrets/github
+            - name: github-app
+              mountPath: /secrets/github-app
           {{- with (.Values.deployment).resources }}
           resources:
             {{- toYaml . | nindent 12 }}
@@ -55,6 +59,16 @@ spec:
         - name: extensions-cfg
           configMap:
             name: extensions-cfg
+        - name: github
+          secret:
+            secretName: secret-factory-github
+            defaultMode: 288 # octal 0440: owner+group read-only
+            optional: true
+        - name: github-app
+          secret:
+            secretName: secret-factory-github-app
+            defaultMode: 288 # octal 0440: owner+group read-only
+            optional: true
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
