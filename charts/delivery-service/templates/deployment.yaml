@@ -177,33 +177,41 @@ spec:
         - name: delivery-db
           secret:
             secretName: {{ .Values.deliveryDb.secretName }}
+            defaultMode: 288 # octal 0440: owner+group read-only
         - name: github
           secret:
             secretName: secret-factory-github
+            defaultMode: 288 # octal 0440: owner+group read-only
             optional: true
         - name: github-app
           secret:
             secretName: secret-factory-github-app
+            defaultMode: 288 # octal 0440: owner+group read-only
             optional: true
         - name: oauth-cfg
           secret:
             secretName: secret-factory-oauth-cfg
+            defaultMode: 288 # octal 0440: owner+group read-only
             optional: true # authentication is optional
         - name: oidc-cfg
           secret:
             secretName: secret-factory-oidc-cfg
+            defaultMode: 288 # octal 0440: owner+group read-only
             optional: true # authentication is optional
         - name: rbac
           secret:
             secretName: secret-factory-rbac
+            defaultMode: 288 # octal 0440: owner+group read-only
             optional: true # authentication is optional
         - name: oci-registry
           secret:
             secretName: secret-factory-oci-registry
+            defaultMode: 288 # octal 0440: owner+group read-only
             optional: true # oci authentication is optional
         - name: signing-cfg
           secret:
             secretName: secret-factory-signing-cfg
+            defaultMode: 288 # octal 0440: owner+group read-only
             optional: true # authentication is optional
         - name: extensions-cfg
           configMap:
@@ -221,6 +229,7 @@ spec:
         - name: features-cfg
           secret:
             secretName: features-cfg
+            defaultMode: 288 # octal 0440: owner+group read-only
             optional: true
         - name: sprints
           configMap:
