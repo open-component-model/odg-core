@@ -30,12 +30,6 @@ rules:
   - apiGroups:
       - delivery-gear.gardener.cloud
     resources:
-      - logcollections
-    verbs:
-      - list
-  - apiGroups:
-      - delivery-gear.gardener.cloud
-    resources:
       - runtimeartefacts
     verbs:
       - create

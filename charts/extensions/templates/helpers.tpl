@@ -25,9 +25,8 @@ The service account name matches the (sub-)chart name; reference it via
 
 Per-extension rules are declared in `charts/extensions/values.yaml` under
 `<chart>.rbac.rules`. `update` is used wherever the code writes via
-`replace_namespaced_*` (claim/unclaim backlog items, pushing log CRDs, scaling
-deployments); `patch` is only granted where `patch_namespaced_*` is actually called
-(artefact-enumerator priority bump).
+`replace_namespaced_*` (claim/unclaim backlog items, scaling deployments); `patch`
+is only granted where `patch_namespaced_*` is actually called (artefact-enumerator priority bump).
 */}}
 {{/*
 Renders the OTel env vars shared by all ODG workloads. `global.otlpEndpoint` is

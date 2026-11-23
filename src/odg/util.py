@@ -1,5 +1,4 @@
 import argparse
-import atexit
 import collections.abc
 import dataclasses
 import datetime
@@ -18,7 +17,6 @@ import structlog
 import consts
 import ctx_util
 import k8s.backlog
-import k8s.logging
 import k8s.model
 import k8s.util
 import lookups
@@ -46,7 +44,7 @@ class Arguments:
     }
     K8S_NAMESPACE = {
         'name': '--k8s-namespace',
-        'help': 'specify kubernetes cluster namespace to interact with extensions (and logs)',
+        'help': 'specify kubernetes cluster namespace to interact with extensions',
         'default': os.environ.get('K8S_TARGET_NAMESPACE', 'delivery'),
     }
     EXTENSIONS_CFG_PATH = {
@@ -137,9 +135,6 @@ def process_backlog_items(
     Make sure the passed-in `callback` accepts all these arguments, even if they are not required for
     the specific use-case, for example by allowing `**kwargs`.
 
-    Also, for convenience, this function will initialise loggers which will periodically write the
-    logs to the Kubernetes custom resource `LogCollection` for monitoring via the Delivery-Dashboard.
-
     If a `local_debug_artefact` is passed, the interaction with backlog items from a Kubernetes
     cluster will be shortcut and instead the passed-in artefact will be used for a dummy backlog
     item. This is useful for local development scenarios.
@@ -154,18 +149,6 @@ def process_backlog_items(
 
     if not local_debug_artefact:
         _kubernetes_api = k8s.util.kubernetes_api(kubeconfig_path=parsed_arguments.kubeconfig)
-
-        k8s.logging.init_logging_thread(
-            service=service,
-            namespace=namespace,
-            kubernetes_api=_kubernetes_api,
-        )
-        atexit.register(
-            k8s.logging.log_to_crd,
-            service=service,
-            namespace=namespace,
-            kubernetes_api=_kubernetes_api,
-        )
 
     if not (extensions_cfg_path := parsed_arguments.extensions_cfg_path):
         extensions_cfg_path = paths.extensions_cfg_path()

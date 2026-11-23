@@ -8,7 +8,6 @@ import structlog
 import urllib3.exceptions
 
 import k8s.backlog
-import k8s.logging
 import k8s.model
 import k8s.util
 import odg.extensions_cfg
@@ -18,7 +17,6 @@ import odg.util
 import paths
 
 logger = structlog.get_logger(__name__)
-k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging()
 odg.telemetry.configure_telemetry()
 
@@ -139,12 +137,6 @@ def main():
     )
     kubernetes_api = k8s.util.kubernetes_api(kubeconfig_path=parsed_arguments.kubeconfig)
     namespace = parsed_arguments.k8s_namespace
-
-    k8s.logging.init_logging_thread(
-        service=odg.extensions_cfg.Services.BACKLOG_CONTROLLER,
-        namespace=namespace,
-        kubernetes_api=kubernetes_api,
-    )
 
     if not (extensions_cfg_path := parsed_arguments.extensions_cfg_path):
         extensions_cfg_path = paths.extensions_cfg_path()

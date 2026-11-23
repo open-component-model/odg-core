@@ -1,7 +1,6 @@
 import collections.abc
 import datetime
 import http
-import logging
 
 import aiohttp.web
 import dacite
@@ -86,93 +85,6 @@ class ContainerStatuses(aiohttp.web.View):
                 ),
             ),
             dumps=util.dict_to_json_factory,
-        )
-
-
-def iter_log_collections(
-    service_filter: list[str],
-    log_level: int,
-    namespace: str,
-    kubernetes_api: k8s.util.KubernetesApi,
-) -> collections.abc.Generator[dict, None, None]:
-    log_collections = kubernetes_api.custom_kubernetes_api.list_namespaced_custom_object(
-        group=k8s.model.LogCollectionCrd.DOMAIN,
-        version=k8s.model.LogCollectionCrd.VERSION,
-        plural=k8s.model.LogCollectionCrd.PLURAL_NAME,
-        namespace=namespace,
-    )
-
-    for log_collection in log_collections.get('items'):
-        spec = log_collection.get('spec')
-
-        if not (
-            spec.get('service') in service_filter
-            and logging._nameToLevel[spec.get('logLevel').upper()] == log_level
-        ):
-            continue
-
-        yield log_collection
-
-
-class LogCollections(aiohttp.web.View):
-    required_features = (features.FeatureClusterAccess,)
-
-    async def get(self):
-        """
-        ---
-        tags:
-        - Service extensions
-        parameters:
-        - in: query
-          name: service
-          required: false
-          schema:
-            type: array
-            items:
-              type: string
-        - in: query
-          name: log_level
-          required: true
-          schema:
-            type: string
-            enum:
-            - ERROR
-            - WARNING
-            - INFO
-            - DEBUG
-        responses:
-          "200":
-            description: Successful operation.
-            content:
-              application/json:
-                schema:
-                  type: array
-                  items:
-                    type: object
-        """
-        params = self.request.rel_url.query
-
-        extensions_cfg = features.get_feature(features.FeatureExtensionsConfiguration).extensions_cfg
-
-        service_filter = params.getall(
-            key='service',
-            default=list(extensions_cfg.enabled_extensions(convert_to_camel_case=True))
-            if extensions_cfg
-            else [],
-        )
-
-        log_level = util.param(params, 'log_level', required=True)
-        log_level = logging._nameToLevel[log_level.upper()]
-
-        return aiohttp.web.json_response(
-            data=tuple(
-                iter_log_collections(
-                    service_filter=service_filter,
-                    log_level=log_level,
-                    namespace=self.request.app[consts.APP_NAMESPACE],
-                    kubernetes_api=self.request.app[consts.APP_KUBERNETES_API],
-                ),
-            ),
         )
 
 

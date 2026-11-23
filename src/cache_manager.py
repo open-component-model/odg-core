@@ -7,7 +7,6 @@ supplied configuration.
 """
 
 import asyncio
-import atexit
 import collections.abc
 import datetime
 
@@ -28,8 +27,6 @@ import ctx_util
 import deliverydb
 import deliverydb.model as dm
 import deliverydb.util as du
-import k8s.logging
-import k8s.util
 import lookups
 import odg.extensions_cfg
 import odg.findings
@@ -41,7 +38,6 @@ import odg_client
 import paths
 
 logger = structlog.get_logger(__name__)
-k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging()
 odg.telemetry.configure_telemetry()
 
@@ -384,21 +380,7 @@ async def main():
     parsed_arguments = odg.util.parse_args()
 
     namespace = parsed_arguments.k8s_namespace
-
     secret_factory = ctx_util.secret_factory()
-    kubernetes_api = k8s.util.kubernetes_api(kubeconfig_path=parsed_arguments.kubeconfig)
-
-    k8s.logging.init_logging_thread(
-        service=odg.extensions_cfg.Services.CACHE_MANAGER,
-        namespace=namespace,
-        kubernetes_api=kubernetes_api,
-    )
-    atexit.register(
-        k8s.logging.log_to_crd,
-        service=odg.extensions_cfg.Services.CACHE_MANAGER,
-        namespace=namespace,
-        kubernetes_api=kubernetes_api,
-    )
 
     if not (extensions_cfg_path := parsed_arguments.extensions_cfg_path):
         extensions_cfg_path = paths.extensions_cfg_path()

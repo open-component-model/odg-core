@@ -24,12 +24,6 @@ class Crd:
 
 
 @dataclasses.dataclass(frozen=True)
-class LogCollectionCrd(Crd):
-    KIND = 'LogCollection'
-    PLURAL_NAME = 'logcollections'
-
-
-@dataclasses.dataclass(frozen=True)
 class BacklogItemCrd(Crd):
     KIND = 'BacklogItem'
     PLURAL_NAME = 'backlogitems'

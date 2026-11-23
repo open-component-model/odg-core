@@ -1,4 +1,3 @@
-import atexit
 import collections.abc
 import datetime
 
@@ -7,8 +6,6 @@ import ocm.iter
 import ocm.retrieve
 import structlog
 
-import k8s.logging
-import k8s.util
 import lookups
 import odg.extensions_cfg
 import odg.logging_cfg
@@ -21,7 +18,6 @@ import rescore.utility
 import util
 
 logger = structlog.get_logger(__name__)
-k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging()
 odg.telemetry.configure_telemetry()
 
@@ -294,21 +290,6 @@ def main():
             odg.util.Arguments.EXTENSIONS_CFG_PATH,
             odg.util.Arguments.DELIVERY_SERVICE_URL,
         ),
-    )
-
-    namespace = parsed_arguments.k8s_namespace
-    kubernetes_api = k8s.util.kubernetes_api(kubeconfig_path=parsed_arguments.kubeconfig)
-
-    k8s.logging.init_logging_thread(
-        service=odg.extensions_cfg.Services.SLA_VIOLATION_PROFILER,
-        namespace=namespace,
-        kubernetes_api=kubernetes_api,
-    )
-    atexit.register(
-        k8s.logging.log_to_crd,
-        service=odg.extensions_cfg.Services.SLA_VIOLATION_PROFILER,
-        namespace=namespace,
-        kubernetes_api=kubernetes_api,
     )
 
     if not (extensions_cfg_path := parsed_arguments.extensions_cfg_path):

@@ -9,7 +9,6 @@ import structlog
 import crypto_extension.cbom
 import crypto_extension.model
 import crypto_extension.validate
-import k8s.logging
 import k8s.util
 import odg.extensions_cfg
 import odg.findings
@@ -22,7 +21,6 @@ import paths
 import secret_mgmt
 
 logger = structlog.get_logger(__name__)
-k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging()
 odg.telemetry.configure_telemetry()
 
