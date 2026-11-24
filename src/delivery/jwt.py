@@ -2,6 +2,8 @@
 This module comprises model classes to define JSON Web Keys according
 to https://datatracker.ietf.org/doc/html/rfc7518 as well as convenience
 functions to it.
+
+Deprecated: use `odg_client.jwt` instead.
 """
 
 import base64
