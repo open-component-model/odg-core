@@ -141,8 +141,8 @@ This list provides an overview.
 | `odg-core-libs` | Python Package | Core APIs and functionalities. Contains the ODG web server. | [PyPi](https://pypi.org/project/odg-core-libs/) |
 | `odg-client` | Python Package | Python HTTP client library to interact with the ODG-Core API | [PyPi](https://pypi.org/project/odg-client/) |
 | `bdba-client` | Python Package | Python HTTP client library to interact with BlackDuck Binary Analysis | [PyPi](https://pypi.org/project/bdba-client/) |
-| `odg-core` | OCI Image | Filesystem to run ODG-Core and ODG extensions in cloud environments | [GCP](https://europe-docker.pkg.dev/gardener-project/releases/odg/core) |
-| `odg-core` | OCM Component | Software component referencing all delivery artefacts and metadata | [OCM Repo](https://europe-docker.pkg.dev/gardener-project/releases/component-descriptors/ocm.software/open-delivery-gear/core) |
+| `odg-core` | OCI Image | Filesystem to run ODG-Core and ODG extensions in cloud environments | [GHCR](https://ghcr.io/open-component-model/odg/images/core) |
+| `odg-core` | OCM Component | Software component referencing all delivery artefacts and metadata | [OCM Repo](https://ghcr.io/open-component-model/component-descriptors/ocm.software/open-delivery-gear/core) |
 
 ---
 

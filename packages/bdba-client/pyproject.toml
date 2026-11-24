@@ -8,7 +8,8 @@ include = ["bdba*"]
 
 [project]
 name = "bdba-client"
-version = "0.15.0"
+# set by release-client-package workflow
+version = "0.0.0"
 requires-python = ">=3.14"
 dependencies = [
     "cachecontrol==0.14.4",

@@ -1,0 +1,114 @@
+name: ocm.software/open-delivery-gear/core
+version: "${VERSION}"
+provider:
+  name: ocm.software
+labels:
+  - name: odg.ocm.software/responsibles
+    value:
+      - github_hostname: github.com
+        teamname: open-component-model/maintainers
+        type: githubTeam
+resources:
+  - name: core
+    type: ociImage
+    version: "${VERSION}"
+    relation: local
+    access:
+      type: OCIImage/v1
+      imageReference: "${CORE_IMAGE_REF}"
+    labels:
+      - name: security.ocm.software/risk-profile
+        value:
+          network_exposure: public
+          authentication_enforced: true
+          user_interaction: end-user
+          confidentiality_requirement: high
+          integrity_requirement: high
+          availability_requirement: high
+  - name: bootstrapping
+    type: helmChart
+    version: "${VERSION}"
+    extraIdentity:
+      type: helmChart
+    relation: local
+    access:
+      type: OCIImage/v1
+      imageReference: "${BOOTSTRAPPING_CHART_REF}"
+  - name: delivery-service
+    type: helmChart
+    version: "${VERSION}"
+    extraIdentity:
+      type: helmChart
+    relation: local
+    access:
+      type: OCIImage/v1
+      imageReference: "${DELIVERY_SERVICE_CHART_REF}"
+  - name: extensions
+    type: helmChart
+    version: "${VERSION}"
+    extraIdentity:
+      type: helmChart
+    relation: local
+    access:
+      type: OCIImage/v1
+      imageReference: "${EXTENSIONS_CHART_REF}"
+  - name: postgresql
+    type: ociImage
+    version: 16.8.0
+    relation: external
+    access:
+      type: OCIImage/v1
+      imageReference: europe-docker.pkg.dev/gardener-project/releases/ocm-gear/postgres:16.8.0
+    labels:
+      - name: security.ocm.software/risk-profile
+        value:
+          authentication_enforced: true
+          availability_requirement: high
+          confidentiality_requirement: high
+          integrity_requirement: high
+          network_exposure: protected
+          user_interaction: operator
+  - name: postgresql
+    type: helmChart
+    version: 16.6.1
+    extraIdentity:
+      type: helmChart
+    relation: external
+    access:
+      type: OCIImage/v1
+      imageReference: europe-docker.pkg.dev/gardener-project/releases/charts/ocm-gear/postgresql:16.6.1
+  - name: odg-extension-definitions
+    type: odg-extension
+    version: "${VERSION}"
+    relation: local
+    input:
+      type: Dir/v1
+      path: ./extension-definitions
+      compress: true
+  - name: extensions
+    type: helmchart-imagemap
+    version: "${VERSION}"
+    extraIdentity:
+      type: helmchart-imagemap
+    relation: local
+    input:
+      type: File/v1
+      path: helmchart-imagemaps/extensions.json
+  - name: delivery-service
+    type: helmchart-imagemap
+    version: "${VERSION}"
+    extraIdentity:
+      type: helmchart-imagemap
+    relation: local
+    input:
+      type: File/v1
+      path: helmchart-imagemaps/delivery-service.json
+  - name: postgresql
+    type: helmchart-imagemap
+    version: "${VERSION}"
+    extraIdentity:
+      type: helmchart-imagemap
+    relation: local
+    input:
+      type: File/v1
+      path: helmchart-imagemaps/postgresql.json

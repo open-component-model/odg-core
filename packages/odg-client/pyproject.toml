@@ -9,7 +9,8 @@ include = ["delivery*", "odg_client*"]
 [project]
 name = "odg-client"
 description = "Client library for the Open Delivery Gear"
-version = "0.18.0"
+# set by release-client-package workflow
+version = "0.0.0"
 requires-python = ">=3.14"
 dependencies = [
     "dacite==1.9.2",
