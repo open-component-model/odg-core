@@ -7,6 +7,8 @@ import tarfile
 import tempfile
 import time
 
+import boto3
+import botocore.config
 import botocore.exceptions
 import dacite
 import oci.client
@@ -309,7 +311,14 @@ def _iter_blob_descriptors_for_s3(
         secret_factory=secret_factory,
         secret_name=aws_secret_name,
     )
-    s3_client = aws_secret.session.client('s3')
+    if aws_secret:
+        s3_client = aws_secret.session.client('s3')
+    else:
+        logger.info('no AWS credentials found, attempting anonymous auth')
+        s3_client = boto3.Session().client(
+            's3',
+            config=botocore.config.Config(signature_version=botocore.UNSIGNED),
+        )
 
     if isinstance(s3_access, ocm.LegacyS3Access):
         bucket = s3_access.bucketName
