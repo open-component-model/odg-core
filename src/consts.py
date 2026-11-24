@@ -8,6 +8,7 @@ import aiohttp.web
 import sqlalchemy.ext.asyncio as sqlasync
 
 APP_BASE_URL = aiohttp.web.AppKey('base_url', str)
+APP_ALLOW_ORIGINS = aiohttp.web.AppKey('allow_origins', tuple[str, ...])
 APP_COMPONENT_DESCRIPTOR_LOOKUP = 'component_descriptor_lookup'
 APP_GITHUB_API_LOOKUP = 'github_api_lookup'
 APP_GITHUB_REPO_LOOKUP = 'github_repo_lookup'

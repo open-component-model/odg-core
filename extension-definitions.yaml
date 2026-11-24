@@ -21,6 +21,14 @@ installation:
     helm_chart_name: delivery-service
     value: delivery-service.${base_url}
     value_type: python-string-template
+  - helm_attribute: envVars.BASE_URL
+    helm_chart_name: delivery-service
+    value: https://delivery-service.${base_url}
+    value_type: python-string-template
+  - helm_attribute: envVars.ALLOW_ORIGINS
+    helm_chart_name: delivery-service
+    value: https://delivery-dashboard.${base_url}
+    value_type: python-string-template
   - helm_attribute: target_namespace
     helm_chart_name: delivery-service
     value: ${target_namespace}
