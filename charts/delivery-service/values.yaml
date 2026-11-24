@@ -20,6 +20,51 @@ gateway:
   enabled: false
   enableTls: true
   fullnameOverride: open-delivery-gear
+# Tiered NetworkPolicy knobs (delivery-service chart). The shipped policies
+# restrict egress to DNS, the Kubernetes API, the delivery database (5432) and
+# HTTPS (443), and ingress to same-namespace pods plus listed gateway namespaces.
+netpol:
+  # labels selecting the cluster DNS namespace (default kube-system);
+  # OpenShift example: {kubernetes.io/metadata.name: openshift-dns}
+  dnsNamespaceLabels: {}
+  # ports offered to the DNS resolver's pods (UDP+TCP each): 53 covers
+  # upstream CoreDNS, 8053 Gardener shoots (coredns PortServer), 5353
+  # OpenShift dns-default — CNIs differ on whether they enforce pre-DNAT
+  # (Service port 53) or post-DNAT (pod port), so list all that may apply
+  dnsPorts: [53, 8053, 5353]
+  # NodeLocal DNSCache link-local IPs (default [169.254.20.10], kubernetes'
+  # default): pods on clusters with NodeLocal DNS query this IP directly, so
+  # each entry becomes a /32 ipBlock in the DNS rule. Set [] on clusters
+  # without NodeLocal DNS (a default entry is harmless there).
+  dnsNodeLocalIps: [169.254.20.10]
+  # CIDRs of database hosts outside the cluster (port 5432). Without entries,
+  # only the in-cluster postgres pods (label pair app.kubernetes.io/name=postgresql
+  # + component=primary, stable across deployments) are reachable.
+  postgresCidrs: []
+  # namespaces allowed to ingress beyond same-namespace pods (matched via the
+  # standard kubernetes.io/metadata.name label). An explicitly empty list
+  # renders no extra namespaces (gateway data plane inside the release
+  # namespace is already covered by the same-namespace rule); only an UNSET
+  # key falls back to envoy-gateway's conventional namespace.
+  gatewayNamespaceNames: [envoy-gateway-system]
+  # client label rendered onto the pods, required to reach a database whose
+  # chart network policy runs with primary.networkPolicy.allowExternal=false
+  # (upstream admits only <fullname>-client=true pods in its namespace).
+  # NOTE: when the database chart is rendered without fullnameOverride (e.g.
+  # odg-operator's default helm template name), the upstream client's label
+  # key becomes `release-name-postgresql-client` — set it here accordingly.
+  dbClientLabelKey: "delivery-db-client"
+  dbClientLabelValue: "true"
+  # pod labels selecting the in-namespace OpenTelemetry collector as an egress
+  # target for trace/metric export (TCP 4317+4318); a selector that matches
+  # nothing is harmless.
+  otlpCollectorLabels:
+    app.kubernetes.io/name: opentelemetry-collector
+  # extra egress rules rendered verbatim into the policy (list of full
+  # NetworkPolicy egress rule dicts) — for targets the tiers cannot express:
+  # cross-namespace/external collectors, egress proxies, registries on
+  # non-443 ports, databases on non-5432 ports
+  extraEgress: []
 host: delivery-service
 limitRange:
   defaultRequest:

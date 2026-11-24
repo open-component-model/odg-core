@@ -21,6 +21,7 @@ spec:
         metadata:
           labels:
             app: {{ $podName }}
+            {{- include "odg.labels.dbClient" . | nindent 12 }}
         spec:
           {{- with .Values.global.imagePullSecrets }}
           imagePullSecrets:
@@ -88,16 +89,4 @@ spec:
                 optional: true
           restartPolicy: Never
 ---
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-egress-from-access-manager
-  namespace: {{ .Values.target_namespace | default .Release.Namespace }}
-spec:
-  podSelector:
-    matchLabels:
-      app: {{ $podName }}
-  policyTypes:
-    - Egress
-  egress:
-    - {}  # Allows all egress traffic to any destination and port
+{{- include "odg.netpol.egress" (list $podName . (dict "postgres" true "internet" true)) }}
