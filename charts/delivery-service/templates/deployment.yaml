@@ -27,6 +27,12 @@ spec:
       {{- end }}
       labels:
         app: {{ $podName }}
+        {{- $dsNp := .Values.netpol | default dict }}
+        {{/* required once the database chart tightens its network policy
+        (primary.networkPolicy.allowExternal: false → only labelled client pods
+        in the database namespace are admitted); key matches the database
+        chart's fullname, override it if the release/chart name differ */}}
+        {{ $dsNp.dbClientLabelKey | default "delivery-db-client" }}: {{ $dsNp.dbClientLabelValue | default "true" | quote }}
       {{- if default dict (.Values.pod).labels }}
       {{- range $annotation, $value := .Values.pod.labels }}
         {{ $annotation }}: {{ $value }}
@@ -137,7 +143,7 @@ spec:
           {{- if default dict .Values.envVars }}
           {{- range $key, $value := .Values.envVars }}
           - name: {{ $key }}
-            value: {{ $value }}
+            value: {{ $value | quote }}
           {{- end }}
           {{- end }}
           volumeMounts:
@@ -264,7 +270,80 @@ spec:
   policyTypes:
     - Egress
   egress:
-    - {}  # Allows all egress traffic to any destination and port
+    # cluster DNS — pod name resolution breaks without this; ports default to
+    # [53, 8053, 5353] (Service port 53 pre-DNAT vs pod port post-DNAT:
+    # Gardener CoreDNS serves on 8053, OpenShift dns-default on 5353)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              {{- $np := .Values.netpol | default dict -}}
+              {{- toYaml ($np.dnsNamespaceLabels | default (dict "kubernetes.io/metadata.name" "kube-system")) | nindent 14 }}
+        {{/* NodeLocal DNSCache: pods query the link-local IP on the node
+        (default 169.254.20.10), which namespace selectors can never match —
+        set netpol.dnsNodeLocalIps: [] on clusters without NodeLocal DNS */}}
+        {{- $dnsNodeLocalIps := list "169.254.20.10" }}
+        {{- if hasKey $np "dnsNodeLocalIps" }}
+        {{- $dnsNodeLocalIps = $np.dnsNodeLocalIps }}
+        {{- end }}
+        {{- range $ip := $dnsNodeLocalIps }}
+        - ipBlock:
+            cidr: {{ $ip }}/32
+        {{- end }}
+      ports:
+        {{- range $port := $np.dnsPorts | default (list 53 8053 5353) }}
+        - port: {{ $port }}
+          protocol: UDP
+        - port: {{ $port }}
+          protocol: TCP
+        {{- end }}
+    # delivery-database: in-cluster postgres pods by default (label pair is
+    # stable across environments); external database hosts via netpol.postgresCidrs
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+              app.kubernetes.io/component: primary
+        {{- range $cidr := ($np.postgresCidrs | default (list)) }}
+        - ipBlock:
+            cidr: {{ $cidr | quote }}
+        {{- end }}
+      ports:
+        - port: 5432
+          protocol: TCP
+    # HTTPS to arbitrary external endpoints (registries, APIs, CDNs)
+    # cannot be narrowed by hostname without L7/DNS-aware egress filtering
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - port: 443
+          protocol: TCP
+    # OpenTelemetry collector in the release namespace (gRPC 4317 + HTTP 4318):
+    # the delivery-service carries the OTEL endpoint env vars; if no collector
+    # matches the selector this tier is inert. Override the selector via
+    # netpol.otlpCollectorLabels
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- toYaml ($np.otlpCollectorLabels | default (dict "app.kubernetes.io/name" "opentelemetry-collector")) | nindent 14 }}
+      ports:
+        - port: 4317
+          protocol: TCP
+        - port: 4318
+          protocol: TCP
+    # Kubernetes API server: destination is the kubernetes.default ClusterIP:443
+    # pre-DNAT (covered by the 0.0.0.0/0:443 tier above) but the translated
+    # endpoint IP:6443 post-DNAT, which needs this explicit tier
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - port: 6443
+          protocol: TCP
+    {{- if $np.extraEgress }}
+    # verbatim extra egress rules from netpol.extraEgress
+    {{- toYaml $np.extraEgress | nindent 4 }}
+    {{- end }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -278,7 +357,27 @@ spec:
   policyTypes:
     - Ingress
   ingress:
-  - ports:
+  - from:
+    # workloads in the same namespace (extensions, dashboard)
+    - podSelector: {}
+    # ingress gateway namespaces (e.g. envoy-gateway-system on OpenShift); traffic
+    # arrives via the Gateway/HTTPRoute. Not needed where the gateway data plane
+    # runs in the same namespace (matched by the podSelector above) — matched via
+    # the standard kubernetes.io/metadata.name label every namespace carries
+    {{- $gwNamespaces := list "envoy-gateway-system" }}
+    {{/* hasKey instead of default: an explicitly empty list must render no
+    extra namespaces; only an unset key falls back to envoy-gateway-system */}}
+    {{- if hasKey $np "gatewayNamespaceNames" }}
+    {{- $gwNamespaces = $np.gatewayNamespaceNames }}
+    {{- end }}
+    {{- range $gwNs := $gwNamespaces }}
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ $gwNs }}
+    {{- end }}
+    # kubelet probes arrive as host/node traffic and bypass pod network policy on
+    # CNIs with host connectivity semantics (calico, cilium); probes remain healthy
+    ports:
     - protocol: TCP
       port: 8080
     - protocol: TCP

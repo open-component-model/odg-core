@@ -1,30 +1,29 @@
-import collections.abc
-
 import aiohttp.typedefs
 import aiohttp.web
+
+import consts
 
 
 def cors_headers(
     request: aiohttp.web.Request,
-    allow_origins: str | collections.abc.Iterable[str] = '*',
-    allow_credentials: str | collections.abc.Iterable[str] = '*',
 ) -> dict:
+    # origin is only sent by browsers on cross-origin requests; server-to-server
+    # callers (e.g. extension pods via internal DNS) omit it -> no CORS headers
     headers = {}
 
     if not (origin := request.headers.get('Origin')):
         return headers
 
-    if allow_origins != '*' and origin not in allow_origins:
+    allow_origins = request.app[consts.APP_ALLOW_ORIGINS]
+    if origin not in allow_origins:
         return headers
 
     if not request.headers.get('Access-Control-Allow-Origin'):
-        set_origin = '*' if allow_origins == '*' else origin
-
-        if allow_credentials == '*' or origin in allow_credentials:
-            set_origin = origin
-            headers['Access-Control-Allow-Credentials'] = 'true'
-
-        headers['Access-Control-Allow-Origin'] = set_origin
+        # every allowed origin is a credentialed origin: the dashboard always
+        # sends `credentials: include`, so echo the origin (never '*', which
+        # browsers reject for credentialed requests)
+        headers['Access-Control-Allow-Origin'] = origin
+        headers['Access-Control-Allow-Credentials'] = 'true'
 
     if request.method == 'OPTIONS' and 'Access-Control-Request-Method' in request.headers:
         allow_methods = request.headers.get('Access-Control-Request-Method')
@@ -36,10 +35,7 @@ def cors_headers(
     return headers
 
 
-def cors_middleware(
-    allow_origins: str | collections.abc.Iterable[str] = '*',
-    allow_credentials: str | collections.abc.Iterable[str] = '*',
-) -> aiohttp.typedefs.Middleware:
+def cors_middleware() -> aiohttp.typedefs.Middleware:
 
     @aiohttp.web.middleware
     async def middleware(
@@ -51,13 +47,7 @@ def cors_middleware(
         except Exception as e:
             response = e
 
-        response.headers.extend(
-            cors_headers(
-                request=request,
-                allow_origins=allow_origins,
-                allow_credentials=allow_credentials,
-            ),
-        )
+        response.headers.extend(cors_headers(request=request))
 
         if request.method == 'OPTIONS':
             # this is a preflight request -> skip processing of this request in other middlewares
@@ -71,17 +61,9 @@ def cors_middleware(
 async def _on_response_prepare_handler(
     request: aiohttp.web.Request,
     response: aiohttp.web.StreamResponse,
-    allow_origins: str | collections.abc.Iterable[str] = '*',
-    allow_credentials: str | collections.abc.Iterable[str] = '*',
 ):
     """
     Signal handler for on_response_prepare to add CORS headers before response is sent.
     This is necessary for StreamResponse where headers must be set before prepare() is called.
     """
-    response.headers.update(
-        cors_headers(
-            request=request,
-            allow_origins=allow_origins,
-            allow_credentials=allow_credentials,
-        ),
-    )
+    response.headers.update(cors_headers(request=request))

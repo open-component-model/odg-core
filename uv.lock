@@ -2,13 +2,6 @@ version = 1
 revision = 5
 requires-python = ">=3.14"
 
-[manifest]
-members = [
-    "bdba-client",
-    "odg-client",
-    "odg-core-libs",
-]
-
 [[package]]
 name = "aiohappyeyeballs"
 version = "2.7.1"
@@ -246,20 +239,15 @@ wheels = [
 [[package]]
 name = "bdba-client"
 version = "0.15.0"
-source = { editable = "packages/bdba-client" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cachecontrol" },
     { name = "dacite" },
     { name = "python-dateutil" },
     { name = "requests" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "cachecontrol", specifier = "==0.14.4" },
-    { name = "dacite", specifier = "==1.9.2" },
-    { name = "python-dateutil", specifier = "==2.9.0.post0" },
-    { name = "requests", specifier = "==2.34.2" },
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5f/ee/278b545f18bafb9fa38677071f8725de0c092b032a77cfdf16ac4b56c330/bdba_client-0.15.0-py3-none-any.whl", hash = "sha256:e45bdd2a5746822bab789564f7a4ccf3a7a777bc02a67d553771e8c2d13193a2", size = 14094, upload-time = "2026-07-27T07:22:27.494Z" },
 ]
 
 [[package]]
@@ -1572,7 +1560,7 @@ wheels = [
 [[package]]
 name = "odg-client"
 version = "0.18.0"
-source = { editable = "packages/odg-client" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "dacite" },
     { name = "gardener-ocm" },
@@ -1581,15 +1569,8 @@ dependencies = [
     { name = "requests" },
     { name = "structlog" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "dacite", specifier = "==1.9.2" },
-    { name = "gardener-ocm", specifier = "==1.2872.0" },
-    { name = "pycryptodome", specifier = "==3.24.1" },
-    { name = "pyjwt", specifier = "==2.15.1" },
-    { name = "requests", specifier = "==2.34.2" },
-    { name = "structlog", specifier = "==26.1.0" },
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/12/11/8a2ec14f961064f75353adf972d907d2a2b1961ea6532836fa2ccc26a00a/odg_client-0.18.0-py3-none-any.whl", hash = "sha256:fb257aaa8fa1c1c49cbdcb8dee72d7dc07ce9cf81caaf62863b530f7d68fb5ec", size = 22225, upload-time = "2026-11-17T19:05:32.306Z" },
 ]
 
 [[package]]
@@ -1657,7 +1638,7 @@ requires-dist = [
     { name = "aiohttp-swagger3", specifier = "==0.10.0" },
     { name = "alembic", specifier = "==1.20.1" },
     { name = "awesomeversion", specifier = "==25.8.0" },
-    { name = "bdba-client", editable = "packages/bdba-client" },
+    { name = "bdba-client", specifier = "==0.15.0" },
     { name = "boto3", specifier = "==1.44.0" },
     { name = "brotli", specifier = "==1.2.1" },
     { name = "cachetools", specifier = "==7.3.0" },
@@ -1673,7 +1654,7 @@ requires-dist = [
     { name = "mako", specifier = "==1.4.3" },
     { name = "mashumaro", specifier = "==3.23" },
     { name = "numpy", specifier = "==2.5.4" },
-    { name = "odg-client", editable = "packages/odg-client" },
+    { name = "odg-client", specifier = "==0.18.0" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", specifier = "==1.45.2" },
     { name = "opentelemetry-instrumentation-aiohttp-client", specifier = "==0.66b2" },
     { name = "opentelemetry-instrumentation-aiohttp-server", specifier = "==0.66b2" },

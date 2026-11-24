@@ -144,16 +144,7 @@ spec:
           configMap:
             name: clamav-freshclam-config
 ---
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-egress-from-clamav
-  namespace: {{ .Values.target_namespace | default .Release.Namespace }}
-spec:
-  podSelector:
-    matchLabels:
-      app: {{ $podName }}
-  policyTypes:
-    - Egress
-  egress:
-    - {}  # Allows all egress traffic to any destination and port
+# clamav scanners pull virus definitions from the freshclam private-mirror
+# Service on 8080 (PrivateMirror in freshclam-config.yaml; service port equals
+# container port, so pre-/post-DNAT coincide) in addition to the standard tiers
+{{ include "odg.netpol.egress" (list $podName . (dict "internet" true "targets" (list (dict "to" (list (dict "podSelector" (dict "matchLabels" (dict "app" "freshclam")))) "ports" (list (dict "port" 8080 "protocol" "TCP")))))) }}

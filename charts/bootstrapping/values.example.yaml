@@ -76,13 +76,9 @@ ocm_repo_mappings:
           - releases
         version_filter_overwrite: semver_releases
   - type: oci
-    repository: europe-docker.pkg.dev/gardener-project/releases
+    repository: ghcr.io/open-component-model
     labels:
       - releases
-  - type: oci
-    repository: europe-docker.pkg.dev/gardener-project/snapshots
-    labels:
-      - snapshots
 
 features_cfg:
   specialComponents:

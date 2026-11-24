@@ -16,87 +16,183 @@ permissions: {}
 
 jobs:
   preprocess:
-    runs-on: ubuntu-latest
     name: Preprocess
-    environment: release  # require approval to run
-    permissions: {}
+    runs-on: ubuntu-latest
+    environment: # require approval to run
+      name: release
+      deployment: false
+    permissions:
+      contents: read
     outputs:
-      release-candidate: ${{ steps.determine-rc.outputs.release-candidate }}
+      version: ${{ steps.version.outputs.version }}
     steps:
-      - name: Verify Release Branch
+      - name: Verify release branch
         run: |
           if [[ "$GITHUB_REF_TYPE" != "branch" || ! "$GITHUB_REF_NAME" =~ ^release-[0-9]+\.[0-9]+$ ]]; then
             echo "Error: release workflow must run on a 'release-<major>.<minor>' branch, got: $GITHUB_REF_NAME"
             echo "Hint: run the 'Prepare Release Candidate' workflow first to create a release branch."
             exit 1
           fi
-      - uses: gardener/cc-utils/.github/actions/trusted-checkout@bce63f62928717a11f610ec8022af9feb497d5df # v1
-      - name: Verify Component References Are No Release Candidates
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-tags: true
+          persist-credentials: false
+          sparse-checkout: |
+            .ocm
+      - name: Verify component references are no release candidates
         if: ${{ inputs.mode == 'regular' }}
         run: |
-          candidates=$(yq '.componentReferences[].version | select(test("-rc\\."))' .ocm/base-component.yaml)
+          candidates=$(yq '.componentReferences[].version | select(test("-rc\\."))' .ocm/component-constructor.yaml)
           if [[ -n "$candidates" ]]; then
             echo "Error: the following componentReference versions are release candidates:"
             echo "$candidates"
-            echo "All componentReferences in .ocm/base-component.yaml must be full releases before releasing."
+            echo "All componentReferences in .ocm/component-constructor.yaml must be full releases before releasing."
             exit 1
           fi
-      - name: Determine Release Candidate
-        id: determine-rc
-        if: ${{ inputs.mode == 'candidate' }}
+      - name: Determine version
+        id: version
         run: |
-          version=$(cat VERSION)
-          if [[ "$version" =~ -rc\.([0-9]+)$ ]]; then
-            release_candidate="${BASH_REMATCH[1]}"
+          set -euo pipefail
+
+          # extract major.minor from branch name "release-<major>.<minor>"
+          major_minor="${GITHUB_REF_NAME#release-}"
+
+          # greatest full-release tag for this major.minor (pre-release tags excluded)
+          last_final=$(git tag --list "${major_minor}.*" \
+            | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
+            | sort -V \
+            | tail -1 || true)
+
+          # greatest rc tag for this major.minor
+          last_rc_tag=$(git tag --list "${major_minor}.*" \
+            | grep -E '^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$' \
+            | sort -V \
+            | tail -1 || true)
+
+          # determine last_patch and last_rc from the greatest of the two
+          if [[ -z "${last_final}" && -z "${last_rc_tag}" ]]; then
+            last_patch=-1
+            last_rc=-1
+          elif [[ -z "${last_rc_tag}" ]]; then
+            last_patch=$(echo "${last_final}" | cut -d. -f3)
+            last_rc=-1
+          elif [[ -z "${last_final}" ]]; then
+            last_patch=$(echo "${last_rc_tag}" | cut -d. -f3 | cut -d- -f1)
+            last_rc=$(echo "${last_rc_tag}" | grep -oE 'rc\.[0-9]+$' | cut -d. -f2)
           else
-            release_candidate=0
+            final_patch=$(echo "${last_final}" | cut -d. -f3)
+            rc_patch=$(echo "${last_rc_tag}" | cut -d. -f3 | cut -d- -f1)
+            if (( rc_patch > final_patch )); then
+              last_patch="${rc_patch}"
+              last_rc=$(echo "${last_rc_tag}" | grep -oE 'rc\.[0-9]+$' | cut -d. -f2)
+            else
+              last_patch="${final_patch}"
+              last_rc=-1
+            fi
           fi
 
-          echo "Will use release candidate 'rc.${release_candidate}'"
-          echo "release-candidate=${release_candidate}" >> "$GITHUB_OUTPUT"
+          if [[ "${{ inputs.mode }}" == "candidate" ]]; then
+            if [[ "${last_rc}" == -1 ]]; then
+              next_patch=$(( last_patch + 1 ))
+            else
+              next_patch="${last_patch}"
+            fi
+            next_rc=$(( last_rc + 1 ))
+            version="${major_minor}.${next_patch}-rc.${next_rc}"
+          else
+            # regular release: promote current patch (drop rc suffix) or bump patch
+            if [[ "${last_rc}" == -1 ]]; then
+              # no rc in progress: bump patch directly
+              version="${major_minor}.$(( last_patch + 1 ))"
+            else
+              # promote the rc to a full release
+              version="${major_minor}.${last_patch}"
+            fi
+          fi
 
-  build:
+          echo "Determined version: ${version} (last final: ${last_final:-none}, last rc: ${last_rc_tag:-none})"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+  build-and-publish-artifacts:
+    name: Build and publish OCI artifacts
+    needs:
+      - preprocess
     uses: ./.github/workflows/build.yaml
-    needs:
-      - preprocess
     permissions:
-      contents: write
-      packages: write
+      attestations: write
+      contents: read
       id-token: write
+      packages: write
     with:
-      mode: release
-      version-prerelease: ${{ inputs.mode == 'candidate' && format('rc.{0}', needs.preprocess.outputs.release-candidate) || '' }}
+      version: ${{ needs.preprocess.outputs.version }}
 
-  release-to-github-and-bump:
-    uses: gardener/cc-utils/.github/workflows/release.yaml@bce63f62928717a11f610ec8022af9feb497d5df # v1
+  publish-component:
+    name: Publish OCM component
     needs:
-      - build
+      - build-and-publish-artifacts
       - preprocess
-    permissions:
-      contents: write
-      packages: write
-      id-token: write
-    with:
-      next-version: ${{ inputs.mode == 'candidate' && 'set-prerelease' || 'bump-patch' }}
-      release-candidate: ${{ inputs.mode == 'candidate' && needs.preprocess.outputs.release-candidate || '' }}
-      github-release-notes-recursion-depth: -1
-
-  pypi:
-    runs-on: ubuntu-latest
-    name: Publish to PYPI
-    needs:
-      - build
+    uses: ./.github/workflows/publish-component.yaml
     permissions:
       contents: read
       id-token: write
+      packages: write
+    with:
+      version: ${{ needs.preprocess.outputs.version }}
+      core-image-digest: ${{ needs.build-and-publish-artifacts.outputs.core-image-digest }}
+      bootstrapping-chart-digest: ${{ needs.build-and-publish-artifacts.outputs.bootstrapping-chart-digest }}
+      delivery-service-chart-digest: ${{ needs.build-and-publish-artifacts.outputs.delivery-service-chart-digest }}
+      extensions-chart-digest: ${{ needs.build-and-publish-artifacts.outputs.extensions-chart-digest }}
+
+  pypi:
+    runs-on: ubuntu-latest
+    name: Publish to PyPI
+    needs:
+      - publish-component
+    permissions:
+      id-token: write
     steps:
-      - name: Retrieve Distribution Packages
+      - name: Download distribution packages
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: distribution-packages
-      - name: Prepare Filesystem
-        run: |
-          tar xf distribution-packages.tar.gz
-          rm -rf dist/blobs.d dist/ocm_resources.yaml
+          path: dist/
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1 # assumes package to be located in `dist/`
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1
+
+  github-release:
+    name: Create GitHub release
+    runs-on: ubuntu-latest
+    needs:
+      - preprocess
+      - publish-component
+    environment:
+      name: release-branch
+      deployment: false
+    permissions: {}
+    steps:
+      - name: Generate app token
+        id: token
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: ${{ vars.RELEASE_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+      - name: Create tag and release
+        env:
+          VERSION: ${{ needs.preprocess.outputs.version }}
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+        run: |
+          set -euo pipefail
+
+          prerelease_flag=""
+          if [[ "${VERSION}" == *-rc.* ]]; then
+            prerelease_flag="--prerelease"
+          fi
+
+          gh release create "$VERSION" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$VERSION" \
+            --generate-notes \
+            --target "$GITHUB_SHA" \
+            ${prerelease_flag}

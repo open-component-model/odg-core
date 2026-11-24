@@ -1,29 +1,23 @@
 import os
 import tomllib
 
-import semver
 import setuptools
 
 
 own_dir = os.path.abspath(os.path.dirname(__file__))
 
 
-def requirements():
+def read_pyproject():
     with open(os.path.join(own_dir, 'packages', 'bdba-client', 'pyproject.toml'), 'rb') as f:
-        return tomllib.load(f)['project']['dependencies']
-
-
-def bump_version():
-    with open(os.path.join(own_dir, 'BDBA_CLIENT_VERSION')) as f:
-        return semver.Version.parse(f.read().strip()).bump_minor()
+        return tomllib.load(f)
 
 
 setuptools.setup(
     name='bdba-client',
-    version=str(bump_version()),
+    version=read_pyproject()['project']['version'],
     package_dir={'': '.'},
     python_requires='>=3.14',
     py_modules=[],
     packages=['bdba'],
-    install_requires=requirements(),
+    install_requires=read_pyproject()['project']['dependencies'],
 )

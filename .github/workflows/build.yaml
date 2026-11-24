@@ -1,320 +1,280 @@
-name: Build and Test
+name: Build and publish OCI artifacts
 
 on:
   workflow_call:
     inputs:
-      mode:
+      version:
+        description: Bare semver, no leading 'v' (0.7.0 or 0.7.0-rc.1)
         required: true
         type: string
-        description:
-          mode as expected by `cc-utils/.github/workflows/prepare`
-          either of
-          - snapshot
-          - release
-      version-prerelease:
-        required: true
-        type: string
+      publish:
+        description: Push images and charts to the registry and create attestations
+        required: false
+        type: boolean
+        default: true
+    outputs:
+      core-image-digest:
+        description: Digest of the published OCI image index
+        value: ${{ jobs.collect-image.outputs.core-image-digest }}
+      bootstrapping-chart-digest:
+        description: Digest of the published bootstrapping Helm chart
+        value: ${{ jobs.helm-chart.outputs.bootstrapping-chart-digest }}
+      delivery-service-chart-digest:
+        description: Digest of the published delivery-service Helm chart
+        value: ${{ jobs.helm-chart.outputs.delivery-service-chart-digest }}
+      extensions-chart-digest:
+        description: Digest of the published extensions Helm chart
+        value: ${{ jobs.helm-chart.outputs.extensions-chart-digest }}
 
 permissions: {}
 
+env:
+  REGISTRY: ghcr.io
+
 jobs:
-  prepare:
-    uses: gardener/cc-utils/.github/workflows/prepare.yaml@bce63f62928717a11f610ec8022af9feb497d5df # v1
-    permissions:
-      id-token: write
-    with:
-      mode: ${{ inputs.mode }}
-      version-prerelease: ${{ inputs.version-prerelease }}
-
-  packages:
+  build-core-libs:
+    name: Build Python core libs
     runs-on: ubuntu-latest
-    needs:
-      - prepare
-    permissions:
-      contents: read
-    outputs:
-      version: ${{ steps.packages.outputs.version }}
-    steps:
-      - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-      - uses: gardener/cc-utils/.github/actions/trusted-checkout@bce63f62928717a11f610ec8022af9feb497d5df # v1
-      - uses: gardener/cc-utils/.github/actions/install-gardener-gha-libs@bce63f62928717a11f610ec8022af9feb497d5df # v1
-      - name: create distribution packages
-        id: packages
-        run: |
-          set -eu
-
-          version=${{ needs.prepare.outputs.version }}
-          if [[ "${version}" == *-* ]]; then
-            # version was non-final - add suffix compliant w/ pep-440
-            version="${version%%-*}-dev0"
-          fi
-
-          echo "version: ${version}"
-          echo "version=${version}" >> "${GITHUB_OUTPUT}"
-
-          # pass finalised version to setup
-          export ODG_CORE_LIBS_VERSION=${version}
-
-          pkg_dir=dist
-          mkdir -p ${pkg_dir}
-          pkg_dir="$(readlink -f dist)"
-
-          for path in \
-            setup.py \
-          ; do
-          echo "building distribution package from ${path}"
-          uv run python3 ${path} \
-              bdist_wheel \
-              --dist-dir ${pkg_dir}
-          rm -rf build
-          done
-
-          echo "Built packages"
-          ls "${pkg_dir}"
-
-          blobs_dir="${pkg_dir}/blobs.d"
-          mkdir ${blobs_dir}
-          resources_file=resources.yaml
-
-          for package in \
-            odg-core-libs \
-            ; do
-            path="$(echo $package | tr - _)-*"
-            outf="${pkg_dir}/${package}.tar.gz"
-            tar cJf ${outf} -C ${pkg_dir} $(cd ${pkg_dir}; ls ${path})
-            mimetype=$(file -i ${outf} | cut -d: -f2 | cut -d' ' -f2-)
-            leng=$(stat -c"%s" ${outf})
-            digest="$(sha256sum ${outf} | cut -d' ' -f1)"
-            echo "\
-          - name: ${package}
-            version: ${{ needs.prepare.outputs.version }}
-            type: ${mimetype}
-            relation: local
-            access:
-              type: localBlob
-              localReference: sha256:${digest}
-              size: ${leng}
-              mediaType: ${mimetype}" \
-            >> ${resources_file}
-            mv ${outf} ${blobs_dir}/${digest}
-          done
-
-          cp "${resources_file}" dist/ocm_resources.yaml
-          tar czf distribution-packages.tar.gz dist
-      - name: export-ocm-fragments
-        uses: gardener/cc-utils/.github/actions/export-ocm-fragments@bce63f62928717a11f610ec8022af9feb497d5df # v1
-        with:
-          ocm-resources-file: dist/ocm_resources.yaml
-          blobs-directory: dist/blobs.d
-      - name: upload python-packages as artefact
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: distribution-packages
-          path: distribution-packages.tar.gz
-
-  odg-extension-definitions:
-    runs-on: ubuntu-latest
-    needs:
-      - prepare
     permissions:
       contents: read
     steps:
-      - uses: gardener/cc-utils/.github/actions/trusted-checkout@bce63f62928717a11f610ec8022af9feb497d5df # v1
-      - name: Install the latest version of uv
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install uv
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-      - name: Export odg-extension-definitions
+      - name: Build wheel
+        id: build
         run: |
           set -euo pipefail
 
-          echo "${{ needs.prepare.outputs.version }}" | uv run .ci/write-version
+          export ODG_CORE_LIBS_VERSION="${{ inputs.version }}"
 
-          mkdir blobs.d
-          tar czf blobs.d/extension_definitions.tar.gz extension-definitions.yaml
-      - uses: gardener/cc-utils/.github/actions/export-ocm-fragments@bce63f62928717a11f610ec8022af9feb497d5df # v1
+          uv run python3 setup.py bdist_wheel --dist-dir dist
+      - name: Upload artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          ocm-resources: |
-            name: odg-extension-definitions
-            type: odg-extension
-            relation: local
-            access:
-              type: localBlob
-              localReference: extension_definitions.tar.gz
-          blobs-directory: blobs.d
-
-  helmchart-imagemap:
-    runs-on: ubuntu-latest
-    needs:
-      - prepare
-    permissions:
-      contents: read
-    steps:
-      - uses: gardener/cc-utils/.github/actions/trusted-checkout@bce63f62928717a11f610ec8022af9feb497d5df # v1
-      - name: Export Helmchart-Imagemap
-        run: |
-          set -eu
-
-          mkdir blobs.d
-          mv postgresql-helmchart-imagemap.json blobs.d
-      - uses: gardener/cc-utils/.github/actions/export-ocm-fragments@bce63f62928717a11f610ec8022af9feb497d5df # v1
-        with:
-          ocm-resources: |
-            name: postgresql
-            type: helmchart-imagemap
-            extraIdentity:
-              type: helmchart-imagemap
-            relation: local
-            access:
-              type: localBlob
-              localReference: postgresql-helmchart-imagemap.json
-          blobs-directory: blobs.d
+          name: distribution-packages
+          path: dist/
 
   lint:
+    name: Lint
     runs-on: ubuntu-latest
     needs:
-      - packages
+      - build-core-libs
     permissions:
       contents: read
     steps:
-      - uses: gardener/cc-utils/.github/actions/trusted-checkout@bce63f62928717a11f610ec8022af9feb497d5df # v1
-      - name: Install the latest version of uv
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install uv
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-      - name: Retrieve Distribution Packages
+      - name: Download distribution packages
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: distribution-packages
-      - name: lint
+          path: dist/
+      - name: Lint and format
         run: |
-          tar xf distribution-packages.tar.gz -C /tmp
+          set -euo pipefail
 
-          echo "installing packages"
-          uv sync --find-links /tmp/dist
-
-          echo "running linters"
-          blobs_dir=blobs.d
-          mkdir $blobs_dir
-          bandit_logfile=bandit.log
-          bandit_evidence="${blobs_dir}/bandit.tar.gz"
-
-          bandit_extra_args="-f txt -o ${bandit_logfile}" \
-            make lint
-
-          # pass bandit.log + used cfg (pyproject.toml) as evidence
-          tar czf $bandit_evidence $bandit_logfile pyproject.toml
-
-          echo "running format checker"
+          uv sync --find-links dist
+          make lint
           make format
-      - uses: gardener/cc-utils/.github/actions/export-ocm-fragments@bce63f62928717a11f610ec8022af9feb497d5df # v1
-        with:
-          ocm-resources: |
-            name: sast-linting-evidence
-            relation: local
-            access:
-              type: localBlob
-              localReference: bandit.tar.gz
-            labels:
-              - name: odg.ocm.software/purposes
-                value:
-                  - lint
-                  - sast
-                  - pybandit
-              - name: gardener.cloud/comment
-                value: |
-                  we use bandit (linter) for SAST-Scans.
-                  See: https://bandit.readthedocs.io/en/latest/
-          blobs-directory: blobs.d
 
   unittests:
+    name: Unittests
     runs-on: ubuntu-latest
     needs:
-      - packages
+      - build-core-libs
     permissions:
       contents: read
     steps:
-      - uses: gardener/cc-utils/.github/actions/trusted-checkout@bce63f62928717a11f610ec8022af9feb497d5df # v1
-      - name: Install the latest version of uv
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install uv
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-      - name: Retrieve Distribution Packages
+      - name: Download distribution packages
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: distribution-packages
-      - name: run-tests
+          path: dist/
+      - name: Run tests
         run: |
-          tar xf distribution-packages.tar.gz -C /tmp
+          set -euo pipefail
 
-          echo "installing packages"
-          uv sync --find-links /tmp/dist
-
-          echo "running tests"
+          uv sync --find-links dist
           .ci/smoke-test
           make test
 
   oci-image:
-    name: Build OCI-Image
-    uses: gardener/cc-utils/.github/workflows/oci-ocm.yaml@bce63f62928717a11f610ec8022af9feb497d5df # v1
+    name: Build OCI image
+    runs-on: ${{ matrix.platform.runner }}
     needs:
-      - packages # needed indirectly (python-packages artefact)
-      - prepare
+      - build-core-libs
     permissions:
       contents: read
       packages: write
-      id-token: write
-    with:
-      name: core
-      version: ${{ needs.prepare.outputs.version }}
-      oci-registry: ${{ needs.prepare.outputs.oci-registry }}
-      oci-repository: odg/core
-      dockerfile: Dockerfile
-      ctx: oci-image
-      oci-platforms: linux/arm64,linux/amd64
-      build-ctx-artefact: distribution-packages
-      untar-build-ctx-artefact: distribution-packages.tar.gz
-      build-args: |
-        ODG_CORE_LIBS_VERSION=${{ needs.packages.outputs.version }}
-      ocm-labels: |
-        name: security.ocm.software/risk-profile
-        value:
-          network_exposure: public
-          authentication_enforced: true
-          user_interaction: end-user
-          confidentiality_requirement: high
-          integrity_requirement: high
-          availability_requirement: high
-
-  helmcharts:
-    name: Build Helmcharts
-    uses: gardener/cc-utils/.github/workflows/helmchart-ocm.yaml@bce63f62928717a11f610ec8022af9feb497d5df # v1
-    needs:
-      - prepare
-      - oci-image
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
+    env:
+      OWNER: ${{ github.repository_owner }}
     strategy:
       matrix:
-        args:
-          - name: delivery-service
-            dir: charts/delivery-service
-            mappings:
-              - ref: ocm-resource:core.repository
-                attribute: image.repository
-              - ref: ocm-resource:core.tag
-                attribute: image.tag
-          - name: extensions
-            dir: charts/extensions
-            mappings:
-              - ref: ocm-resource:core.repository
-                attribute: global.image.repository
-              - ref: ocm-resource:core.tag
-                attribute: global.image.tag
+        platform:
+          - name: linux/amd64
+            runner: ubuntu-latest
+            tag-suffix: linux_amd64
+          - name: linux/arm64
+            runner: ubuntu-24.04-arm
+            tag-suffix: linux_arm64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download distribution packages
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: distribution-packages
+          path: dist/
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+      - name: Set lowercase owner
+        run: echo "OWNER=${OWNER,,}" >> "$GITHUB_ENV"
+      - name: Log in to GHCR
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        id: push
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          file: Dockerfile
+          context: .
+          build-args: |
+            ODG_CORE_LIBS_VERSION=${{ inputs.version }}
+          platforms: ${{ matrix.platform.name }}
+          push: ${{ inputs.publish }}
+          tags: ${{ env.REGISTRY }}/${{ env.OWNER }}/odg/images/core:${{ inputs.version }}-${{ matrix.platform.tag-suffix }}
+
+  collect-image:
+    name: Build OCI image index
+    if: inputs.publish
+    runs-on: ubuntu-latest
+    needs:
+      - oci-image
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+      packages: write
+    env:
+      OWNER: ${{ github.repository_owner }}
+    outputs:
+      core-image-digest: ${{ steps.manifest.outputs.core-image-digest }}
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create and push image index
+        id: manifest
+        run: |
+          set -euo pipefail
+
+          OWNER="${OWNER,,}"
+          IMAGE_REF="$REGISTRY/$OWNER/odg/images/core:${{ inputs.version }}"
+
+          docker buildx imagetools create \
+            --tag "${IMAGE_REF}" \
+            "${IMAGE_REF}-linux_amd64" \
+            "${IMAGE_REF}-linux_arm64"
+
+          digest=$(docker buildx imagetools inspect "${IMAGE_REF}" \
+            --format '{{json .Manifest}}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["digest"])')
+
+          echo "core-image-digest=${digest}" >> "$GITHUB_OUTPUT"
+          echo "OWNER=$OWNER" >> "$GITHUB_ENV"
+      - name: Attest OCI image
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          push-to-registry: true
+          subject-digest: ${{ steps.manifest.outputs.core-image-digest }}
+          subject-name: ${{ env.REGISTRY }}/${{ env.OWNER }}/odg/images/core
+
+  helm-chart:
+    name: Build Helm chart
+    if: inputs.publish
+    runs-on: ubuntu-latest
+    needs:
+      - collect-image
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+      packages: write
+    env:
+      OWNER: ${{ github.repository_owner }}
+    outputs:
+      bootstrapping-chart-digest: ${{ steps.push.outputs.bootstrapping-chart-digest }}
+      delivery-service-chart-digest: ${{ steps.push.outputs.delivery-service-chart-digest }}
+      extensions-chart-digest: ${{ steps.push.outputs.extensions-chart-digest }}
+    strategy:
+      matrix:
+        chart:
           - name: bootstrapping
             dir: charts/bootstrapping
-            mappings: []
-    with:
-      name: ${{ matrix.args.name }}
-      dir: ${{ matrix.args.dir }}
-      ocm-repository: ${{ needs.prepare.outputs.ocm-releases-repository }}
-      oci-registry: ${{ needs.prepare.outputs.oci-registry }}
-      oci-repository: charts/odg
-      ocm-mappings: ${{ toJSON(matrix.args.mappings) }}
+          - name: delivery-service
+            dir: charts/delivery-service
+          - name: extensions
+            dir: charts/extensions
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Helm
+        uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+      - name: Log in to GHCR
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Package and push chart
+        id: push
+        env:
+          VERSION: ${{ inputs.version }}
+          CORE_IMAGE_DIGEST: ${{ needs.collect-image.outputs.core-image-digest }}
+        run: |
+          set -euo pipefail
+
+          OWNER="${OWNER,,}"
+
+          if [[ "${{ matrix.chart.name }}" == "delivery-service" || "${{ matrix.chart.name }}" == "extensions" ]]; then
+            values_file="${{ matrix.chart.dir }}/values.yaml"
+            repository="$REGISTRY/$OWNER/odg/images/core"
+            sed -i "s|repository: null|repository: ${repository}|" "${values_file}"
+            sed -i "s|tag: null|tag: ${CORE_IMAGE_DIGEST}|" "${values_file}"
+          fi
+
+          helm package ${{ matrix.chart.dir }} --version "${VERSION}" --app-version "${VERSION}"
+
+          output=$(helm push ${{ matrix.chart.name }}-${VERSION}.tgz \
+            oci://$REGISTRY/$OWNER/odg/charts)
+          echo "${output}"
+
+          digest=$(echo "${output}" | grep '^Digest:' | cut -d' ' -f2)
+
+          echo "${{ matrix.chart.name }}-chart-digest=${digest}" >> "$GITHUB_OUTPUT"
+          echo "CHART_DIGEST=${digest}" >> "$GITHUB_ENV"
+          echo "OWNER=$OWNER" >> "$GITHUB_ENV"
+      - name: Attest Helm chart
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          push-to-registry: true
+          subject-digest: ${{ env.CHART_DIGEST }}
+          subject-name: ${{ env.REGISTRY }}/${{ env.OWNER }}/odg/charts/${{ matrix.chart.name }}

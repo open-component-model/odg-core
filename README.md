@@ -12,6 +12,7 @@ This repository is the home of the core API and feature extensions for the [Open
 - [Getting Started](#getting-started)
   - [Standalone](#standalone)
   - [Kubernetes in Docker](#kubernetes-in-docker)
+- [Network Policies](#network-policies)
 - [Documentation](#documentation)
 - [Packages](#packages)
 
@@ -111,6 +112,31 @@ To work with a KinD cluster:
 
 To clean up the KinD cluster: `kind delete clusters odg-devcontainer-cluster`
 
+## Network Policies
+
+The `delivery-service` and `extensions` Helm charts ship a namespace-wide `default-deny`
+policy (Ingress + Egress) plus tiered per-workload allow policies. Egress is restricted
+to cluster DNS, the Kubernetes API, the delivery-service, the delivery database,
+the OpenTelemetry collector, and HTTPS (`443`); ingress to the delivery-service is
+restricted to same-namespace pods and the configured gateway namespaces.
+
+Tuning knobs (defaults work on upstream Kubernetes, Gardener shoots, and OpenShift):
+
+- `global.netpol.*` in `charts/extensions/values.yaml` (shared by all extension sub-charts)
+- `netpol.*` in `charts/delivery-service/values.yaml`
+- documented as well in [charts/bootstrapping/values.documentation.yaml](charts/bootstrapping/values.documentation.yaml)
+
+| Knob | Purpose |
+| --- | --- |
+| `dnsNamespaceLabels` / `dnsPorts` / `dnsNodeLocalIps` | Where and how Cluster-DNS is reachable (CoreDNS `8053`, OpenShift `5353`, NodeLocal DNSCache `169.254.20.10`) |
+| `postgresCidrs` | Egress to databases outside the cluster |
+| `dbClientLabelKey` / `dbClientLabelValue` | Pod label required to connect to a tightened DB policy (`allowExternal: false`) |
+| `otlpCollectorLabels` | Selector for the in-namespace OTLP collector |
+| `gatewayNamespaceNames` | Extra namespaces allowed to ingress the delivery-service (empty list honoured; unset defaults to `envoy-gateway-system`) |
+| `extraEgress` | Raw egress rules appended verbatim (proxies, non-`443` registries, cross-namespace collectors) |
+
+Pod-to-pod traffic on ports other than the listed ones is denied by default.
+
 ## Documentation
 
 The documentation is hosted [here](https://open-component-model.github.io/open-delivery-gear/index.html).
@@ -141,8 +167,8 @@ This list provides an overview.
 | `odg-core-libs` | Python Package | Core APIs and functionalities. Contains the ODG web server. | [PyPi](https://pypi.org/project/odg-core-libs/) |
 | `odg-client` | Python Package | Python HTTP client library to interact with the ODG-Core API | [PyPi](https://pypi.org/project/odg-client/) |
 | `bdba-client` | Python Package | Python HTTP client library to interact with BlackDuck Binary Analysis | [PyPi](https://pypi.org/project/bdba-client/) |
-| `odg-core` | OCI Image | Filesystem to run ODG-Core and ODG extensions in cloud environments | [GCP](https://europe-docker.pkg.dev/gardener-project/releases/odg/core) |
-| `odg-core` | OCM Component | Software component referencing all delivery artefacts and metadata | [OCM Repo](https://europe-docker.pkg.dev/gardener-project/releases/component-descriptors/ocm.software/open-delivery-gear/core) |
+| `odg-core` | OCI Image | Filesystem to run ODG-Core and ODG extensions in cloud environments | [GHCR](https://ghcr.io/open-component-model/odg/images/core) |
+| `odg-core` | OCM Component | Software component referencing all delivery artefacts and metadata | [OCM Repo](https://ghcr.io/open-component-model/component-descriptors/ocm.software/open-delivery-gear/core) |
 
 ---
 
