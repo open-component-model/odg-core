@@ -1008,3 +1008,106 @@ class TestScannerDecideRoute:
 
     def test_empty_evidence_routes_to_file(self):
         assert self._s.decide_route(self._e()) is scanner_utils.model.ScanTarget.FILE
+
+
+# ---------------------------------------------------------------------------
+# Tests — OCI image allowlist enforcement in scan_ocm_resource
+# ---------------------------------------------------------------------------
+
+
+def _make_oci_resource_node(image_reference: str) -> ocm.iter.ResourceNode:
+    component = ocm.Component(
+        name='example.org/test',
+        version='1.0.0',
+        repositoryContexts=[],
+        provider='test',
+        sources=[],
+        componentReferences=[],
+        resources=[],
+    )
+    resource = ocm.Resource(
+        name='test-image',
+        version='1.0.0',
+        type=ocm.ArtefactType.OCI_IMAGE,
+        access=ocm.OciAccess(imageReference=image_reference),
+    )
+    return ocm.iter.ResourceNode(
+        path=(ocm.iter.NodePathEntry(component=component),),
+        resource=resource,
+    )
+
+
+class TestScannerOciAllowlist:
+    class _Scanner(scanner_utils.scanner.Scanner):
+        pass
+
+    _s = _Scanner()
+
+    def _patched_allowlist(self, allowed: bool):
+        return unittest.mock.patch(
+            'lookups.is_allowlisted_ocm_repo',
+            return_value=allowed,
+        )
+
+    def test_allowlisted_image_does_not_raise(self):
+        node = _make_oci_resource_node('ghcr.io/org/image:latest')
+        mock_client = unittest.mock.MagicMock()
+        with (
+            self._patched_allowlist(True),
+            unittest.mock.patch('odg.audit.emit'),
+        ):
+            # the scan itself will raise (no implementation), but NOT a PermissionError
+            with pytest.raises(Exception) as exc_info:
+                self._s.scan_ocm_resource(node, mock_client)
+            assert not isinstance(exc_info.value, PermissionError)
+
+    def test_non_allowlisted_image_raises_permission_error(self):
+        node = _make_oci_resource_node('evil.example.com/bad/image:latest')
+        mock_client = unittest.mock.MagicMock()
+        with (
+            self._patched_allowlist(False),
+            unittest.mock.patch('odg.audit.emit') as mock_emit,
+        ):
+            with pytest.raises(PermissionError, match='not in allowlist'):
+                self._s.scan_ocm_resource(node, mock_client)
+
+        mock_emit.assert_called_once()
+        call_kwargs = mock_emit.call_args.kwargs
+        assert call_kwargs['odg_audit_outcome'] == 'denied'
+
+    def test_non_oci_registry_access_skips_allowlist_check(self):
+        component = ocm.Component(
+            name='example.org/test',
+            version='1.0.0',
+            repositoryContexts=[],
+            provider='test',
+            sources=[],
+            componentReferences=[],
+            resources=[],
+        )
+        resource = ocm.Resource(
+            name='test-blob',
+            version='1.0.0',
+            type=ocm.ArtefactType.BLOB,
+            access=ocm.LocalBlobAccess(
+                localReference='sha256:abc123',
+                mediaType='application/octet-stream',
+            ),
+        )
+        node = ocm.iter.ResourceNode(
+            path=(ocm.iter.NodePathEntry(component=component),),
+            resource=resource,
+        )
+        mock_client = unittest.mock.MagicMock()
+        mock_client.blob.return_value.__enter__ = unittest.mock.MagicMock(
+            return_value=unittest.mock.MagicMock(iter_content=lambda chunk_size: iter([])),
+        )
+        with (
+            unittest.mock.patch('lookups.is_allowlisted_ocm_repo') as mock_check,
+            unittest.mock.patch('odg.audit.emit'),
+            unittest.mock.patch('ocm_util.iter_blob_descriptors', return_value=iter([])),
+        ):
+            with pytest.raises(ValueError):
+                self._s.scan_ocm_resource(node, mock_client)
+
+        mock_check.assert_not_called()

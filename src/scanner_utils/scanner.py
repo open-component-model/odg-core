@@ -10,6 +10,7 @@ import ocm
 import ocm.iter
 import structlog
 
+import lookups
 import ocm_util
 import odg.audit
 import scanner_utils.model
@@ -114,16 +115,36 @@ class Scanner(abc.ABC):
             artefact_type=resource_node.resource.type,
         )
 
+        component_ref = (
+            f'{resource_node.component.component.name}:{resource_node.component.component.version}'
+        )
+        artefact_ref = f'{resource_node.resource.name}:{resource_node.resource.version}'
+
+        if access.type is ocm.AccessType.OCI_REGISTRY and not lookups.is_allowlisted_ocm_repo(
+            access.imageReference,
+        ):
+            odg.audit.emit(
+                action='scan_artefact_pull',
+                component=component_ref,
+                artefact=artefact_ref,
+                odg_audit_target=_access_reference(access=access),
+                odg_audit_outcome=odg.audit.Outcome.DENIED,
+                odg_audit_detail={
+                    'access_type': access.type.value,
+                    'scanner': type(self).__name__,
+                },
+            )
+            raise PermissionError(
+                f'container image registry not in allowlist: {access.imageReference!r}',
+            )
+
         # one audit event per scanned artefact: records which repo/registry the scanner
         # extension pulled from (e.g. after a credential leak). The outcome records
         # that the scan was dispatched; scan failures surface in the scanner's error logs.
         odg.audit.emit(
             action='scan_artefact_pull',
-            component=(
-                f'{resource_node.component.component.name}'
-                f':{resource_node.component.component.version}'
-            ),
-            artefact=f'{resource_node.resource.name}:{resource_node.resource.version}',
+            component=component_ref,
+            artefact=artefact_ref,
             odg_audit_target=_access_reference(access=access),
             odg_audit_outcome=odg.audit.Outcome.ALLOWED,
             odg_audit_detail={
