@@ -4,6 +4,7 @@ import atexit
 import collections.abc
 import dataclasses
 import datetime
+import re
 
 import dacite
 import ocm
@@ -30,6 +31,20 @@ logger = structlog.get_logger(__name__)
 k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging()
 odg.telemetry.configure_telemetry()
+
+
+def _redact_secret(secret: str, visible_chars: int = 4) -> str:
+    def sanitise(s: str) -> str:
+        return re.sub(r'[|`]', lambda m: f'\\{m.group()}', s)
+
+    if len(secret) <= visible_chars * 2:
+        return f'***{len(secret)}***'
+    redacted_count = len(secret) - visible_chars * 2
+    return (
+        f'{sanitise(secret[:visible_chars])}'
+        f'***{redacted_count}***'
+        f'{sanitise(secret[-visible_chars:])}'
+    )
 
 
 @dataclasses.dataclass
@@ -281,7 +296,7 @@ def create_ghas_findings(
                         severity=categorisation.id,
                         html_url=alert.html_url,
                         secret_type=alert.secret_type,
-                        secret=alert.secret,
+                        secret=_redact_secret(alert.secret) if alert.secret else alert.secret,
                         secret_type_display_name=alert.secret_type_display_name,
                         resolution=alert.resolution,
                         locations=list(locations),

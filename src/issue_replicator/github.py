@@ -6,6 +6,7 @@ import datetime
 import enum
 import functools
 import hashlib
+import html
 import re
 import textwrap
 
@@ -112,10 +113,17 @@ class FindingGroup:
         return summary_long, summary, summary_short
 
 
+def _sanitise_md_table_cell(value: object) -> str:
+    # `value` may be any JSON-derived type (dict, list, int, ...), so stringify first
+    return re.sub(r'[|`]', lambda m: f'\\{m.group()}', str(value))
+
+
 def _artefact_to_str(
     artefact: odg.model.ComponentArtefactId,
 ) -> str:
-    id_str = '<br>'.join(f'{k}: {v}' for k, v in artefact.as_dict_repr().items())
+    id_str = '<br>'.join(
+        f'{html.escape(k)}: {html.escape(v)}' for k, v in artefact.as_dict_repr().items()
+    )
 
     if not id_str:
         return ''
@@ -398,7 +406,11 @@ def crypto_summary(
         finding_group: FindingGroup,
     ) -> str:
         return '<br/>'.join(
-            sorted(f'`{name}`' for name in aggregated_finding.finding.data.asset.names if name),
+            sorted(
+                f'`{_sanitise_md_table_cell(name)}`'
+                for name in aggregated_finding.finding.data.asset.names
+                if name
+            ),
         )
 
     finding_table_callback = {
@@ -464,11 +476,17 @@ def diki_summary(
             unique_keys.remove('details')
             unique_keys.append('details')
 
-        table = '| ' + ' | '.join(key.title() for key in unique_keys) + ' |\n'
+        table = (
+            '| ' + ' | '.join(_sanitise_md_table_cell(key.title()) for key in unique_keys) + ' |\n'
+        )
         table += '| ' + ' | '.join(':-:' for _ in unique_keys) + ' |\n'
 
         for target in targets:
-            table += '| ' + ' | '.join(target.get(key, '') for key in unique_keys) + ' |\n'
+            table += (
+                '| '
+                + ' | '.join(_sanitise_md_table_cell(target.get(key, '')) for key in unique_keys)
+                + ' |\n'
+            )
 
         return table
 
@@ -488,11 +506,11 @@ def diki_summary(
                 ## Failed rule summary
                 |    |    |
                 | -- | -- |
-                | Ruleset ID | {finding_rule.ruleset_id} |
-                | Ruleset Name | {finding_rule.ruleset_name} |
-                | Ruleset Version | {finding_rule.ruleset_version} |
-                | Rule ID | {finding_rule.rule_id} |
-                | Rule Name | {finding_rule.rule_name} |
+                | Ruleset ID | {_sanitise_md_table_cell(finding_rule.ruleset_id)} |
+                | Ruleset Name | {_sanitise_md_table_cell(finding_rule.ruleset_name)} |
+                | Ruleset Version | {_sanitise_md_table_cell(finding_rule.ruleset_version)} |
+                | Rule ID | {_sanitise_md_table_cell(finding_rule.rule_id)} |
+                | Rule Name | {_sanitise_md_table_cell(finding_rule.rule_name)} |
             """)
 
             if finding_rule.ruleset_id == 'disa-kubernetes-stig':
@@ -685,20 +703,16 @@ def _redact_secret(
     """
     Returns a redacted representation of `secret`, keeping the first and last `visible_chars`
     characters visible and replacing the middle with `***<number-redacted-chars>***`. Characters
-    that would break a markdown table cell (`|`, newlines) are removed from the visible portions.
+    that would break a markdown table cell are escaped in the visible portions.
     """
-
-    def sanitise(s: str) -> str:
-        return s.replace('|', ' ').replace('\n', ' ').replace('\r', ' ')
-
     if len(secret) <= visible_chars * 2:
         return f'***{len(secret)}***'
 
     redacted_count = len(secret) - visible_chars * 2
     return (
-        f'{sanitise(secret[:visible_chars])}'
+        f'{_sanitise_md_table_cell(secret[:visible_chars])}'
         f'***{redacted_count}***'
-        f'{sanitise(secret[-visible_chars:])}'
+        f'{_sanitise_md_table_cell(secret[-visible_chars:])}'
     )
 
 
@@ -725,9 +739,11 @@ def ghas_summary(
         )
 
     finding_table_callback = {
-        'Secret Type': lambda f, _: f'`{f.finding.data.secret_type}`',
+        'Secret Type': lambda f, _: f'`{_sanitise_md_table_cell(f.finding.data.secret_type)}`',
         'Secret': lambda f, _: f'`{_redact_secret(f.finding.data.secret)}`',
-        'Display Name': lambda f, _: f'`{f.finding.data.secret_type_display_name}`',
+        'Display Name': lambda f, _: (
+            f'`{_sanitise_md_table_cell(f.finding.data.secret_type_display_name)}`'
+        ),  # noqa: E501
         'Location(s)': lambda f, g: _locations_str(f.finding.data.locations),
         'Alert Details': lambda f, _: f'[Alert]({f.finding.data.html_url})',
         'Severity': lambda f, g: _severity_str(
@@ -738,7 +754,7 @@ def ghas_summary(
     }
 
     historical_table_callback = {
-        'Secret Type': lambda f, _: f'`{f.finding.data.secret_type}`',
+        'Secret Type': lambda f, _: f'`{_sanitise_md_table_cell(f.finding.data.secret_type)}`',
         'Secret': lambda f, _: f'`{_redact_secret(f.finding.data.secret)}`',
         'Severity': lambda f, g: _severity_str(
             aggregated_finding=f,
@@ -787,14 +803,19 @@ def inventory_summary(
                 finding_cfg=finding_cfg,
             )
 
+            _summary = _sanitise_md_table_cell(finding.summary)
+            _provider = _sanitise_md_table_cell(finding.provider_name)
+            _resource = _sanitise_md_table_cell(finding.resource_name)
             finding_str = textwrap.dedent(f"""\
-                ## {finding.summary} - {finding.provider_name} - {finding.resource_name}
+                ## {_summary} - {_provider} - {_resource}
                 |    |    |
                 | -- | -- |
             """)
 
             for key, value in finding.attributes.items():
-                finding_str += f'| {key.title().replace("_", " ")} | {value} |\n'
+                finding_str += (
+                    f'| {key.title().replace("_", " ")} | {_sanitise_md_table_cell(value)} |\n'  # noqa: E501
+                )
 
             finding_str += f'| Severity | {severity} |\n'
 
@@ -844,7 +865,7 @@ def ip_summary(
         finding_group: FindingGroup,
     ) -> str:
         return ', <br/>'.join(
-            f'`{package_version}`'
+            f'`{_sanitise_md_table_cell(package_version)}`'
             for package_version in sorted(
                 aggregated_finding.finding.data.package_version,
                 key=util.version_sorting_key,
@@ -856,7 +877,7 @@ def ip_summary(
         finding_group: FindingGroup,
     ) -> str:
         return ', <br/>'.join(
-            f'`{license.name}`'
+            f'`{_sanitise_md_table_cell(license.name)}`'
             for license in sorted(
                 aggregated_finding.finding.data.license,
                 key=lambda license: license.name,
@@ -876,7 +897,7 @@ def ip_summary(
         )
 
     finding_table_callback = {
-        'Affected Package': lambda f, _: f'`{f.finding.data.package_name}`',
+        'Affected Package': lambda f, _: f'`{_sanitise_md_table_cell(f.finding.data.package_name)}`',
         'Package Version(s)': package_versions_str,
         'License(s)': licenses_str,
         'Policy Violation(s)': policy_violations_str,
@@ -888,7 +909,7 @@ def ip_summary(
     }
 
     historical_table_callback = {
-        'Affected Package': lambda f, _: f'`{f.finding.data.package_name}`',
+        'Affected Package': lambda f, _: f'`{_sanitise_md_table_cell(f.finding.data.package_name)}`',
         'Package Version(s)': package_versions_str,
         'License(s)': licenses_str,
         'Policy Violation(s)': policy_violations_str,
@@ -1059,9 +1080,11 @@ def license_summary(
     sprint: sm.Sprint | None = None,
 ) -> tuple[str, str, str]:
     finding_table_callback = {
-        'Affected Package': lambda f, _: f'`{f.finding.data.package_name}`',
-        'Package Version': lambda f, _: f'`{f.finding.data.package_version}`',
-        'License': lambda f, _: f'`{f.finding.data.license.name}`',
+        'Affected Package': lambda f, _: f'`{_sanitise_md_table_cell(f.finding.data.package_name)}`',
+        'Package Version': lambda f, _: (
+            f'`{_sanitise_md_table_cell(f.finding.data.package_version)}`'
+        ),  # noqa: E501
+        'License': lambda f, _: f'`{_sanitise_md_table_cell(f.finding.data.license.name)}`',
         'Severity': lambda f, g: _severity_str(
             aggregated_finding=f,
             finding_group=g,
@@ -1070,9 +1093,11 @@ def license_summary(
     }
 
     historical_table_callback = {
-        'Affected Package': lambda f, _: f'`{f.finding.data.package_name}`',
-        'Package Version': lambda f, _: f'`{f.finding.data.package_version}`',
-        'License': lambda f, _: f'`{f.finding.data.license.name}`',
+        'Affected Package': lambda f, _: f'`{_sanitise_md_table_cell(f.finding.data.package_name)}`',
+        'Package Version': lambda f, _: (
+            f'`{_sanitise_md_table_cell(f.finding.data.package_version)}`'
+        ),  # noqa: E501
+        'License': lambda f, _: f'`{_sanitise_md_table_cell(f.finding.data.license.name)}`',
         'Severity': lambda f, g: _severity_str(
             aggregated_finding=f,
             finding_group=g,
@@ -1118,9 +1143,11 @@ def malware_summary(
     sprint: sm.Sprint | None = None,
 ) -> tuple[str, str, str]:
     finding_table_callback = {
-        'Malware': lambda f, _: f'`{f.finding.data.finding.malware}`',
-        'Filename': lambda f, _: f'`{f.finding.data.finding.filename}`',
-        'Content Digest': lambda f, _: f'`{f.finding.data.finding.content_digest}`',
+        'Malware': lambda f, _: f'`{_sanitise_md_table_cell(f.finding.data.finding.malware)}`',
+        'Filename': lambda f, _: f'`{_sanitise_md_table_cell(f.finding.data.finding.filename)}`',
+        'Content Digest': lambda f, _: (
+            f'`{_sanitise_md_table_cell(f.finding.data.finding.content_digest)}`'
+        ),  # noqa: E501
         'Severity': lambda f, g: _severity_str(
             aggregated_finding=f,
             finding_group=g,
@@ -1129,7 +1156,7 @@ def malware_summary(
     }
 
     historical_table_callback = {
-        'Malware': lambda f, _: f'`{f.finding.data.finding.malware}`',
+        'Malware': lambda f, _: f'`{_sanitise_md_table_cell(f.finding.data.finding.malware)}`',
         'Severity': lambda f, g: _severity_str(
             aggregated_finding=f,
             finding_group=g,
@@ -1167,10 +1194,14 @@ def osid_summary(
     sprint: sm.Sprint | None = None,
 ) -> tuple[str, str, str]:
     finding_table_callback = {
-        'OS Name': lambda f, _: f'`{f.finding.data.osid.NAME}`',
-        'Detected Version': lambda f, _: f'`{f.finding.data.osid.VERSION_ID}`',
-        'Greatest Version': lambda f, _: f'`{f.finding.data.greatest_version}`',
-        'Issue Text': lambda f, _: f.finding.data.status_description,
+        'OS Name': lambda f, _: f'`{_sanitise_md_table_cell(f.finding.data.osid.NAME)}`',
+        'Detected Version': lambda f, _: (
+            f'`{_sanitise_md_table_cell(f.finding.data.osid.VERSION_ID)}`'
+        ),  # noqa: E501
+        'Greatest Version': lambda f, _: (
+            f'`{_sanitise_md_table_cell(f.finding.data.greatest_version)}`'
+        ),  # noqa: E501
+        'Issue Text': lambda f, _: _sanitise_md_table_cell(f.finding.data.status_description),
         'Severity': lambda f, g: _severity_str(
             aggregated_finding=f,
             finding_group=g,
@@ -1179,8 +1210,10 @@ def osid_summary(
     }
 
     historical_table_callback = {
-        'OS Name': lambda f, _: f'`{f.finding.data.osid.NAME}`',
-        'Detected Version': lambda f, _: f'`{f.finding.data.osid.VERSION_ID}`',
+        'OS Name': lambda f, _: f'`{_sanitise_md_table_cell(f.finding.data.osid.NAME)}`',
+        'Detected Version': lambda f, _: (
+            f'`{_sanitise_md_table_cell(f.finding.data.osid.VERSION_ID)}`'
+        ),  # noqa: E501
         'Severity': lambda f, g: _severity_str(
             aggregated_finding=f,
             finding_group=g,
@@ -1324,7 +1357,7 @@ def vulnerability_summary(
         finding_group: FindingGroup,
     ) -> str:
         return ', <br/>'.join(
-            f'`{package_version}`'
+            f'`{_sanitise_md_table_cell(package_version)}`'
             for package_version in sorted(
                 aggregated_finding.finding.data.package_version,
                 key=util.version_sorting_key,
@@ -1332,9 +1365,9 @@ def vulnerability_summary(
         )
 
     finding_table_callback = {
-        'Affected Package': lambda f, _: f'`{f.finding.data.package_name}`',
-        'CVE': lambda f, _: f'`{f.finding.data.cve}`',
-        'CVE Score': lambda f, _: f'`{f.finding.data.cvss_score}`',
+        'Affected Package': lambda f, _: f'`{_sanitise_md_table_cell(f.finding.data.package_name)}`',
+        'CVE': lambda f, _: f'`{_sanitise_md_table_cell(f.finding.data.cve)}`',
+        'CVE Score': lambda f, _: f'`{_sanitise_md_table_cell(f.finding.data.cvss_score)}`',
         'Severity': lambda f, g: _severity_str(
             aggregated_finding=f,
             finding_group=g,
@@ -1345,8 +1378,8 @@ def vulnerability_summary(
     }
 
     historical_table_callback = {
-        'Affected Package': lambda f, _: f'`{f.finding.data.package_name}`',
-        'CVE': lambda f, _: f'`{f.finding.data.cve}`',
+        'Affected Package': lambda f, _: f'`{_sanitise_md_table_cell(f.finding.data.package_name)}`',
+        'CVE': lambda f, _: f'`{_sanitise_md_table_cell(f.finding.data.cve)}`',
         'Severity': lambda f, g: _severity_str(
             aggregated_finding=f,
             finding_group=g,
