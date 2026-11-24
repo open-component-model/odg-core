@@ -26,6 +26,8 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ $podName }}
+      securityContext:
+        {{- include "odg.podSecurityContext" . | nindent 8 }}
       containers:
         - name: {{ $podName }}
           image: {{ include "image" .Values.global.image }}
@@ -35,7 +37,7 @@ spec:
             - -m
             - freshclam
           securityContext:
-            allowPrivilegeEscalation: false
+            {{- include "odg.containerSecurityContext" . | nindent 12 }}
           env:
             - name: ODG_LOG_LEVEL
               value: {{ .Values.logLevel | default "INFO" | quote }}
@@ -53,6 +55,13 @@ spec:
               port: 8080
             periodSeconds: 10
             timeoutSeconds: 3
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: www
+              mountPath: /www
+            - name: freshclam-status
+              mountPath: /freshclam
           ports:
             - containerPort: 8080
               name: default
@@ -60,6 +69,13 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: www
+          emptyDir: {}
+        - name: freshclam-status
+          emptyDir: {}
 ---
 {{- include "odg.netpol.egress" (list $podName . (dict "internet" true "anywherePorts" (list 80))) }}
 ---

@@ -40,6 +40,8 @@ spec:
       {{- end }}
     spec:
       serviceAccountName: {{ $podName }}
+      securityContext:
+        {{- include "odg.podSecurityContext" . | nindent 8 }}
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
@@ -60,7 +62,7 @@ spec:
             - -m
             - migrations.bootstrap
           securityContext:
-            allowPrivilegeEscalation: false
+            {{- include "odg.containerSecurityContext" . | nindent 12 }}
           env:
           - name: SECRET_FACTORY_PATH
             value: /secrets
@@ -73,6 +75,8 @@ spec:
           volumeMounts:
             - name: delivery-db
               mountPath: /secrets/delivery-db
+            - name: tmp
+              mountPath: /tmp
       containers:
         - name: {{ $podName }}
           image: {{ include "image" .Values.image }}
@@ -83,7 +87,7 @@ spec:
             - app
             - --productive
           securityContext:
-            allowPrivilegeEscalation: false
+            {{- include "odg.containerSecurityContext" . | nindent 12 }}
           readinessProbe:
             httpGet:
               path: /ready
@@ -175,11 +179,15 @@ spec:
               mountPath: "/addressbook"
             - name: github-mappings
               mountPath: "/github_mappings"
+            - name: tmp
+              mountPath: /tmp
           {{- with (.Values.deployment).resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
       volumes:
+        - name: tmp
+          emptyDir: {}
         - name: delivery-db
           secret:
             secretName: {{ .Values.deliveryDb.secretName }}

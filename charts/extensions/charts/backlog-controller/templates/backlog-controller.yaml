@@ -23,6 +23,8 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ .Chart.Name }}
+      securityContext:
+        {{- include "odg.podSecurityContext" . | nindent 8 }}
       containers:
         - name: {{ $podName }}
           image: {{ include "image" .Values.global.image }}
@@ -32,7 +34,7 @@ spec:
             - -m
             - backlog_controller
           securityContext:
-            allowPrivilegeEscalation: false
+            {{- include "odg.containerSecurityContext" . | nindent 12 }}
           env:
             - name: SECRET_FACTORY_PATH
               value: /secrets
@@ -45,6 +47,8 @@ spec:
             {{- include "odg.otelEnv" . | nindent 12 }}
             {{- include "odg.otelResourceAttrs" . | nindent 12 }}
           volumeMounts:
+            - name: tmp
+              mountPath: /tmp
             - name: extensions-cfg
               mountPath: /extensions_cfg
             - name: github
@@ -56,6 +60,8 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
       volumes:
+        - name: tmp
+          emptyDir: {}
         - name: extensions-cfg
           configMap:
             name: extensions-cfg
