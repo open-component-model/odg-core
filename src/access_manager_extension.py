@@ -6,7 +6,6 @@ role bindings, e.g. a change of the GitHub organisation and/or team membership.
 """
 
 import asyncio
-import atexit
 import collections
 import collections.abc
 import enum
@@ -22,10 +21,7 @@ import structlog
 import ctx_util
 import deliverydb
 import deliverydb.model as dm
-import k8s.logging
-import k8s.util
 import lookups
-import odg.extensions_cfg
 import odg.logging_cfg
 import odg.telemetry
 import odg.util
@@ -33,8 +29,6 @@ import secret_mgmt.oauth_cfg
 import util
 
 logger = structlog.get_logger(__name__)
-# CRD FileHandlers (legacy odg-ui format) must be attached before structlog takes over stdout
-k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging()
 odg.telemetry.configure_telemetry()
 
@@ -369,21 +363,7 @@ async def main():
         ),
     )
     namespace = parsed_arguments.k8s_namespace
-
     secret_factory = ctx_util.secret_factory()
-    kubernetes_api = k8s.util.kubernetes_api(kubeconfig_path=parsed_arguments.kubeconfig)
-
-    k8s.logging.init_logging_thread(
-        service=odg.extensions_cfg.Services.ACCESS_MANAGER,
-        namespace=namespace,
-        kubernetes_api=kubernetes_api,
-    )
-    atexit.register(
-        k8s.logging.log_to_crd,
-        service=odg.extensions_cfg.Services.ACCESS_MANAGER,
-        namespace=namespace,
-        kubernetes_api=kubernetes_api,
-    )
 
     delivery_db_secrets = secret_factory.delivery_db()
     if len(delivery_db_secrets) != 1:

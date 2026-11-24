@@ -7,7 +7,6 @@ import functools
 import ocm
 import structlog
 
-import k8s.logging
 import k8s.util
 import odg.extensions_cfg
 import odg.findings
@@ -21,7 +20,6 @@ import paths
 import rescore.utility
 
 logger = structlog.get_logger(__name__)
-k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging()
 odg.telemetry.configure_telemetry()
 

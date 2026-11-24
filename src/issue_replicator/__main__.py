@@ -15,7 +15,6 @@ import structlog
 import github_util
 import issue_replicator.github
 import k8s.backlog
-import k8s.logging
 import k8s.model
 import k8s.util
 import odg.extensions_cfg
@@ -34,7 +33,6 @@ import sprints.util as su
 import util
 
 logger = structlog.get_logger(__name__)
-k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging()
 odg.telemetry.configure_telemetry()
 

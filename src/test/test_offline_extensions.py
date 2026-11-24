@@ -5,14 +5,6 @@ without infra:
 
 1. Each migrated extension imports cleanly.
 2. `odg.logging_cfg.configure_logging(service_name=...)` produces JSON on stdout.
-3. `k8s.logging.configure_kubernetes_logging()` produces CRD-shaped files.
-4. The CRD format preserves the odg-ui contract keys + a parseable timestamp.
-
-NOTE: importing any extension module calls `k8s.logging.configure_kubernetes_logging()`
-as a side effect, attaching CRD FileHandlers to the root logger. The tests below
-therefore do NOT call it again; their `configure_logging()` calls only configure
-stdout/structlog, so CRD-shape verification lives in the dedicated contract test
-(`test_log_collection_contract.py`).
 """
 
 import importlib
@@ -55,7 +47,7 @@ def test_extension_modules_import_cleanly():
             raise AssertionError(f'importing {module_name} failed: {e}') from e
 
 
-def test_all_crd_logging_produces_json_on_stdout(tmp_path):
+def test_extensions_produce_json_on_stdout(tmp_path):
     """every extension module emits structlog JSON once configured"""
     captured = io.StringIO()
 

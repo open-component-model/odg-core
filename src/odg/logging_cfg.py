@@ -14,10 +14,6 @@ Works alongside existing infrastructure:
   only re-formats the stdlib pipeline via ProcessorFormatter)
 - third-party stdlib loggers (uvicorn, aiohttp, kubernetes, ...) are routed into
   the same pipeline, see `route_foreign_loggers()`
-- `k8s.logging.configure_kubernetes_logging()` may be called BEFORE
-  `configure_logging()` to keep its FileHandlers attached for the LogCollection
-  CRD pipeline; pod stdout logs then use the structlog format, the CRD content
-  the legacy frontend format.
 
 Field naming follows OpenTelemetry semantic conventions
 (https://opentelemetry.io/docs/specs/semconv/general/naming/):
@@ -200,17 +196,6 @@ def merge_extra_fields(logger, method_name: str, event_dict: dict) -> dict:
             event_dict[otel_key] = value
 
     return event_dict
-
-
-class SuppressLoggerPrefixesFilter(logging.Filter):
-    """Drop records whose logger name starts with one of the given prefixes."""
-
-    def __init__(self, logger_prefixes: collections.abc.Iterable[str]):
-        super().__init__()
-        self.logger_prefixes = tuple(logger_prefixes)
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        return not record.name.startswith(self.logger_prefixes)
 
 
 class SuppressLoggerNamesFilter(logging.Filter):
@@ -441,20 +426,9 @@ def configure_logging(
     stream_handler.addFilter(SuppressLoggerNamesFilter(logger_names=DEFAULT_SUPPRESSED_LOGGERS))
 
     root_logger = logging.getLogger()
-    # drop pre-configured stream handlers (e.g. from basicConfig) to avoid
-    # duplicate/unstructured output; FileHandlers attached before this call
-    # (k8s CRD pipeline, see k8s.logging.configure_kubernetes_logging) are kept
+    # drop pre-configured handlers (e.g. from basicConfig) to avoid duplicate/unstructured output
     for handler in root_logger.handlers[:]:
-        if isinstance(handler, logging.StreamHandler) and not isinstance(
-            handler,
-            logging.FileHandler,
-        ):
-            root_logger.removeHandler(handler)
-        elif isinstance(handler, logging.FileHandler):
-            # FileHandlers (LogCollection CRD pipeline, attached before this call) do
-            # not get the SuppressLoggerNamesFilter the stdout handler gets: the CRD
-            # keeps DEBUG-level records of suppressed loggers for troubleshooting.
-            handler.addFilter(SuppressLoggerPrefixesFilter(logger_prefixes=('urllib3',)))
+        root_logger.removeHandler(handler)
     root_logger.addHandler(hdlr=stream_handler)
     root_logger.setLevel(level=log_level)
 

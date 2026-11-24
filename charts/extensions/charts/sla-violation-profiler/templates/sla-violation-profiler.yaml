@@ -1,6 +1,6 @@
 {{- $podName := "sla-violation-profiler" }}
 
-{{- include "odg.rbac" . }}
+{{- include "odg.serviceaccount" (dict "name" .Chart.Name "context" .) }}
 ---
 apiVersion: batch/v1
 kind: CronJob

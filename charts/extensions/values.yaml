@@ -60,11 +60,6 @@ access-manager:
   deliveryDb:
     secretName: secret-factory-delivery-db
   enabled: false
-  rbac:
-    rules: # pushes logs into logcollections CRDs only
-      - apiGroups: [delivery-gear.gardener.cloud]
-        resources: [logcollections]
-        verbs: [create, get, update]
 artefact-enumerator:
   cronjob:
     resources:
@@ -82,9 +77,6 @@ artefact-enumerator:
       - apiGroups: [delivery-gear.gardener.cloud]
         resources: [runtimeartefacts]
         verbs: [list]
-      - apiGroups: [delivery-gear.gardener.cloud]
-        resources: [logcollections]
-        verbs: [create, get, update]
 backlog-controller:
   deployment:
     resources:
@@ -105,9 +97,6 @@ backlog-controller:
       - apiGroups: [apps]
         resources: [deployments]
         verbs: [get, update] # read + scale replicas (replace)
-      - apiGroups: [delivery-gear.gardener.cloud]
-        resources: [logcollections]
-        verbs: [create, get, update]
 bdba:
   deployment:
     annotations: []
@@ -123,9 +112,6 @@ bdba:
       - apiGroups: [delivery-gear.gardener.cloud]
         resources: [backlogitems]
         verbs: [list, update, delete] # list+claim (update=replace); delete after processing
-      - apiGroups: [delivery-gear.gardener.cloud]
-        resources: [logcollections]
-        verbs: [create, get, update]
 cache-manager:
   cronjob:
     resources:
@@ -137,11 +123,6 @@ cache-manager:
   deliveryDb:
     secretName: secret-factory-delivery-db
   enabled: false
-  rbac:
-    rules: # pushes logs into logcollections CRDs only
-      - apiGroups: [delivery-gear.gardener.cloud]
-        resources: [logcollections]
-        verbs: [create, get, update]
 clamav:
   deployment:
     annotations: []
@@ -157,9 +138,6 @@ clamav:
       - apiGroups: [delivery-gear.gardener.cloud]
         resources: [backlogitems]
         verbs: [list, update, delete]
-      - apiGroups: [delivery-gear.gardener.cloud]
-        resources: [logcollections]
-        verbs: [create, get, update]
   freshclam:
     resources:
       requests:
@@ -182,9 +160,6 @@ codeql:
       - apiGroups: [delivery-gear.gardener.cloud]
         resources: [backlogitems]
         verbs: [list, update, delete]
-      - apiGroups: [delivery-gear.gardener.cloud]
-        resources: [logcollections]
-        verbs: [create, get, update]
 crypto:
   deployment:
     annotations: []
@@ -200,9 +175,6 @@ crypto:
       - apiGroups: [delivery-gear.gardener.cloud]
         resources: [backlogitems]
         verbs: [list, update, delete]
-      - apiGroups: [delivery-gear.gardener.cloud]
-        resources: [logcollections]
-        verbs: [create, get, update]
 delivery-db-backup:
   cronjob:
     resources:
@@ -214,11 +186,6 @@ delivery-db-backup:
   deliveryDb:
     secretName: secret-factory-delivery-db
   enabled: false
-  rbac:
-    rules: # pushes logs into logcollections CRDs only
-      - apiGroups: [delivery-gear.gardener.cloud]
-        resources: [logcollections]
-        verbs: [create, get, update]
 ghas:
   cronjob:
     resources:
@@ -228,11 +195,6 @@ ghas:
       limits:
         memory: 500Mi
   enabled: false
-  rbac:
-    rules:
-      - apiGroups: [delivery-gear.gardener.cloud]
-        resources: [logcollections]
-        verbs: [create, get, update]
 issue-replicator:
   deployment:
     annotations: []
@@ -248,9 +210,6 @@ issue-replicator:
       - apiGroups: [delivery-gear.gardener.cloud]
         resources: [backlogitems]
         verbs: [list, update, delete]
-      - apiGroups: [delivery-gear.gardener.cloud]
-        resources: [logcollections]
-        verbs: [create, get, update]
 odg-operator:
   deployment:
     resources:
@@ -277,9 +236,6 @@ osid:
       - apiGroups: [delivery-gear.gardener.cloud]
         resources: [backlogitems]
         verbs: [list, update, delete]
-      - apiGroups: [delivery-gear.gardener.cloud]
-        resources: [logcollections]
-        verbs: [create, get, update]
 responsibles:
   deployment:
     annotations: []
@@ -295,9 +251,6 @@ responsibles:
       - apiGroups: [delivery-gear.gardener.cloud]
         resources: [backlogitems]
         verbs: [list, update, delete]
-      - apiGroups: [delivery-gear.gardener.cloud]
-        resources: [logcollections]
-        verbs: [create, get, update]
 sast:
   deployment:
     annotations: []
@@ -313,9 +266,6 @@ sast:
       - apiGroups: [delivery-gear.gardener.cloud]
         resources: [backlogitems]
         verbs: [list, update, delete]
-      - apiGroups: [delivery-gear.gardener.cloud]
-        resources: [logcollections]
-        verbs: [create, get, update]
 sbom-generator:
   deployment:
     annotations: []
@@ -331,9 +281,6 @@ sbom-generator:
       - apiGroups: [delivery-gear.gardener.cloud]
         resources: [backlogitems]
         verbs: [list, update, delete]
-      - apiGroups: [delivery-gear.gardener.cloud]
-        resources: [logcollections]
-        verbs: [create, get, update]
 sla-violation-profiler:
   cronjob:
     resources:
@@ -352,11 +299,6 @@ sla-violation-profiler:
   enabled: false
   schedule: null
   target_namespace: null
-  rbac:
-    rules: # pushes logs into logcollections CRDs only
-      - apiGroups: [delivery-gear.gardener.cloud]
-        resources: [logcollections]
-        verbs: [create, get, update]
   ttl_seconds_after_finished: null
   successful_jobs_history_limit: null
   failed_jobs_history_limit: null
@@ -377,9 +319,6 @@ trivy:
       - apiGroups: [delivery-gear.gardener.cloud]
         resources: [backlogitems]
         verbs: [list, update, delete]
-      - apiGroups: [delivery-gear.gardener.cloud]
-        resources: [logcollections]
-        verbs: [create, get, update]
   cache:
     enabled: false
     storageClass: "" # if empty default SC is used

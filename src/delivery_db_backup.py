@@ -1,4 +1,3 @@
-import atexit
 import collections.abc
 import datetime
 import hashlib
@@ -19,8 +18,6 @@ import structlog
 import version
 
 import ctx_util
-import k8s.logging
-import k8s.util
 import lookups
 import odg.extensions_cfg
 import odg.logging_cfg
@@ -32,7 +29,6 @@ import secret_mgmt
 import secret_mgmt.oci_registry
 
 logger = structlog.get_logger(__name__)
-k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging()
 odg.telemetry.configure_telemetry()
 
@@ -269,21 +265,7 @@ def main():
         ),
     )
     namespace = parsed_arguments.k8s_namespace
-
     secret_factory = ctx_util.secret_factory()
-    kubernetes_api = k8s.util.kubernetes_api(kubeconfig_path=parsed_arguments.kubeconfig)
-
-    k8s.logging.init_logging_thread(
-        service=odg.extensions_cfg.Services.DELIVERY_DB_BACKUP,
-        namespace=namespace,
-        kubernetes_api=kubernetes_api,
-    )
-    atexit.register(
-        k8s.logging.log_to_crd,
-        service=odg.extensions_cfg.Services.DELIVERY_DB_BACKUP,
-        namespace=namespace,
-        kubernetes_api=kubernetes_api,
-    )
 
     logger.info('creating delivery-db backup')
 

@@ -1,6 +1,6 @@
 {{- $podName := "cache-manager" }}
 
-{{- include "odg.rbac" . }}
+{{- include "odg.serviceaccount" (dict "name" .Chart.Name "context" .) }}
 ---
 
 apiVersion: batch/v1

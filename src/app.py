@@ -320,10 +320,6 @@ def add_routes(
         handler=service_extensions.ServiceExtensions,
     )
     swagger.add_view(
-        path='/service-extensions/log-collections',
-        handler=service_extensions.LogCollections,
-    )
-    swagger.add_view(
         path='/service-extensions/container-statuses',
         handler=service_extensions.ContainerStatuses,
     )

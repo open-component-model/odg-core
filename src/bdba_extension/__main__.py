@@ -8,7 +8,6 @@ import bdba.client
 import bdba_utils.scan
 import deliverydb_cache.model as dcm
 import deliverydb_cache.util as dcu
-import k8s.logging
 import k8s.util
 import odg.extensions_cfg
 import odg.findings
@@ -22,7 +21,6 @@ import secret_mgmt
 import secret_mgmt.bdba
 
 logger = structlog.get_logger(__name__)
-k8s.logging.configure_kubernetes_logging()
 odg.logging_cfg.configure_logging()
 odg.telemetry.configure_telemetry()
 
