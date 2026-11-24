@@ -133,7 +133,7 @@ spec:
           {{- if default dict .Values.envVars }}
           {{- range $key, $value := .Values.envVars }}
           - name: {{ $key }}
-            value: {{ $value }}
+            value: {{ $value | quote }}
           {{- end }}
           {{- end }}
           volumeMounts:
