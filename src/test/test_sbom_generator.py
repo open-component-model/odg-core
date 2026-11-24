@@ -17,6 +17,14 @@ _RESOURCES = pathlib.Path(__file__).parent / 'resources'
 _SMOKE_FIXTURE = _RESOURCES / 'component_descriptor_ocm_sbom.yaml'
 
 
+@pytest.fixture(autouse=True)
+def _allowlist_fixture_registry():
+    # the test fixtures reference `registry.example.com`, which is not in the real allowlist;
+    # treat every image reference as allowlisted so iter_blob_descriptors does not reject pulls
+    with unittest.mock.patch('lookups.is_allowlisted_ocm_repo', return_value=True):
+        yield
+
+
 def _make_resource(
     name='my-image',
     version='1.0.0',

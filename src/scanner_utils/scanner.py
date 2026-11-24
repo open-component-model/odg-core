@@ -120,23 +120,14 @@ class Scanner(abc.ABC):
         )
         artefact_ref = f'{resource_node.resource.name}:{resource_node.resource.version}'
 
-        if access.type is ocm.AccessType.OCI_REGISTRY and not lookups.is_allowlisted_ocm_repo(
-            access.imageReference,
-        ):
-            odg.audit.emit(
-                action='scan_artefact_pull',
-                component=component_ref,
-                artefact=artefact_ref,
-                odg_audit_target=_access_reference(access=access),
-                odg_audit_outcome=odg.audit.Outcome.DENIED,
-                odg_audit_detail={
-                    'access_type': access.type.value,
-                    'scanner': type(self).__name__,
-                },
-            )
-            raise PermissionError(
-                f'container image registry not in allowlist: {access.imageReference!r}',
-            )
+        # enforce the registry allowlist before any pull; raises PermissionError and emits a
+        # DENIED audit event for non-allowlisted OCI_REGISTRY images (no-op for other accesses).
+        lookups.ensure_allowlisted_oci_access(
+            access=access,
+            audit_component=component_ref,
+            audit_artefact=artefact_ref,
+            audit_detail={'scanner': type(self).__name__},
+        )
 
         # one audit event per scanned artefact: records which repo/registry the scanner
         # extension pulled from (e.g. after a credential leak). The outcome records

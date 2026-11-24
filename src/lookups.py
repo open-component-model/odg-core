@@ -27,6 +27,7 @@ import version as versionutil
 import ctx_util
 import deliverydb_cache.model as dcm
 import deliverydb_cache.util as dcu
+import odg.audit
 import odg_client
 import paths
 import secret_mgmt.github
@@ -463,6 +464,49 @@ def is_allowlisted_ocm_repo(
                 return True
 
     return False
+
+
+def ensure_allowlisted_oci_access(
+    access: ocm.Access,
+    *,
+    audit_component: ocm.Component | str | None = None,
+    audit_artefact: str | None = None,
+    audit_detail: dict | None = None,
+) -> None:
+    """
+    Enforce the OCM-repo allowlist on an OCI_REGISTRY access before any image is pulled.
+
+    No-op for non-OCI_REGISTRY accesses. For a non-allowlisted image reference, emits a
+    `DENIED` audit event and raises `PermissionError`; otherwise returns silently (the
+    successful-pull audit event is left to the caller, which has richer context).
+
+    `audit_component` may be a pre-formatted `name:version` string or an `ocm.Component`
+    (formatted lazily, only on the denied path, so callers need not build it eagerly).
+    """
+    if access.type is not ocm.AccessType.OCI_REGISTRY:
+        return
+
+    image_reference = access.imageReference
+    if is_allowlisted_ocm_repo(image_reference):
+        return
+
+    if isinstance(audit_component, ocm.Component):
+        audit_component = f'{audit_component.name}:{audit_component.version}'
+
+    odg.audit.emit(
+        action='scan_artefact_pull',
+        component=audit_component,
+        artefact=audit_artefact,
+        odg_audit_target=image_reference,
+        odg_audit_outcome=odg.audit.Outcome.DENIED,
+        odg_audit_detail={
+            'access_type': access.type.value,
+            **(audit_detail or {}),
+        },
+    )
+    raise PermissionError(
+        f'container image registry not in allowlist: {image_reference!r}',
+    )
 
 
 @functools.cache

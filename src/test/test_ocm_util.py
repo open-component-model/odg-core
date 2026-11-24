@@ -1,6 +1,7 @@
 import unittest.mock
 
 import ocm
+import pytest
 
 import ocm_util
 import odg.labels
@@ -186,3 +187,72 @@ class TestIterResourcesReferencing:
         )
         component = _make_component([subject, ref])
         assert list(ocm_util.iter_resources_referencing(component, subject)) == [ref]
+
+
+# --- iter_blob_descriptors allowlist enforcement ---
+
+
+class TestIterBlobDescriptorsAllowlist:
+    def _component(self):
+        component = unittest.mock.MagicMock(spec=ocm.Component)
+        component.name = 'example.org/test'
+        component.version = '1.0.0'
+        return component
+
+    def test_non_allowlisted_oci_image_raises(self):
+        access = ocm.OciAccess(imageReference='evil.example.com/bad/image:latest')
+        with (
+            unittest.mock.patch('lookups.is_allowlisted_ocm_repo', return_value=False),
+            unittest.mock.patch('odg.audit.emit') as mock_emit,
+        ):
+            with pytest.raises(PermissionError, match='not in allowlist'):
+                # function body runs eagerly (returns a generator, does not yield), so the
+                # allowlist check fires on call
+                ocm_util.iter_blob_descriptors(
+                    component=self._component(),
+                    access=access,
+                    oci_client=unittest.mock.MagicMock(),
+                    secret_factory=unittest.mock.MagicMock(),
+                )
+        mock_emit.assert_called_once()
+        assert mock_emit.call_args.kwargs['odg_audit_outcome'] == 'denied'
+
+    def test_allowlisted_oci_image_proceeds(self):
+        access = ocm.OciAccess(imageReference='ghcr.io/org/image:latest')
+        with (
+            unittest.mock.patch('lookups.is_allowlisted_ocm_repo', return_value=True),
+            unittest.mock.patch(
+                'ocm_util._iter_blob_descriptors_for_manifest',
+                return_value=iter([]),
+            ) as mock_manifest,
+        ):
+            result = ocm_util.iter_blob_descriptors(
+                component=self._component(),
+                access=access,
+                oci_client=unittest.mock.MagicMock(),
+                secret_factory=unittest.mock.MagicMock(),
+            )
+            assert list(result) == []
+        mock_manifest.assert_called_once()
+
+    def test_non_oci_access_skips_check(self):
+        access = ocm.LocalBlobAccess(
+            localReference='sha256:abc123',
+            mediaType='application/octet-stream',
+        )
+        with (
+            unittest.mock.patch('lookups.is_allowlisted_ocm_repo') as mock_check,
+            unittest.mock.patch(
+                'ocm_util._iter_blob_descriptors_for_blob',
+                return_value=iter([]),
+            ),
+        ):
+            list(
+                ocm_util.iter_blob_descriptors(
+                    component=self._component(),
+                    access=access,
+                    oci_client=unittest.mock.MagicMock(),
+                    secret_factory=unittest.mock.MagicMock(),
+                ),
+            )
+        mock_check.assert_not_called()
