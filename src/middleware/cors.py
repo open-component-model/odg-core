@@ -14,6 +14,8 @@ def cors_headers(
     if not (origin := request.headers.get('Origin')):
         return headers
 
+    headers['Vary'] = 'Origin'
+
     allow_origins = request.app[consts.APP_ALLOW_ORIGINS]
     if origin not in allow_origins:
         return headers
