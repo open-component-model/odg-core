@@ -7,6 +7,12 @@ on:
         options:
           - bdba
           - odg
+      version:
+        type: string
+        required: false
+        description: |
+          Optional version to publish (e.g. 0.16.0).
+          If not set, the latest PyPI version is bumped by minor.
 
 concurrency:
   group: release-${{ inputs.client }}-client
@@ -17,27 +23,39 @@ permissions: {}
 jobs:
   build:
     runs-on: ubuntu-latest
-    name: Build and Update Python Package
+    name: Build Python package
     permissions:
+      contents: read
       id-token: write
     steps:
-      - name: Verify Dispatch Ref
+      - name: Verify dispatch ref
         run: |
           if [[ "$GITHUB_REF_TYPE" != "branch" || "$GITHUB_REF_NAME" != "master" ]]; then
             echo "Error: this workflow must be dispatched from 'master', got: $GITHUB_REF_NAME"
             exit 1
           fi
-      - uses: gardener/cc-utils/.github/actions/trusted-checkout@bce63f62928717a11f610ec8022af9feb497d5df # v1
-        id: token
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          token-server: ${{ vars.FEDERATED_GITHUB_ACCESS_TOKEN_SERVER }}
-          github-auth-token-permissions: |
-            contents: write
-            pull-requests: write
-          init-git-identity: true
+          persist-credentials: false
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-      - name: Create Distribution Package
+      - name: Determine version
+        id: version
+        run: |
+          set -euo pipefail
+
+          if [[ -n "${{ inputs.version }}" ]]; then
+            uv version --project "packages/${{ inputs.client }}-client" --frozen "${{ inputs.version }}"
+          else
+            uv venv --no-project -q /tmp/pypi-resolve
+            latest=$(uv pip install --no-deps --dry-run \
+              --python /tmp/pypi-resolve/bin/python \
+              "${{ inputs.client }}-client" \
+              2>&1 | grep '^\s*+' | sed 's/.*==\(.*\)/\1/')
+            uv version --project "packages/${{ inputs.client }}-client" --frozen "${latest}"
+            uv version --project "packages/${{ inputs.client }}-client" --frozen --bump minor
+          fi
+      - name: Create distribution packages
         shell: bash
         run: |
           set -euo pipefail
@@ -55,12 +73,12 @@ jobs:
 
           echo "Built package:"
           ls "${pkg_dir}"
-      - name: Upload Distribution Package
+      - name: Upload distribution package
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: distribution-package
           path: dist/
-      - name: Smoke Test
+      - name: Smoke test
         shell: bash
         run: |
           set -euo pipefail
@@ -78,56 +96,13 @@ jobs:
           ")
 
           uv venv --no-project .venv-smoke-test
-          uv pip install --python .venv-smoke-test/bin/python --no-deps "${wheel}"
+          uv pip install --python .venv-smoke-test/bin/python "${wheel}"
           .venv-smoke-test/bin/python -c "
           import importlib
           for mod in '${modules}'.split():
               importlib.import_module(mod)
               print(f'ok: {mod}')
           "
-      - name: Retrieve Version
-        id: version
-        shell: uv run --no-project --with semver python {0}
-        run: |
-          import os
-          import semver
-
-          version_file = '${{ inputs.client }}_CLIENT_VERSION'.upper()
-
-          with open(version_file) as f:
-            from_version = f.read().strip()
-
-          to_version = semver.Version.parse(from_version).bump_minor()
-
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-            f.write(f'from-version={from_version}\n')
-            f.write(f'to-version={to_version}\n')
-            f.write(f'version-file={version_file}\n')
-      - name: Update Version
-        shell: bash
-        env:
-          GH_TOKEN: ${{ steps.token.outputs.token }}
-        run: |
-          from_version=${{ steps.version.outputs.from-version }}
-          to_version=${{ steps.version.outputs.to-version }}
-          version_file=${{ steps.version.outputs.version-file }}
-
-          echo "$to_version" > "$version_file"
-          uv version --project "packages/${{ inputs.client }}-client" "$to_version"
-
-          # Pin the exact version in pyproject.toml so downstream consumers get the correct version
-          sed -i "s/\"${{ inputs.client }}-client.*\"/\"${{ inputs.client }}-client==${to_version}\"/" pyproject.toml
-
-          branch="bump-${{ inputs.client }}-client-${to_version}"
-          git checkout -b "${branch}"
-          git add "$version_file" "packages/${{ inputs.client }}-client/pyproject.toml" pyproject.toml uv.lock
-          git commit -m "Upgrade ${{ inputs.client }} client" -m "from ${from_version} to ${to_version}"
-          git push origin "${branch}"
-          gh pr create \
-            --base "$GITHUB_REF_NAME" \
-            --head "${branch}" \
-            --title "Upgrade ${{ inputs.client }} client from ${from_version} to ${to_version}" \
-            --body "Automated version bump triggered by release-client-package workflow."
 
   pypi:
     runs-on: ubuntu-latest
@@ -138,7 +113,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - name: Retrieve Distribution Package
+      - name: Retrieve distribution package
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: distribution-package
