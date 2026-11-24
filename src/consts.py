@@ -4,7 +4,11 @@ are dict-like objects, so the constants can be used to retrieve the desired vari
 globally available.
 """
 
-APP_BASE_URL = 'base_url'
+import aiohttp.web
+import sqlalchemy.ext.asyncio as sqlasync
+
+APP_BASE_URL = aiohttp.web.AppKey('base_url', str)
+APP_ALLOW_ORIGINS = aiohttp.web.AppKey('allow_origins', tuple[str, ...])
 APP_COMPONENT_DESCRIPTOR_LOOKUP = 'component_descriptor_lookup'
 APP_GITHUB_API_LOOKUP = 'github_api_lookup'
 APP_GITHUB_REPO_LOOKUP = 'github_repo_lookup'
@@ -13,7 +17,7 @@ APP_NAMESPACE = 'namespace'
 APP_OCI_CLIENT = 'oci_client'
 
 # `db_session` is intended to be used for tasks which have to be finished in a timely manner
-REQUEST_DB_SESSION = 'db_session'
+REQUEST_DB_SESSION = aiohttp.web.RequestKey('db_session', sqlasync.AsyncSession)
 # `db_url` key to create sessions outside the request-scoped ones
 REQUEST_DB_URL = 'db_url'
 REQUEST_USER_ID = 'user_id'

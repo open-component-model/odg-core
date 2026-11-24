@@ -1,0 +1,14 @@
+{
+  "helmchartResource": {
+    "name": "extensions"
+  },
+  "imageMapping": [
+    {
+      "resource": {
+        "name": "core"
+      },
+      "repository": "global.image.repository",
+      "tag": "global.image.tag"
+    }
+  ]
+}

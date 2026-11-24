@@ -995,7 +995,7 @@ ocm_repo_mappings:
   - type: oci
     # @param ocm_repo_mappings[].repository the OCM repository
     # e.g.
-    # repository: europe-docker.pkg.dev/gardener-project/releases
+    # repository: ghcr.io/open-component-model
     repository: ""
     # @param ocm_repo_mappings[].prefixes the prefix(es) of OCM component name(s) for which the OCM
     # repository should be used. Use `null` or the empty string "" as "match-all"
@@ -1925,7 +1925,7 @@ secrets:
       # note: The prefixes are _not_ evaluated as a regex
       # e.g.
       # image_reference_prefixes:
-      #   - europe-docker.pkg.dev/gardener-project
+      #   - ghcr.io/open-component-model
       image_reference_prefixes: []
       # @param secrets.oci-registry.<name>.privileges the privileges which are associated with this
       # serviceaccount, those are used during lookup of which credentials to use

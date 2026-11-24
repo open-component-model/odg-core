@@ -8,16 +8,16 @@ import yaml
 
 own_dir = os.path.dirname(__file__)
 repo_dir = os.path.abspath(os.path.join(own_dir, os.path.pardir))
-EXTENSION_DEFINITIONS_FILE = os.path.join(repo_dir, 'extension-definitions.yaml')
-VERSION_FILE = os.path.join(repo_dir, 'VERSION')
+EXTENSION_DEFINITIONS_FILE = os.path.join(
+    repo_dir,
+    'extension-definitions',
+    'extension-definitions.yaml',
+)
 LOCAL_ARTEFACTS = ('delivery-service', 'extensions')
 
 
 def main():
     next_version = sys.stdin.read().strip()
-
-    with open(VERSION_FILE, 'w') as f:
-        f.write(f'{next_version}\n')
 
     with open(EXTENSION_DEFINITIONS_FILE) as f:
         extension_definitions = list(yaml.safe_load_all(f.read()))

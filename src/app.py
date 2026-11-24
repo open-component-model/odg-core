@@ -16,9 +16,9 @@ import consts
 import deliverydb.cache_async
 import dora
 import features
-import k8s.util
 import lookups
 import metadata
+import middleware.audit
 import middleware.auth
 import middleware.cors
 import middleware.db_session
@@ -58,6 +58,24 @@ def parse_args():
     parser.add_argument('--delivery-db-url', default=None)
     parser.add_argument('--cache-dir', default=default_cache_dir)
     parser.add_argument(
+        '--base-url',
+        default=os.environ.get('BASE_URL'),
+        help=(
+            'public base URL of this service, used as the OIDC issuer; '
+            'defaults to the BASE_URL env var, else http://localhost:<port>'
+        ),
+    )
+    parser.add_argument(
+        '--allow-origins',
+        action='append',
+        default=None,
+        help=(
+            'origin permitted to make credentialed cross-origin (CORS) requests, e.g. the '
+            'delivery-dashboard URL; repeatable; defaults to the ALLOW_ORIGINS env var '
+            '(comma-separated), else http://localhost:3000'
+        ),
+    )
+    parser.add_argument(
         '--kubeconfig',
         help="""
             specify kubernetes cluster to interact with extensions (and logs); defaults
@@ -80,24 +98,29 @@ def parse_args():
 
 
 def get_base_url(
-    is_productive: bool,
-    kubernetes_api: k8s.util.KubernetesApi | None = None,
-    namespace: str | None = None,
+    base_url: str | None,
     port: int | None = None,
 ) -> str:
-    if not is_productive or not kubernetes_api:
-        return f'http://localhost:{port}'
+    return base_url or f'http://localhost:{port}'
 
-    http_route = kubernetes_api.custom_kubernetes_api.get_namespaced_custom_object(
-        group='gateway.networking.k8s.io',
-        version='v1',
-        plural='httproutes',
-        name='delivery-service',
-        namespace=namespace,
-    )
-    host = http_route['spec']['hostnames'][0]
 
-    return f'https://{host}'
+_LOCAL_DEV_ORIGIN = 'http://localhost:3000'
+
+
+def get_allow_origins(
+    allow_origins: list[str] | None,
+) -> tuple[str, ...]:
+    # CLI (--allow-origins, repeatable) takes precedence over the comma-separated
+    # ALLOW_ORIGINS env var; localhost:3000 is always included for local dev
+    if allow_origins:
+        origins = set(allow_origins)
+    elif env_value := os.environ.get('ALLOW_ORIGINS'):
+        origins = {o.strip() for o in env_value.split(',') if o.strip()}
+    else:
+        origins = set()
+
+    origins.add(_LOCAL_DEV_ORIGIN)
+    return tuple(sorted(origins))
 
 
 def add_app_context_vars(
@@ -129,13 +152,12 @@ def add_app_context_vars(
         namespace = None
 
     base_url = get_base_url(
-        is_productive=parsed_arguments.productive,
-        kubernetes_api=kubernetes_api,
-        namespace=namespace,
+        base_url=parsed_arguments.base_url,
         port=parsed_arguments.port,
     )
 
     app[consts.APP_BASE_URL] = base_url
+    app[consts.APP_ALLOW_ORIGINS] = get_allow_origins(parsed_arguments.allow_origins)
     app[consts.APP_COMPONENT_DESCRIPTOR_LOOKUP] = component_descriptor_lookup
     app[consts.APP_GITHUB_API_LOOKUP] = github_api_lookup
     app[consts.APP_GITHUB_REPO_LOOKUP] = github_repo_lookup
@@ -360,6 +382,8 @@ async def initialise_app():
     middlewares = [
         middleware.cors.cors_middleware(),
         middleware.errors.errors_middleware(),
+        # registered before the auth middleware so auth rejections (401/403) are also audited
+        middleware.audit.audit_middleware(),
         middleware.auth.auth_middleware(default_auth=default_auth),
         middleware.db_session.db_session_middleware(db_url=parsed_arguments.delivery_db_url),
         rfc.feature_check_middleware(),
@@ -389,14 +413,7 @@ async def initialise_app():
     )
     # Register on_response_prepare signal handler for CORS headers
     # This ensures CORS headers are added before StreamResponse.prepare() is called
-    app.on_response_prepare.append(
-        lambda request, response: middleware.cors._on_response_prepare_handler(
-            request,
-            response,
-            allow_origins='*',
-            allow_credentials='*',
-        ),
-    )
+    app.on_response_prepare.append(middleware.cors._on_response_prepare_handler)
     app = middleware.metrics.add_http_metrics_middleware(app=app)
 
     app = add_app_context_vars(
