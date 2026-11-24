@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 
+import contextlib
 import os
 import subprocess
+import threading
 
 import starlette.applications
 import starlette.responses
 import starlette.routing
 import starlette.staticfiles
+import structlog
 import uvicorn
 
 import odg.logging_cfg
@@ -20,6 +23,8 @@ odg.logging_cfg.quiet_uvicorn_access_log(path_prefixes=('/readiness',))
 # serves starlette/uvicorn, not aiohttp — only span export + log/trace identity apply
 odg.telemetry.configure_telemetry(instrument_aiohttp=False)
 
+
+logger = structlog.get_logger(__name__)
 
 status_file = os.path.join('/', 'freshclam', 'status')
 
@@ -52,8 +57,41 @@ def start_server(path, directory, port, debug=False):
     uvicorn.run(app, host='0.0.0.0', port=port, log_config=None)
 
 
-def main():
-    subprocess.run(
+def write_status(status: str) -> None:
+    with open(status_file, 'w') as f:
+        f.write(status)
+
+
+def clear_status() -> None:
+    with contextlib.suppress(FileNotFoundError):
+        os.remove(status_file)
+
+
+def verify_database_and_start_daemon() -> None:
+    # the status file survives a container restart in the same pod (emptyDir),
+    # so this container must verify the database itself before it may report
+    # ready; freshclam without --daemon performs a single foreground check and
+    # exits 0 whether it updated the database or found it still current, hence
+    # readiness also recovers when the daemon's OnUpdateExecute hook never runs
+    check_result = subprocess.run(
+        args=[
+            'freshclam',
+            '--config-file',
+            paths.freshclam_config_path,
+        ],
+    )
+
+    if check_result.returncode == 0:
+        write_status('up-to-date')
+        logger.info('virus database verified as up-to-date')
+    else:
+        write_status('outdated')
+        logger.error(
+            'virus database check failed',
+            returncode=check_result.returncode,
+        )
+
+    daemon_result = subprocess.run(
         args=[
             'freshclam',
             '--daemon',
@@ -61,6 +99,20 @@ def main():
             paths.freshclam_config_path,
         ],
     )
+
+    if daemon_result.returncode != 0:
+        write_status('outdated')
+        logger.error(
+            'freshclam daemon failed to start',
+            returncode=daemon_result.returncode,
+        )
+
+
+def main():
+    # invalidate a status retained from a previous container so readiness
+    # cannot pass before this container verified the database
+    clear_status()
+    threading.Thread(target=verify_database_and_start_daemon, daemon=True).start()
     start_server('/', '/www', 8080)
 
 

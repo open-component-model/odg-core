@@ -26,6 +26,8 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ $podName }}
+      securityContext:
+        {{- include "odg.podSecurityContext" . | nindent 8 }}
       containers:
         - name: {{ $podName }}
           image: {{ include "image" .Values.global.image }}
@@ -35,7 +37,7 @@ spec:
             - -m
             - freshclam
           securityContext:
-            allowPrivilegeEscalation: false
+            {{- include "odg.containerSecurityContext" . | nindent 12 }}
           env:
             - name: ODG_LOG_LEVEL
               value: {{ .Values.logLevel | default "INFO" | quote }}
@@ -53,6 +55,13 @@ spec:
               port: 8080
             periodSeconds: 10
             timeoutSeconds: 3
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: www
+              mountPath: /www
+            - name: freshclam-status
+              mountPath: /freshclam
           ports:
             - containerPort: 8080
               name: default
@@ -60,20 +69,15 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: www
+          emptyDir: {}
+        - name: freshclam-status
+          emptyDir: {}
 ---
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-egress-from-freshclam
-  namespace: {{ .Values.target_namespace | default .Release.Namespace }}
-spec:
-  podSelector:
-    matchLabels:
-      app: {{ $podName }}
-  policyTypes:
-    - Egress
-  egress:
-    - {}  # Allows all egress traffic to any destination and port
+{{- include "odg.netpol.egress" (list $podName . (dict "internet" true "anywherePorts" (list 80))) }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -87,6 +91,12 @@ spec:
   policyTypes:
     - Ingress
   ingress:
-  - ports:
+  - from:
+    # only the clamd pods pull whole-database files from this private mirror;
+    # kubelet probes arrive as host/node traffic and bypass pod network policy
+    - podSelector:
+        matchLabels:
+          app: clamav
+    ports:
     - protocol: TCP
       port: 8080

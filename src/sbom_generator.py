@@ -32,7 +32,6 @@ import syft
 logger = structlog.get_logger(__name__)
 odg.logging_cfg.configure_logging()
 odg.telemetry.configure_telemetry()
-own_dir = os.path.abspath(os.path.dirname(__file__))
 
 
 @dataclasses.dataclass
@@ -90,7 +89,7 @@ def generate_sbom_with_syft(
 ) -> SBOM:
     logger.info(f'Creating SBOM for resource node {resource_node} using syft')
 
-    with tempfile.TemporaryDirectory(dir=own_dir) as tmp_dir:
+    with tempfile.TemporaryDirectory() as tmp_dir:
         sbom_raw = syft.generate_raw_sbom_for_artefact(
             component=resource_node.component,
             resource=resource_node.resource,

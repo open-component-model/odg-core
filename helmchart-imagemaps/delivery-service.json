@@ -1,0 +1,14 @@
+{
+  "helmchartResource": {
+    "name": "delivery-service"
+  },
+  "imageMapping": [
+    {
+      "resource": {
+        "name": "core"
+      },
+      "repository": "image.repository",
+      "tag": "image.tag"
+    }
+  ]
+}

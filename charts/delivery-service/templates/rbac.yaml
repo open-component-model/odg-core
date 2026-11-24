@@ -35,12 +35,6 @@ rules:
       - create
       - delete
       - list
-  - apiGroups:
-      - gateway.networking.k8s.io
-    resources:
-      - httproutes
-    verbs:
-      - get
 ---
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1

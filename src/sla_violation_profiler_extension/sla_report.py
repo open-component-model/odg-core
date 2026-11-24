@@ -421,7 +421,11 @@ def main():
             )
 
     if not sla_cfg.github_repository:
-        _generate_report_for_components(out_dir=os.getcwd())
+        # without a github repository there is nowhere to publish; write to a
+        # temp dir — the working directory (image root) is read-only under
+        # readOnlyRootFilesystem
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            _generate_report_for_components(out_dir=tmp_dir)
         return
 
     repo_url = sla_cfg.github_repository

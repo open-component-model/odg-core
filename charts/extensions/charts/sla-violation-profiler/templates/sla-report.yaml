@@ -26,6 +26,8 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           serviceAccountName: {{ $podName }}
+          securityContext:
+            {{- include "odg.podSecurityContext" . | nindent 12 }}
           containers:
           - name: {{ $podName }}
             image: {{ include "image" .Values.global.image }}
@@ -35,7 +37,7 @@ spec:
             - -m
             - sla_violation_profiler_extension.sla_report
             securityContext:
-              allowPrivilegeEscalation: false
+              {{- include "odg.containerSecurityContext" . | nindent 14 }}
             env:
             - name: SECRET_FACTORY_PATH
               value: /secrets
@@ -50,6 +52,8 @@ spec:
             {{- include "odg.otelEnv" (mergeOverwrite (deepCopy .) (dict "serviceName" "sla-report")) | nindent 12 }}
             {{- include "odg.otelResourceAttrs" (mergeOverwrite (deepCopy .) (dict "containerName" "sla-report")) | nindent 12 }}
             volumeMounts:
+            - name: tmp
+              mountPath: /tmp
             - name: github
               mountPath: /secrets/github
             - name: github-app
@@ -63,6 +67,8 @@ spec:
               {{- toYaml . | nindent 16 }}
             {{- end }}
           volumes:
+            - name: tmp
+              emptyDir: {}
             - name: github
               secret:
                 secretName: secret-factory-github
@@ -81,16 +87,4 @@ spec:
                 name: findings-cfg
           restartPolicy: Never
 ---
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-egress-from-sla-report
-  namespace: {{ .Values.target_namespace | default .Release.Namespace }}
-spec:
-  podSelector:
-    matchLabels:
-      app: {{ $podName }}
-  policyTypes:
-    - Egress
-  egress:
-    - {}  # Allows all egress traffic to any destination and port
+{{- include "odg.netpol.egress" (list $podName . (dict "internet" true)) }}

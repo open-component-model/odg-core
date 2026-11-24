@@ -995,7 +995,7 @@ ocm_repo_mappings:
   - type: oci
     # @param ocm_repo_mappings[].repository the OCM repository
     # e.g.
-    # repository: europe-docker.pkg.dev/gardener-project/releases
+    # repository: ghcr.io/open-component-model
     repository: ""
     # @param ocm_repo_mappings[].prefixes the prefix(es) of OCM component name(s) for which the OCM
     # repository should be used. Use `null` or the empty string "" as "match-all"
@@ -1925,7 +1925,7 @@ secrets:
       # note: The prefixes are _not_ evaluated as a regex
       # e.g.
       # image_reference_prefixes:
-      #   - europe-docker.pkg.dev/gardener-project
+      #   - ghcr.io/open-component-model
       image_reference_prefixes: []
       # @param secrets.oci-registry.<name>.privileges the privileges which are associated with this
       # serviceaccount, those are used during lookup of which credentials to use
@@ -2095,3 +2095,44 @@ secrets:
       # note: you may use "openssl rsa -in private.pem -outform PEM -pubout -out public.pem" for
       # generation
       public_key: ""
+
+# @section netpol network policy knobs of the extensions and delivery-service charts.
+# NOTE: these are NOT bootstrapping values — set them via `global.netpol.*` in the
+# extensions umbrella chart (charts/extensions/values.yaml, shared with all extension
+# sub-charts) and via `netpol.*` in the delivery-service chart
+# (charts/delivery-service/values.yaml). Both charts ship a namespace-wide default-deny
+# policy (Ingress + Egress) plus tiered per-workload allow policies.
+netpol:
+  # @param netpol.dnsNamespaceLabels labels selecting the cluster DNS namespace
+  # (default kube-system)
+  # e.g. for OpenShift:
+  # dnsNamespaceLabels: {kubernetes.io/metadata.name: openshift-dns}
+  dnsNamespaceLabels: {}
+  # @param netpol.dnsPorts ports exposed to the DNS resolver's pods (UDP+TCP each).
+  # CNIs differ on pre-DNAT (Service port 53) vs post-DNAT (pod port) enforcement:
+  # 53 upstream CoreDNS, 8053 gardener shoots, 5353 OpenShift dns-default
+  dnsPorts: [53, 8053, 5353]
+  # @param netpol.dnsNodeLocalIps NodeLocal DNSCache link-local IPs, each rendered as
+  # a /32 ipBlock in the DNS rule. Set to [] on clusters without NodeLocal DNS
+  dnsNodeLocalIps: [169.254.20.10]
+  # @param netpol.postgresCidrs CIDRs of database hosts outside the cluster (port 5432);
+  # without entries only the in-cluster postgres pods are reachable
+  postgresCidrs: []
+  # @param netpol.dbClientLabelKey label key rendered onto DB-consuming pods, required
+  # once the database chart runs with primary.networkPolicy.allowExternal=false
+  # (upstream admits only <fullname>-client=true pods in its namespace)
+  dbClientLabelKey: "delivery-db-client"
+  # @param netpol.dbClientLabelValue label value (see above)
+  dbClientLabelValue: "true"
+  # @param netpol.otlpCollectorLabels pod labels selecting the in-namespace
+  # OpenTelemetry collector as an egress target for trace/metric export (TCP 4317+4318)
+  otlpCollectorLabels:
+    app.kubernetes.io/name: opentelemetry-collector
+  # @param netpol.gatewayNamespaceNames (delivery-service chart only) namespaces
+  # allowed to ingress beyond same-namespace pods. An explicitly empty list renders no
+  # extra namespaces; only an UNSET key falls back to envoy-gateway-system
+  gatewayNamespaceNames: [envoy-gateway-system]
+  # @param netpol.extraEgress extra egress rules rendered verbatim into the policy —
+  # for targets the tiers cannot express (cross-namespace/external collectors, egress
+  # proxies, registries on non-443 ports, databases on non-5432 ports)
+  extraEgress: []

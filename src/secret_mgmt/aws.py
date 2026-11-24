@@ -30,6 +30,9 @@ def find_cfg(
 
     aws_cfgs: list[AWS] = secret_factory.aws()
 
+    if len(aws_cfgs) == 0:
+        return None
+
     if len(aws_cfgs) == 1:
         return aws_cfgs[0]
 

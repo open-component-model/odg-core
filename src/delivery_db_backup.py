@@ -4,6 +4,7 @@ import hashlib
 import os
 import subprocess
 import tarfile
+import tempfile
 
 import cnudie.purge
 import oci.auth
@@ -309,7 +310,8 @@ def main():
     else:
         component_version = initial_version
 
-    outfile = os.path.abspath('./delivery-db-backup.tar')
+    # root filesystem is read-only at runtime; tmp is a writable emptyDir mount
+    outfile = os.path.join(tempfile.gettempdir(), 'delivery-db-backup.tar')
 
     if os.path.exists(outfile):
         logger.info('local backup present already, skipping creation')

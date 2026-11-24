@@ -34,7 +34,7 @@ features_cfg:
           offset_days: -1
 
 ocm_repo_mappings:
-  - repository: europe-docker.pkg.dev/gardener-project/releases
+  - repository: ghcr.io/open-component-model
 
 findings:
   - type: finding/malware
