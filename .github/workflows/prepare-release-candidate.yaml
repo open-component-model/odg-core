@@ -85,7 +85,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          target="${COMMIT_SHA:-${GITHUB_SHA}}"
+          target="${COMMIT_SHA:-$(git rev-parse HEAD)}"
 
           gh api \
             --method POST \
