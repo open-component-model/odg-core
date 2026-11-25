@@ -125,6 +125,29 @@ async def test_set_session_creates_bearer_and_refresh_cookies(signing_cfg):
 
 
 @pytest.mark.asyncio
+async def test_set_session_body_omits_identity_and_roles(signing_cfg):
+    # the response body must not leak user identity / roles into JS-readable storage; the
+    # signed JWT (with those claims) is delivered only via the httponly cookie
+    user = _make_user()
+    db_session = _make_db_session(user)
+
+    response = await middleware.auth.set_session_and_refresh_token(
+        user_id=USER_ID,
+        issuer=ISSUER,
+        db_session=db_session,
+        signing_cfg=signing_cfg,
+    )
+
+    body = json.loads(response.body)
+
+    assert set(body) == {'version', 'exp'}
+    assert body['version'] == 'v2'
+    assert isinstance(body['exp'], int)
+    for leaked in ('sub', 'roles', 'iss', 'iat', 'key_id'):
+        assert leaked not in body
+
+
+@pytest.mark.asyncio
 async def test_set_session_without_refresh_token_only_sets_bearer_cookie(signing_cfg):
     user = _make_user()
     db_session = _make_db_session(user)

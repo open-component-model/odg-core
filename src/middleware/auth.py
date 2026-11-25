@@ -591,8 +591,15 @@ async def set_session_and_refresh_token(
         'roles': list({role_binding['name'] for role_binding in role_bindings}),
     }
 
+    # the signed JWT (with all claims, incl. `sub` and `roles`) is delivered only via the
+    # httponly cookie below; the response body carries just what the client needs to schedule a
+    # proactive refresh (`exp`) and to validate the token version it is talking to (`version`),
+    # so no user identity or role information ends up in JS-readable storage
     response = aiohttp.web.json_response(
-        data=session_token,
+        data={
+            'version': session_token['version'],
+            'exp': session_token['exp'],
+        },
     )
 
     response.set_cookie(

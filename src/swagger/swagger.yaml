@@ -25,31 +25,17 @@ components:
             access token and to true otherwise. Always false for OIDC logins.
     AuthToken:
       type: object
+      description: >
+        Non-sensitive metadata about the session. The signed session JWT (carrying sub, roles,
+        iss, iat, key_id) is returned only as an httponly cookie, never in this body.
       required:
       - version
-      - sub
-      - iss
-      - iat
       - exp
-      - key_id
-      - roles
       properties:
         version:
           type: string
-        sub:
-          type: string
-        iss:
-          type: string
-        iat:
-          type: integer
         exp:
           type: integer
-        key_id:
-          type: string
-        roles:
-          type: array
-          items:
-            type: string
     AuthConfig:
       type: object
       required:
