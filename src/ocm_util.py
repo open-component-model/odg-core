@@ -22,6 +22,7 @@ import requests.exceptions
 import structlog
 import tarutil
 
+import lookups
 import odg.labels
 import odg.model
 import secret_mgmt
@@ -364,6 +365,11 @@ def iter_blob_descriptors(
     secret_factory: secret_mgmt.SecretFactory,
     aws_secret_name: str | None = None,
 ) -> collections.abc.Generator[BlobDescriptor, None, None]:
+    lookups.ensure_allowlisted_oci_access(
+        access=access,
+        audit_component=component,
+    )
+
     if access.type is ocm.AccessType.OCI_REGISTRY:
         access: ocm.OciAccess
 

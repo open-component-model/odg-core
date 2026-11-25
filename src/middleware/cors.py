@@ -9,7 +9,9 @@ def cors_headers(
 ) -> dict:
     # origin is only sent by browsers on cross-origin requests; server-to-server
     # callers (e.g. extension pods via internal DNS) omit it -> no CORS headers
-    headers = {}
+    # Vary: Origin must be set unconditionally so that caches populated by a
+    # no-Origin request don't serve that entry to a cross-origin request
+    headers = {'Vary': 'Origin'}
 
     if not (origin := request.headers.get('Origin')):
         return headers

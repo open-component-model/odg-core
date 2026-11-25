@@ -1,8 +1,10 @@
 import unittest.mock
 
+import ocm
 import pytest
 
 import lookups
+import odg.audit
 
 
 @pytest.fixture
@@ -218,3 +220,53 @@ def test_is_allowlisted_ocm_repo_virtual():
         assert lookups.is_allowlisted_ocm_repo('<auto>') is True
         assert lookups.is_allowlisted_ocm_repo('my-virtual-repo') is True
         assert lookups.is_allowlisted_ocm_repo('other-virtual-repo') is False
+
+
+# ---------------------------------------------------------------------------
+# ensure_allowlisted_oci_access (end-to-end against the real matching logic)
+# ---------------------------------------------------------------------------
+
+
+def test_ensure_allowlisted_oci_access_allows_allowlisted_image():
+    access = ocm.OciAccess(imageReference='ghcr.io/org/image:latest')
+    with _patched_allowlist():
+        # real matching logic runs; must not raise and must not emit any audit event
+        with unittest.mock.patch('odg.audit.emit') as mock_emit:
+            lookups.ensure_allowlisted_oci_access(access=access)
+    mock_emit.assert_not_called()
+
+
+def test_ensure_allowlisted_oci_access_rejects_non_allowlisted_image():
+    access = ocm.OciAccess(imageReference='evil.example.com/bad/image:latest')
+    with _patched_allowlist():
+        with unittest.mock.patch('odg.audit.emit') as mock_emit:
+            with pytest.raises(PermissionError, match='not in allowlist'):
+                lookups.ensure_allowlisted_oci_access(
+                    access=access,
+                    audit_component='my.component:1.0.0',
+                )
+    mock_emit.assert_called_once()
+    call_kwargs = mock_emit.call_args.kwargs
+    assert call_kwargs['odg_audit_outcome'] is odg.audit.Outcome.DENIED
+    assert call_kwargs['odg_audit_target'] == 'evil.example.com/bad/image:latest'
+    assert call_kwargs['component'] == 'my.component:1.0.0'
+
+
+def test_ensure_allowlisted_oci_access_rejects_lookalike_host():
+    # real bypass-rejection logic: a host that merely contains an allowlisted netloc as a
+    # prefix must not pass
+    access = ocm.OciAccess(imageReference='ghcr.io.attacker.com/org/image:latest')
+    with _patched_allowlist():
+        with pytest.raises(PermissionError):
+            lookups.ensure_allowlisted_oci_access(access=access)
+
+
+def test_ensure_allowlisted_oci_access_noop_for_non_oci_access():
+    access = ocm.LocalBlobAccess(
+        localReference='sha256:abc123',
+        mediaType='application/octet-stream',
+    )
+    with _patched_allowlist():
+        with unittest.mock.patch('odg.audit.emit') as mock_emit:
+            lookups.ensure_allowlisted_oci_access(access=access)
+    mock_emit.assert_not_called()
