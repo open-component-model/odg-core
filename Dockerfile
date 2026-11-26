@@ -14,7 +14,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 
 # ── Stage 2: installer ────────────────────────────────────────────────────────
-# Full BCI image with zypper — installs packages and builds the venv.
+# Full BCI image with zypper — installs packages, builds the venv, and
+# assembles a minimal /rootfs containing only the runtime packages needed.
 # Nothing from this stage's build tooling reaches the final image.
 FROM registry.suse.com/bci/python:3.14@sha256:5ee77207d55d42d760ade2f24418dc01c216f2bfde0c5ce14977137d4f59dd2e AS installer
 
@@ -45,6 +46,57 @@ RUN zypper --non-interactive install --no-recommends \
             esac; \
           done
 
+# Assemble minimal rootfs from exactly the runtime packages Python needs.
+# rpm -ql gives the authoritative file manifest — no hand-picked paths.
+RUN mkdir -p /rootfs/lib /rootfs/etc \
+        /rootfs/home/odg \
+        /rootfs/freshclam \
+        /rootfs/www \
+        /rootfs/run/clamav \
+        /rootfs/var/lib/clamav \
+        /rootfs/var/log/clamav \
+        /rootfs/tmp \
+        /rootfs/var/tmp \
+        /rootfs/usr/local/bin \
+        /rootfs/usr/sbin \
+        /rootfs/usr/bin \
+        /rootfs/sbin \
+        /rootfs/etc/clamav \
+        /rootfs/etc/certs \
+ && rpm -ql \
+        libpython3_14-1_0 \
+        python314-base \
+        glibc \
+        libz1 \
+        libbz2-1 \
+        liblzma5 \
+        libffi8 \
+        libexpat1 \
+        libmpdec4 \
+        libopenssl3 \
+        libsqlite3-0 \
+        libgcc_s1 \
+        libstdc++6 \
+        ca-certificates \
+    | while read -r f; do \
+        test -f "$f" || continue; \
+        mkdir -p "/rootfs$(dirname "$f")"; \
+        cp --dereference "$f" "/rootfs$f"; \
+      done \
+ && cp --dereference /lib/ld-linux-*.so.1 /rootfs/lib/ \
+ && chmod 1777 /rootfs/tmp /rootfs/var/tmp \
+ && ln -sf /usr/bin/python3.14 /rootfs/usr/local/bin/python3 \
+ && printf 'root:x:0:0:root:/root:/sbin/nologin\nodg:x:10000:10000::/home/odg:/sbin/nologin\n' \
+        > /rootfs/etc/passwd \
+ && printf 'root:x:0:\nodg:x:10000:\n' > /rootfs/etc/group \
+ && chown -R 10000:10000 \
+        /rootfs/home/odg \
+        /rootfs/freshclam \
+        /rootfs/www \
+        /rootfs/run/clamav \
+        /rootfs/var/lib/clamav \
+        /rootfs/var/log/clamav
+
 # Download SAP CA certs (curl is in the BCI base; not installed explicitly)
 ADD --checksum=sha256:840ce93e2c8e3e15ff9c48b360fa87ac726f1eb6d25cb1fc2711739515bac139 \
     https://aia.pki.co.sap.com/aia/SAP%20Global%20Root%20CA.crt \
@@ -70,16 +122,15 @@ RUN --mount=type=bind,source=dist/,target=/dist \
  && $VIRTUAL_ENV/bin/python3 -m compileall -q "$VIRTUAL_ENV/lib"
 
 
-# ── Stage 3: final (micro) ────────────────────────────────────────────────────
-# No package manager, no compiler, no shell — only the runtime.
-FROM registry.suse.com/bci/python:3.14-micro@sha256:d7f871893926b3cdd81d21698c641c87db94be9a906feb626d6992f036988165
+# ── Stage 3: final (scratch) ──────────────────────────────────────────────────
+# No base OS, no package manager, no shell — only what we explicitly copy in.
+FROM scratch
+
+# Minimal SUSE runtime: Python + glibc + openssl + ca-certs (and nothing else)
+COPY --from=installer /rootfs /
 
 # Python venv
 COPY --from=installer /opt/venv /opt/venv
-
-# C++ runtime — required by venv C extensions (greenlet, psycopg, etc.)
-COPY --from=installer /usr/lib64/libstdc++.so.6 /usr/lib64/
-COPY --from=installer /usr/lib64/libgcc_s.so.1 /usr/lib64/
 
 # Static Go binaries — no .so dependencies
 COPY --from=aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb \
@@ -114,31 +165,11 @@ COPY --from=installer /etc/pki/trust/anchors/ /etc/pki/trust/anchors/
 COPY src/malware/clamd.conf /etc/clamav/clamd.conf
 COPY src/malware/clamav_entrypoint.py /clamav_entrypoint.py
 
-# Runtime directories and unprivileged user
-# micro has no useradd — write /etc/passwd and /etc/group entries directly
-RUN sed -i 's|^root:.*|root:x:0:0:root:/root:/sbin/nologin|' /etc/passwd \
- && echo 'odg:x:10000:10000::/home/odg:/sbin/nologin' >> /etc/passwd \
- && echo 'odg:x:10000:' >> /etc/group \
- && mkdir -p /home/odg /freshclam /www /run/clamav /var/lib/clamav /var/log/clamav \
- && chown -R 10000:10000 /home/odg /freshclam /www /run/clamav /var/lib/clamav /var/log/clamav \
- && rm -f \
-        /bin/bash /bin/sh /bin/rbash \
-        /usr/bin/bash /usr/bin/sh /usr/bin/rbash \
-        /usr/bin/python3.14 /usr/bin/python3 /usr/local/bin/python3 \
-        /usr/bin/pip /usr/bin/pip3 /usr/bin/pip3.14 /usr/bin/pip-3.14 /usr/bin/pip3-3.14 \
-        /usr/local/bin/pydoc /usr/bin/pydoc3.14 \
-        /usr/bin/ldd /usr/bin/chroot /usr/bin/install
-
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-# micro base ships a pre-built ld.so.cache that only covers /lib64/; libs
-# copied into /usr/lib64/ at image-build time (clamav, pg, C++ runtime) are
-# invisible to the cache.  LD_LIBRARY_PATH is checked before the cache so the
-# dynamic linker finds them without ldconfig.
+# scratch has no ld.so.cache; LD_LIBRARY_PATH ensures the dynamic linker finds
+# libs copied into /usr/lib64/ (clamav, pg, C++ runtime, venv C extensions)
 ENV LD_LIBRARY_PATH=/usr/lib64
-# runtime-writable paths live in tmpfs/emptyDir mounts (/tmp covers caches via
-# XDG_CACHE_HOME/TRIVY_CACHE_DIR); HOME itself stays read-only under
-# readOnlyRootFilesystem
 ENV HOME=/home/odg
 ENV XDG_CACHE_HOME=/tmp/.cache
 ENV TRIVY_CACHE_DIR=/tmp/.cache/trivy
