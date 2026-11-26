@@ -116,11 +116,18 @@ COPY src/malware/clamav_entrypoint.py /clamav_entrypoint.py
 
 # Runtime directories and unprivileged user
 # micro has no useradd — write /etc/passwd and /etc/group entries directly
-RUN echo 'odg:x:10000:10000::/home/odg:/sbin/nologin' >> /etc/passwd \
+RUN sed -i 's|^root:.*|root:x:0:0:root:/root:/sbin/nologin|' /etc/passwd \
+ && echo 'odg:x:10000:10000::/home/odg:/sbin/nologin' >> /etc/passwd \
  && echo 'odg:x:10000:' >> /etc/group \
  && mkdir -p /home/odg /freshclam /www /run/clamav /var/lib/clamav /var/log/clamav \
  && chown -R 10000:10000 /home/odg /freshclam /www /run/clamav /var/lib/clamav /var/log/clamav \
- && rm -f /bin/bash /bin/sh /usr/bin/bash /usr/bin/sh
+ && rm -f \
+        /bin/bash /bin/sh /bin/rbash \
+        /usr/bin/bash /usr/bin/sh /usr/bin/rbash \
+        /usr/bin/python3.14 /usr/bin/python3 /usr/local/bin/python3 \
+        /usr/bin/pip /usr/bin/pip3 /usr/bin/pip3.14 /usr/bin/pip-3.14 /usr/bin/pip3-3.14 \
+        /usr/local/bin/pydoc /usr/bin/pydoc3.14 \
+        /usr/bin/ldd /usr/bin/chroot /usr/bin/install
 
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
