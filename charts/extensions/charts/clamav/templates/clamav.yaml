@@ -96,8 +96,9 @@ spec:
             preStop: # hook ensures that just created pods have at least enough time alive to add a termination signal handler
               exec:
                 command:
-                  - sleep
-                  - "60"
+                  - python3
+                  - -c
+                  - "import time; time.sleep(60)"
           {{- with (.Values.deployment).resources }}
           resources:
             {{- toYaml . | nindent 12 }}

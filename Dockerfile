@@ -23,28 +23,41 @@ COPY --from=ghcr.io/astral-sh/uv:0.13.10@sha256:a3ea1357342c1a4bf9a0c53a3deb1b55
 
 RUN zypper --non-interactive install --no-recommends \
     clamav \
+    git-core \
     libclamunrar12 \
     postgresql16 \
  && zypper --non-interactive clean --all \
- && mkdir -p /clamav-libs/usr/lib64 /clamav-libs/lib64 /pg-libs/usr/lib64 /pg-libs/lib64 \
- && for bin in /usr/sbin/clamd /usr/bin/freshclam; do \
+ && mkdir -p /clamav-libs/usr/lib64 /clamav-libs/lib64 /pg-libs/usr/lib64 /pg-libs/lib64 /git-libs/usr/lib64 /git-libs/lib64 \
+ && bash -euo pipefail -c ' \
+    for bin in /usr/sbin/clamd /usr/bin/freshclam; do \
         ldd "$bin" \
-        | awk '/=>/ && !/vdso/ {print $3}' \
+        | awk '"'"'/=>/ && !/vdso/ && $3 != "not" {print $3}'"'"' \
         | while read -r lib; do \
             case "$lib" in \
                 /usr/lib64/*) cp --dereference "$lib" /clamav-libs/usr/lib64/ ;; \
                 /lib64/*)     cp --dereference "$lib" /clamav-libs/lib64/ ;; \
+                *)            echo "unexpected lib path: $lib" >&2; exit 1 ;; \
             esac; \
           done; \
     done \
- && ldd /usr/lib/postgresql16/bin/pg_dump \
-        | awk '/=>/ && !/vdso/ {print $3}' \
+    && ldd /usr/lib/postgresql16/bin/pg_dump \
+        | awk '"'"'/=>/ && !/vdso/ && $3 != "not" {print $3}'"'"' \
         | while read -r lib; do \
             case "$lib" in \
                 /usr/lib64/*) cp --dereference "$lib" /pg-libs/usr/lib64/ ;; \
                 /lib64/*)     cp --dereference "$lib" /pg-libs/lib64/ ;; \
+                *)            echo "unexpected lib path: $lib" >&2; exit 1 ;; \
             esac; \
           done \
+    && ldd /usr/bin/git \
+        | awk '"'"'/=>/ && !/vdso/ && $3 != "not" {print $3}'"'"' \
+        | while read -r lib; do \
+            case "$lib" in \
+                /usr/lib64/*) cp --dereference "$lib" /git-libs/usr/lib64/ ;; \
+                /lib64/*)     cp --dereference "$lib" /git-libs/lib64/ ;; \
+                *)            echo "unexpected lib path: $lib" >&2; exit 1 ;; \
+            esac; \
+          done' \
  && cp --dereference /usr/lib64/libclamunrar.so.12 /clamav-libs/usr/lib64/ \
  && cp --dereference /usr/lib64/libclamunrar_iface.so.12 /clamav-libs/usr/lib64/
 
@@ -63,7 +76,8 @@ RUN mkdir -p /rootfs/lib /rootfs/etc \
         /rootfs/usr/sbin \
         /rootfs/usr/bin \
         /rootfs/etc/clamav \
- && rpm -ql \
+ && bash -euo pipefail -c ' \
+    pkgs=" \
         libpython3_14-1_0 \
         python314-base \
         glibc \
@@ -77,18 +91,21 @@ RUN mkdir -p /rootfs/lib /rootfs/etc \
         libsqlite3-0 \
         libgcc_s1 \
         libstdc++6 \
-        ca-certificates \
-    | while read -r f; do \
-        test -f "$f" || continue; \
-        mkdir -p "/rootfs$(dirname "$f")"; \
-        cp --dereference "$f" "/rootfs$f"; \
-      done \
- && cp --dereference /lib/ld-linux-*.so.1 /rootfs/lib/ \
+        ca-certificates" \
+    && rpm -q $pkgs \
+    && rpm -ql $pkgs \
+        | while read -r f; do \
+            test -f "$f" || continue; \
+            mkdir -p "/rootfs$(dirname "$f")"; \
+            cp --dereference "$f" "/rootfs$f"; \
+          done' \
  && mkdir -p /rootfs/usr/lib64 /rootfs/lib64 \
  && cp -a /clamav-libs/usr/lib64/. /rootfs/usr/lib64/ \
  && cp -a /clamav-libs/lib64/. /rootfs/lib64/ \
  && cp -a /pg-libs/usr/lib64/. /rootfs/usr/lib64/ \
  && cp -a /pg-libs/lib64/. /rootfs/lib64/ \
+ && cp -a /git-libs/usr/lib64/. /rootfs/usr/lib64/ \
+ && cp -a /git-libs/lib64/. /rootfs/lib64/ \
  && cp -a /etc/certs /rootfs/etc/certs \
  && chmod 1777 /rootfs/tmp /rootfs/var/tmp \
  && ln -sf /usr/bin/python3.14 /rootfs/usr/local/bin/python3 \
@@ -156,6 +173,9 @@ COPY --from=installer /usr/lib/postgresql16/bin/pg_dump /usr/local/bin/pg_dump
 # clamav binaries (their shared libs and the dlopen-loaded libclamunrar are in /rootfs)
 COPY --from=installer /usr/sbin/clamd /usr/sbin/clamd
 COPY --from=installer /usr/bin/freshclam /usr/bin/freshclam
+
+# git binary — needed by the SLA report extension (gitpython calls the git CLI)
+COPY --from=installer /usr/bin/git /usr/bin/git
 
 # CA certificates (SUSE uses /var/lib/ca-certificates; certifi symlink points to ca-bundle.pem)
 COPY --from=installer /var/lib/ca-certificates/ /var/lib/ca-certificates/
