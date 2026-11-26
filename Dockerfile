@@ -44,7 +44,9 @@ RUN zypper --non-interactive install --no-recommends \
                 /usr/lib64/*) cp --dereference "$lib" /pg-libs/usr/lib64/ ;; \
                 /lib64/*)     cp --dereference "$lib" /pg-libs/lib64/ ;; \
             esac; \
-          done
+          done \
+ && cp --dereference /usr/lib64/libclamunrar.so.12 /clamav-libs/usr/lib64/ \
+ && cp --dereference /usr/lib64/libclamunrar_iface.so.12 /clamav-libs/usr/lib64/
 
 # Assemble minimal rootfs from exactly the runtime packages Python needs.
 # rpm -ql gives the authoritative file manifest — no hand-picked paths.
@@ -60,9 +62,7 @@ RUN mkdir -p /rootfs/lib /rootfs/etc \
         /rootfs/usr/local/bin \
         /rootfs/usr/sbin \
         /rootfs/usr/bin \
-        /rootfs/sbin \
         /rootfs/etc/clamav \
-        /rootfs/etc/certs \
  && rpm -ql \
         libpython3_14-1_0 \
         python314-base \
@@ -84,6 +84,12 @@ RUN mkdir -p /rootfs/lib /rootfs/etc \
         cp --dereference "$f" "/rootfs$f"; \
       done \
  && cp --dereference /lib/ld-linux-*.so.1 /rootfs/lib/ \
+ && mkdir -p /rootfs/usr/lib64 /rootfs/lib64 \
+ && cp -a /clamav-libs/usr/lib64/. /rootfs/usr/lib64/ \
+ && cp -a /clamav-libs/lib64/. /rootfs/lib64/ \
+ && cp -a /pg-libs/usr/lib64/. /rootfs/usr/lib64/ \
+ && cp -a /pg-libs/lib64/. /rootfs/lib64/ \
+ && cp -a /etc/certs /rootfs/etc/certs \
  && chmod 1777 /rootfs/tmp /rootfs/var/tmp \
  && ln -sf /usr/bin/python3.14 /rootfs/usr/local/bin/python3 \
  && printf 'root:x:0:0:root:/root:/sbin/nologin\nodg:x:10000:10000::/home/odg:/sbin/nologin\n' \
@@ -95,7 +101,9 @@ RUN mkdir -p /rootfs/lib /rootfs/etc \
         /rootfs/www \
         /rootfs/run/clamav \
         /rootfs/var/lib/clamav \
-        /rootfs/var/log/clamav
+        /rootfs/var/log/clamav \
+ && printf '/lib64\n/usr/lib64\n' > /rootfs/etc/ld.so.conf \
+ && ldconfig -r /rootfs
 
 # Download SAP CA certs (curl is in the BCI base; not installed explicitly)
 ADD --checksum=sha256:840ce93e2c8e3e15ff9c48b360fa87ac726f1eb6d25cb1fc2711739515bac139 \
@@ -126,7 +134,11 @@ RUN --mount=type=bind,source=dist/,target=/dist \
 # No base OS, no package manager, no shell — only what we explicitly copy in.
 FROM scratch
 
-# Minimal SUSE runtime: Python + glibc + openssl + ca-certs (and nothing else)
+# Minimal SUSE runtime: Python + glibc + openssl + ca-certs, plus all runtime
+# .so libs (clamav, pg, C++ runtime), the ld.so.cache built in the installer,
+# and ClamAV's /etc/certs (code-signing certs ClamAV 1.x reads from this
+# compiled-in directory at verifier init to validate downloaded CVDs; absence
+# fails freshclam init and makes clamd reject the DB as "Broken or not a CVD")
 COPY --from=installer /rootfs /
 
 # Python venv
@@ -140,21 +152,10 @@ COPY --from=anchore/syft:v1.57.2@sha256:e97e20b6e6d1699c60296b66ab337941724f9bd0
     /syft /usr/local/bin/syft
 COPY --from=cbomkit-theia-builder /cbomkit-theia/cbomkit-theia /usr/local/bin/cbomkit-theia
 COPY --from=installer /usr/lib/postgresql16/bin/pg_dump /usr/local/bin/pg_dump
-COPY --from=installer /pg-libs/usr/lib64/ /usr/lib64/
-COPY --from=installer /pg-libs/lib64/ /lib64/
 
-# clamav binaries
+# clamav binaries (their shared libs and the dlopen-loaded libclamunrar are in /rootfs)
 COPY --from=installer /usr/sbin/clamd /usr/sbin/clamd
 COPY --from=installer /usr/bin/freshclam /usr/bin/freshclam
-# ClamAV code-signing cert — required by ClamAV 1.x to verify downloaded CVD signatures
-COPY --from=installer /etc/certs/clamav.crt /etc/certs/clamav.crt
-
-# clamav shared libraries — collected via ldd in installer stage
-COPY --from=installer /clamav-libs/usr/lib64/ /usr/lib64/
-COPY --from=installer /clamav-libs/lib64/ /lib64/
-# libclamunrar is dlopen-loaded at runtime (not visible to ldd)
-COPY --from=installer /usr/lib64/libclamunrar.so.12 /usr/lib64/
-COPY --from=installer /usr/lib64/libclamunrar_iface.so.12 /usr/lib64/
 
 # CA certificates (SUSE uses /var/lib/ca-certificates; certifi symlink points to ca-bundle.pem)
 COPY --from=installer /var/lib/ca-certificates/ /var/lib/ca-certificates/
@@ -167,9 +168,6 @@ COPY src/malware/clamav_entrypoint.py /clamav_entrypoint.py
 
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-# scratch has no ld.so.cache; LD_LIBRARY_PATH ensures the dynamic linker finds
-# libs copied into /usr/lib64/ (clamav, pg, C++ runtime, venv C extensions)
-ENV LD_LIBRARY_PATH=/usr/lib64
 ENV HOME=/home/odg
 ENV XDG_CACHE_HOME=/tmp/.cache
 ENV TRIVY_CACHE_DIR=/tmp/.cache/trivy
