@@ -741,7 +741,7 @@ class Rescore(aiohttp.web.View):
         elif isinstance(user_identifier, dm.OAuthUserIdentifier):
             rescoring_user = odg.model.OAuthUser(
                 username=user_identifier.username,
-                hostname=user_identifier.hostname,
+                issuer=user_identifier.issuer,
             )
         else:
             raise aiohttp.web.HTTPUnauthorized(

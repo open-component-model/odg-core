@@ -144,9 +144,9 @@ def _prepared_signing_key(
 
 async def _fetch_oauth_endpoints(
     well_known_url: str,
-) -> tuple[str, str, str]:
+) -> tuple[str, str, str, str]:
     """
-    Returns (authorization_url, token_url, userinfo_url)
+    Returns (authorization_url, token_url, userinfo_url, issuer)
     """
     try:
         async with aiohttp.ClientSession() as session:
@@ -166,8 +166,9 @@ async def _fetch_oauth_endpoints(
     authorization_url = discovery.get('authorization_endpoint')
     token_url = discovery.get('token_endpoint')
     userinfo_url = discovery.get('userinfo_endpoint')
+    issuer = discovery.get('issuer')
 
-    if not authorization_url or not token_url or not userinfo_url:
+    if not authorization_url or not token_url or not userinfo_url or not issuer:
         raise aiohttp.web.HTTPNotFound(
             text=f'well-known config under {well_known_url} is missing endpoints',
         )
@@ -177,6 +178,7 @@ async def _fetch_oauth_endpoints(
         ('authorization_endpoint', authorization_url),
         ('token_endpoint', token_url),
         ('userinfo_endpoint', userinfo_url),
+        ('issuer', issuer),
     ):
         parsed = urllib.parse.urlparse(url)
         if (parsed.scheme, parsed.netloc) != (expected_origin.scheme, expected_origin.netloc):
@@ -184,7 +186,7 @@ async def _fetch_oauth_endpoints(
                 text=f'discovery {name} {url!r} does not match origin of {well_known_url}',
             )
 
-    return authorization_url, token_url, userinfo_url
+    return authorization_url, token_url, userinfo_url, issuer
 
 
 @noauth
@@ -203,16 +205,25 @@ class OAuthCfgs(aiohttp.web.View):
                   $ref: '#/components/schemas/AuthConfig'
         """
 
-        async def oauth_cfg_to_dict(oauth_cfg: secret_mgmt.oauth_cfg.OAuthCfg):
+        async def oauth_cfg_to_dict(
+            oauth_cfg: secret_mgmt.oauth_cfg.OAuthCfg,
+        ) -> dict | None:
             hostname = urllib.parse.urlparse(oauth_cfg.api_url).hostname.lower()
 
             # note: no `redirect_uri`/`oauth_url_with_redirect` here on purpose: the OAuth
             # callback is owned by the UI (its landing page POSTs the code to /auth); GET
             # /auth (the former callback target) returns 410 Gone
             if not (oauth_url := oauth_cfg.authorization_url):
-                oauth_url, _, _ = await _fetch_oauth_endpoints(
-                    well_known_url=oauth_cfg.well_known_url,
-                )
+                try:
+                    oauth_url, _, _, _ = await _fetch_oauth_endpoints(
+                        well_known_url=oauth_cfg.well_known_url,
+                    )
+                except Exception:
+                    logger.warning(
+                        'skipping oauth provider: discovery failed',
+                        well_known_url=oauth_cfg.well_known_url,
+                    )
+                    return None
 
             return {
                 'name': oauth_cfg.name,
@@ -231,7 +242,11 @@ class OAuthCfgs(aiohttp.web.View):
             oauth_cfgs = []
 
         return aiohttp.web.json_response(
-            data=[await oauth_cfg_to_dict(oauth_cfg) for oauth_cfg in oauth_cfgs],
+            data=[
+                cfg_dict
+                for oauth_cfg in oauth_cfgs
+                if (cfg_dict := await oauth_cfg_to_dict(oauth_cfg)) is not None
+            ],
         )
 
 
@@ -365,7 +380,7 @@ async def find_oauth_identifier(
     code: str | None = None,
     redirect_uri: str | None = None,
 ) -> dm.OAuthUserIdentifier:
-    _, token_url, userinfo_url = await _fetch_oauth_endpoints(
+    _, token_url, userinfo_url, issuer = await _fetch_oauth_endpoints(
         well_known_url=oauth_cfg.well_known_url,
     )
 
@@ -437,7 +452,7 @@ async def find_oauth_identifier(
     return dm.OAuthUserIdentifier(
         username=username,
         groups=userinfo.get(oauth_cfg.groups_claim, []),
-        hostname=urllib.parse.urlparse(oauth_cfg.api_url).hostname.lower(),
+        issuer=issuer,
     )
 
 
@@ -689,7 +704,7 @@ def find_oauth_role_bindings(
             dm.RoleBinding(
                 name=role,
                 origin=dm.OAuthRoleBindingOrigin(
-                    hostname=user_identifier.hostname,
+                    issuer=user_identifier.issuer,
                     username=username,
                     group=group,
                 ),

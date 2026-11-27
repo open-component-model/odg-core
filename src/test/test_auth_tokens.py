@@ -786,6 +786,7 @@ _WELL_KNOWN_FULL = {
     'authorization_endpoint': 'https://idp.example.com/auth',
     'token_endpoint': 'https://idp.example.com/token',
     'userinfo_endpoint': 'https://idp.example.com/userinfo',
+    'issuer': 'https://idp.example.com',
 }
 
 
@@ -810,19 +811,20 @@ async def test_fetch_oauth_endpoints_returns_all_three():
     session = _make_well_known_session(_WELL_KNOWN_FULL)
 
     with unittest.mock.patch('aiohttp.ClientSession', return_value=session):
-        auth_url, token_url, userinfo_url = await middleware.auth._fetch_oauth_endpoints(
+        auth_url, token_url, userinfo_url, issuer = await middleware.auth._fetch_oauth_endpoints(
             well_known_url='https://idp.example.com/.well-known/openid-configuration',
         )
 
     assert auth_url == 'https://idp.example.com/auth'
     assert token_url == 'https://idp.example.com/token'
     assert userinfo_url == 'https://idp.example.com/userinfo'
+    assert issuer == 'https://idp.example.com'
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     'missing_key',
-    ['authorization_endpoint', 'token_endpoint', 'userinfo_endpoint'],
+    ['authorization_endpoint', 'token_endpoint', 'userinfo_endpoint', 'issuer'],
 )
 async def test_fetch_oauth_endpoints_raises_404_when_endpoint_missing(missing_key):
     discovery = dict(_WELL_KNOWN_FULL)
@@ -904,7 +906,12 @@ async def test_find_oauth_identifier_via_access_token():
         unittest.mock.patch(
             'middleware.auth._fetch_oauth_endpoints',
             new=unittest.mock.AsyncMock(
-                return_value=('https://idp/auth', 'https://idp/token', 'https://idp/userinfo'),
+                return_value=(
+                    'https://idp/auth',
+                    'https://idp/token',
+                    'https://idp/userinfo',
+                    'https://idp',
+                ),
             ),
         ),
         unittest.mock.patch('aiohttp.ClientSession', return_value=userinfo_session),
@@ -916,7 +923,7 @@ async def test_find_oauth_identifier_via_access_token():
 
     assert identifier.username == 'alice'
     assert identifier.groups == ['devs']
-    assert identifier.hostname == 'idp.example.com'
+    assert identifier.issuer == 'https://idp'
 
 
 @pytest.mark.asyncio
@@ -946,7 +953,12 @@ async def test_find_oauth_identifier_via_code_exchanges_token():
         unittest.mock.patch(
             'middleware.auth._fetch_oauth_endpoints',
             new=unittest.mock.AsyncMock(
-                return_value=('https://idp/auth', 'https://idp/token', 'https://idp/userinfo'),
+                return_value=(
+                    'https://idp/auth',
+                    'https://idp/token',
+                    'https://idp/userinfo',
+                    'https://idp',
+                ),
             ),
         ),
         unittest.mock.patch('aiohttp.ClientSession', side_effect=session_factory),
@@ -987,7 +999,12 @@ async def test_find_oauth_identifier_raises_401_on_error_in_token_response():
         unittest.mock.patch(
             'middleware.auth._fetch_oauth_endpoints',
             new=unittest.mock.AsyncMock(
-                return_value=('https://idp/auth', 'https://idp/token', 'https://idp/userinfo'),
+                return_value=(
+                    'https://idp/auth',
+                    'https://idp/token',
+                    'https://idp/userinfo',
+                    'https://idp',
+                ),
             ),
         ),
         unittest.mock.patch('aiohttp.ClientSession', return_value=token_session),
@@ -1010,7 +1027,12 @@ async def test_find_oauth_identifier_raises_401_when_username_claim_missing():
         unittest.mock.patch(
             'middleware.auth._fetch_oauth_endpoints',
             new=unittest.mock.AsyncMock(
-                return_value=('https://idp/auth', 'https://idp/token', 'https://idp/userinfo'),
+                return_value=(
+                    'https://idp/auth',
+                    'https://idp/token',
+                    'https://idp/userinfo',
+                    'https://idp',
+                ),
             ),
         ),
         unittest.mock.patch('aiohttp.ClientSession', return_value=userinfo_session),
@@ -1053,7 +1075,7 @@ def test_find_oauth_role_bindings_matches_group():
     user_identifier = dm.OAuthUserIdentifier(
         username='alice',
         groups=['devs', 'ops'],
-        hostname='idp.example.com',
+        issuer='https://idp.example.com',
     )
 
     bindings = list(
@@ -1082,7 +1104,7 @@ def test_find_oauth_role_bindings_matches_sub():
     user_identifier = dm.OAuthUserIdentifier(
         username='alice',
         groups=[],
-        hostname='idp.example.com',
+        issuer='https://idp.example.com',
     )
 
     bindings = list(
@@ -1111,7 +1133,7 @@ def test_find_oauth_role_bindings_no_match_yields_nothing():
     user_identifier = dm.OAuthUserIdentifier(
         username='bob',
         groups=['devs'],
-        hostname='idp.example.com',
+        issuer='https://idp.example.com',
     )
 
     bindings = list(

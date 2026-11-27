@@ -147,13 +147,13 @@ class OidcRoleBindingOrigin(RoleBindingOrigin):
 @dataclasses.dataclass(kw_only=True)
 class OAuthRoleBindingOrigin(RoleBindingOrigin):
     type: RoleBindingOriginType = RoleBindingOriginType.OAUTH
-    hostname: str
+    issuer: str
     username: str | None = None
     group: str | None = None
 
     @property
     def key(self) -> str:
-        return f'{self.type}|{self.hostname}|{self.username}|{self.group}'
+        return f'{self.type}|{self.issuer}|{self.username}|{self.group}'
 
 
 @dataclasses.dataclass
@@ -231,12 +231,12 @@ class GitHubUserIdentifier(UserIdentifier):
 
 @dataclasses.dataclass
 class OAuthUserIdentifier(UserIdentifier):
-    hostname: str
+    issuer: str
     groups: list[str]
 
     @property
     def normalised(self) -> str:
-        return f'username:{self.username}_hostname:{self.hostname}'
+        return f'username:{self.username}_issuer:{self.issuer}'
 
 
 @dataclasses.dataclass

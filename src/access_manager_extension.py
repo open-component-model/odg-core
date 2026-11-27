@@ -213,10 +213,14 @@ def iter_oauth_role_bindings(
     identifier: dm.OAuthUserIdentifier,
     oauth_cfgs: collections.abc.Iterable[secret_mgmt.oauth_cfg.OAuthCfg],
 ) -> collections.abc.Iterable[dm.RoleBinding]:
+    # groups are a snapshot from the last login; they are not re-fetched here because the access
+    # manager has no stored token to call the userinfo endpoint. a user removed from a group
+    # retains the derived role until their next login (or until their refresh token expires).
     for oauth_cfg in oauth_cfgs:
-        hostname = util.urlparse(oauth_cfg.api_url).hostname.lower()
+        # derive expected issuer from well_known_url (per RFC 8414: issuer + "/.well-known/...")
+        expected_issuer = oauth_cfg.well_known_url.removesuffix('/.well-known/openid-configuration')
 
-        if identifier.hostname != hostname:
+        if identifier.issuer != expected_issuer:
             continue
 
         def find_oauth_subject(
@@ -246,7 +250,7 @@ def iter_oauth_role_bindings(
                 dm.RoleBinding(
                     name=role,
                     origin=dm.OAuthRoleBindingOrigin(
-                        hostname=identifier.hostname,
+                        issuer=identifier.issuer,
                         username=username,
                         group=group,
                     ),

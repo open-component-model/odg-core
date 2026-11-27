@@ -997,7 +997,7 @@ class OidcUser(User):
 
 @dataclasses.dataclass(kw_only=True)
 class OAuthUser(User):
-    hostname: str
+    issuer: str
     type: str = 'oauth-user'
 
     @property
