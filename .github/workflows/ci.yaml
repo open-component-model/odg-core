@@ -80,6 +80,7 @@ jobs:
       - preprocess
     uses: ./.github/workflows/build.yaml
     permissions:
+      artifact-metadata: write
       attestations: write
       contents: read
       id-token: write

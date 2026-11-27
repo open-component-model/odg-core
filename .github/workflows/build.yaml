@@ -166,6 +166,7 @@ jobs:
     needs:
       - oci-image
     permissions:
+      artifact-metadata: write
       attestations: write
       contents: read
       id-token: write
@@ -218,6 +219,7 @@ jobs:
     needs:
       - collect-image
     permissions:
+      artifact-metadata: write
       attestations: write
       contents: read
       id-token: write
