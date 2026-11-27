@@ -609,12 +609,15 @@ async def test_github_login_via_code_and_client_id(signing_cfg):
         user=_make_user_idp(),
     )
 
+    oauth_cfg_mock = unittest.mock.MagicMock()
+    oauth_cfg_mock.type = secret_mgmt.oauth_cfg.OAuthCfgTypes.GITHUB
+
     with (
         unittest.mock.patch('ctx_util.secret_factory'),
         unittest.mock.patch.object(
             middleware.auth,
-            'find_github_oauth_cfg',
-            return_value=unittest.mock.MagicMock(),
+            'find_oauth_cfg',
+            return_value=oauth_cfg_mock,
         ),
         unittest.mock.patch.object(
             middleware.auth,
@@ -644,12 +647,15 @@ async def test_github_login_via_access_token_and_api_url(signing_cfg):
         user=_make_user_idp(),
     )
 
+    oauth_cfg_mock = unittest.mock.MagicMock()
+    oauth_cfg_mock.type = secret_mgmt.oauth_cfg.OAuthCfgTypes.GITHUB
+
     with (
         unittest.mock.patch('ctx_util.secret_factory'),
         unittest.mock.patch.object(
             middleware.auth,
-            'find_github_oauth_cfg',
-            return_value=unittest.mock.MagicMock(),
+            'find_oauth_cfg',
+            return_value=oauth_cfg_mock,
         ),
         unittest.mock.patch.object(
             middleware.auth,
@@ -742,7 +748,7 @@ async def test_login_without_credentials_raises_401():
         {'client_id': 'unknown-client-id'},
     ],
 )
-def test_find_github_oauth_cfg_does_not_leak_configured_values(lookup_kwargs):
+def test_find_oauth_cfg_does_not_leak_configured_values(lookup_kwargs):
     oauth_cfg = secret_mgmt.oauth_cfg.OAuthCfg(
         name='internal',
         type=secret_mgmt.oauth_cfg.OAuthCfgTypes.GITHUB,
@@ -752,7 +758,7 @@ def test_find_github_oauth_cfg_does_not_leak_configured_values(lookup_kwargs):
     )
 
     with pytest.raises(aiohttp.web.HTTPUnauthorized) as excinfo:
-        middleware.auth.find_github_oauth_cfg(
+        middleware.auth.find_oauth_cfg(
             oauth_cfgs=[oauth_cfg],
             **lookup_kwargs,
         )
@@ -761,3 +767,381 @@ def test_find_github_oauth_cfg_does_not_leak_configured_values(lookup_kwargs):
     assert header == 'invalid api_url or client_id'
     assert oauth_cfg.api_url not in header
     assert oauth_cfg.client_id not in header
+
+
+# ---------------------------------------------------------------------------
+# _fetch_oauth_endpoints
+# ---------------------------------------------------------------------------
+
+_WELL_KNOWN_FULL = {
+    'authorization_endpoint': 'https://idp.example.com/auth',
+    'token_endpoint': 'https://idp.example.com/token',
+    'userinfo_endpoint': 'https://idp.example.com/userinfo',
+}
+
+
+def _make_well_known_session(discovery: dict):
+    res = unittest.mock.MagicMock()
+    res.ok = True
+    res.raise_for_status = unittest.mock.MagicMock()
+    res.json = unittest.mock.AsyncMock(return_value=discovery)
+    res.__aenter__ = unittest.mock.AsyncMock(return_value=res)
+    res.__aexit__ = unittest.mock.AsyncMock(return_value=None)
+
+    session = unittest.mock.MagicMock()
+    session.get = unittest.mock.MagicMock(return_value=res)
+    session.__aenter__ = unittest.mock.AsyncMock(return_value=session)
+    session.__aexit__ = unittest.mock.AsyncMock(return_value=None)
+
+    return session
+
+
+@pytest.mark.asyncio
+async def test_fetch_oauth_endpoints_returns_all_three():
+    session = _make_well_known_session(_WELL_KNOWN_FULL)
+
+    with unittest.mock.patch('aiohttp.ClientSession', return_value=session):
+        auth_url, token_url, userinfo_url = await middleware.auth._fetch_oauth_endpoints(
+            well_known_url='https://idp.example.com/.well-known/openid-configuration',
+        )
+
+    assert auth_url == 'https://idp.example.com/auth'
+    assert token_url == 'https://idp.example.com/token'
+    assert userinfo_url == 'https://idp.example.com/userinfo'
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    'missing_key',
+    ['authorization_endpoint', 'token_endpoint', 'userinfo_endpoint'],
+)
+async def test_fetch_oauth_endpoints_raises_404_when_endpoint_missing(missing_key):
+    discovery = dict(_WELL_KNOWN_FULL)
+    del discovery[missing_key]
+
+    session = _make_well_known_session(discovery)
+
+    with (
+        unittest.mock.patch('aiohttp.ClientSession', return_value=session),
+        pytest.raises(aiohttp.web.HTTPNotFound),
+    ):
+        await middleware.auth._fetch_oauth_endpoints(
+            well_known_url='https://idp.example.com/.well-known/openid-configuration',
+        )
+
+
+# ---------------------------------------------------------------------------
+# find_oauth_identifier
+# ---------------------------------------------------------------------------
+
+
+def _make_oauth_cfg(
+    *,
+    username_claim: str = 'sub',
+    groups_claim: str = 'groups',
+) -> secret_mgmt.oauth_cfg.OAuthCfg:
+    return secret_mgmt.oauth_cfg.OAuthCfg(
+        name='my-idp',
+        type=secret_mgmt.oauth_cfg.OAuthCfgTypes.OAUTH,
+        api_url='https://idp.example.com',
+        client_id='client-id',
+        client_secret='client-secret',
+        username_claim=username_claim,
+        groups_claim=groups_claim,
+    )
+
+
+def _make_token_session(access_token: str = 'at-xyz') -> unittest.mock.MagicMock:
+    token_res = unittest.mock.MagicMock()
+    token_res.ok = True
+    token_res.raise_for_status = unittest.mock.MagicMock()
+    token_res.json = unittest.mock.AsyncMock(return_value={'access_token': access_token})
+    token_res.__aenter__ = unittest.mock.AsyncMock(return_value=token_res)
+    token_res.__aexit__ = unittest.mock.AsyncMock(return_value=None)
+
+    session = unittest.mock.MagicMock()
+    session.post = unittest.mock.MagicMock(return_value=token_res)
+    session.__aenter__ = unittest.mock.AsyncMock(return_value=session)
+    session.__aexit__ = unittest.mock.AsyncMock(return_value=None)
+
+    return session
+
+
+def _make_userinfo_session(userinfo: dict) -> unittest.mock.MagicMock:
+    userinfo_res = unittest.mock.MagicMock()
+    userinfo_res.ok = True
+    userinfo_res.raise_for_status = unittest.mock.MagicMock()
+    userinfo_res.json = unittest.mock.AsyncMock(return_value=userinfo)
+    userinfo_res.__aenter__ = unittest.mock.AsyncMock(return_value=userinfo_res)
+    userinfo_res.__aexit__ = unittest.mock.AsyncMock(return_value=None)
+
+    session = unittest.mock.MagicMock()
+    session.get = unittest.mock.MagicMock(return_value=userinfo_res)
+    session.__aenter__ = unittest.mock.AsyncMock(return_value=session)
+    session.__aexit__ = unittest.mock.AsyncMock(return_value=None)
+
+    return session
+
+
+@pytest.mark.asyncio
+async def test_find_oauth_identifier_via_access_token():
+    oauth_cfg = _make_oauth_cfg()
+    userinfo_session = _make_userinfo_session({'sub': 'alice', 'groups': ['devs']})
+
+    with (
+        unittest.mock.patch(
+            'middleware.auth._fetch_oauth_endpoints',
+            new=unittest.mock.AsyncMock(
+                return_value=('https://idp/auth', 'https://idp/token', 'https://idp/userinfo'),
+            ),
+        ),
+        unittest.mock.patch('aiohttp.ClientSession', return_value=userinfo_session),
+    ):
+        identifier = await middleware.auth.find_oauth_identifier(
+            oauth_cfg=oauth_cfg,
+            access_token='at-existing',
+        )
+
+    assert identifier.username == 'alice'
+    assert identifier.groups == ['devs']
+    assert identifier.hostname == 'idp.example.com'
+
+
+@pytest.mark.asyncio
+async def test_find_oauth_identifier_via_code_exchanges_token():
+    oauth_cfg = _make_oauth_cfg()
+    token_session = _make_token_session(access_token='at-from-code')
+
+    # second ClientSession call (userinfo) must succeed too
+    userinfo_res = unittest.mock.MagicMock()
+    userinfo_res.ok = True
+    userinfo_res.json = unittest.mock.AsyncMock(return_value={'sub': 'bob', 'groups': []})
+    userinfo_res.__aenter__ = unittest.mock.AsyncMock(return_value=userinfo_res)
+    userinfo_res.__aexit__ = unittest.mock.AsyncMock(return_value=None)
+    userinfo_session = unittest.mock.MagicMock()
+    userinfo_session.get = unittest.mock.MagicMock(return_value=userinfo_res)
+    userinfo_session.__aenter__ = unittest.mock.AsyncMock(return_value=userinfo_session)
+    userinfo_session.__aexit__ = unittest.mock.AsyncMock(return_value=None)
+
+    call_count = 0
+
+    def session_factory():
+        nonlocal call_count
+        call_count += 1
+        return token_session if call_count == 1 else userinfo_session
+
+    with (
+        unittest.mock.patch(
+            'middleware.auth._fetch_oauth_endpoints',
+            new=unittest.mock.AsyncMock(
+                return_value=('https://idp/auth', 'https://idp/token', 'https://idp/userinfo'),
+            ),
+        ),
+        unittest.mock.patch('aiohttp.ClientSession', side_effect=session_factory),
+    ):
+        identifier = await middleware.auth.find_oauth_identifier(
+            oauth_cfg=oauth_cfg,
+            code='auth-code',
+        )
+
+    assert identifier.username == 'bob'
+    token_session.post.assert_called_once()
+    _, kwargs = token_session.post.call_args
+    assert kwargs['data']['code'] == 'auth-code'
+    assert kwargs['data']['client_secret'] == 'client-secret'
+
+
+@pytest.mark.asyncio
+async def test_find_oauth_identifier_raises_401_on_error_in_token_response():
+    oauth_cfg = _make_oauth_cfg()
+
+    error_res = unittest.mock.MagicMock()
+    error_res.ok = True
+    error_res.raise_for_status = unittest.mock.MagicMock()
+    error_res.json = unittest.mock.AsyncMock(
+        return_value={'error': 'invalid_grant', 'error_description': 'code expired'},
+    )
+    error_res.__aenter__ = unittest.mock.AsyncMock(return_value=error_res)
+    error_res.__aexit__ = unittest.mock.AsyncMock(return_value=None)
+    token_session = unittest.mock.MagicMock()
+    token_session.post = unittest.mock.MagicMock(return_value=error_res)
+    token_session.__aenter__ = unittest.mock.AsyncMock(return_value=token_session)
+    token_session.__aexit__ = unittest.mock.AsyncMock(return_value=None)
+
+    with (
+        unittest.mock.patch(
+            'middleware.auth._fetch_oauth_endpoints',
+            new=unittest.mock.AsyncMock(
+                return_value=('https://idp/auth', 'https://idp/token', 'https://idp/userinfo'),
+            ),
+        ),
+        unittest.mock.patch('aiohttp.ClientSession', return_value=token_session),
+        pytest.raises(aiohttp.web.HTTPUnauthorized) as excinfo,
+    ):
+        await middleware.auth.find_oauth_identifier(
+            oauth_cfg=oauth_cfg,
+            code='bad-code',
+        )
+
+    assert 'code expired' in excinfo.value.text
+
+
+@pytest.mark.asyncio
+async def test_find_oauth_identifier_raises_401_when_username_claim_missing():
+    oauth_cfg = _make_oauth_cfg(username_claim='preferred_username')
+    userinfo_session = _make_userinfo_session({'sub': 'alice'})  # missing preferred_username
+
+    with (
+        unittest.mock.patch(
+            'middleware.auth._fetch_oauth_endpoints',
+            new=unittest.mock.AsyncMock(
+                return_value=('https://idp/auth', 'https://idp/token', 'https://idp/userinfo'),
+            ),
+        ),
+        unittest.mock.patch('aiohttp.ClientSession', return_value=userinfo_session),
+        pytest.raises(aiohttp.web.HTTPUnauthorized) as excinfo,
+    ):
+        await middleware.auth.find_oauth_identifier(
+            oauth_cfg=oauth_cfg,
+            access_token='at-xyz',
+        )
+
+    assert 'preferred_username' in excinfo.value.text
+
+
+# ---------------------------------------------------------------------------
+# find_oauth_role_bindings
+# ---------------------------------------------------------------------------
+
+
+def _make_oauth_role_binding(
+    subject_type: secret_mgmt.oauth_cfg.SubjectType,
+    subject_name: str,
+    roles: list[str],
+) -> secret_mgmt.oauth_cfg.RoleBinding:
+    return secret_mgmt.oauth_cfg.RoleBinding(
+        subjects=[secret_mgmt.oauth_cfg.Subject(type=subject_type, name=subject_name)],
+        roles=roles,
+    )
+
+
+def test_find_oauth_role_bindings_matches_group():
+    oauth_cfg = _make_oauth_cfg()
+    oauth_cfg.role_bindings = [
+        _make_oauth_role_binding(
+            subject_type=secret_mgmt.oauth_cfg.SubjectType.OAUTH_GROUP,
+            subject_name='devs',
+            roles=['developer'],
+        ),
+    ]
+
+    user_identifier = dm.OAuthUserIdentifier(
+        username='alice',
+        groups=['devs', 'ops'],
+        hostname='idp.example.com',
+    )
+
+    bindings = list(
+        middleware.auth.find_oauth_role_bindings(
+            oauth_cfg=oauth_cfg,
+            user_identifier=user_identifier,
+        ),
+    )
+
+    assert len(bindings) == 1
+    assert bindings[0].name == 'developer'
+    assert bindings[0].origin.group == 'devs'
+    assert bindings[0].origin.username is None
+
+
+def test_find_oauth_role_bindings_matches_sub():
+    oauth_cfg = _make_oauth_cfg()
+    oauth_cfg.role_bindings = [
+        _make_oauth_role_binding(
+            subject_type=secret_mgmt.oauth_cfg.SubjectType.OAUTH_SUB,
+            subject_name='alice',
+            roles=['admin'],
+        ),
+    ]
+
+    user_identifier = dm.OAuthUserIdentifier(
+        username='alice',
+        groups=[],
+        hostname='idp.example.com',
+    )
+
+    bindings = list(
+        middleware.auth.find_oauth_role_bindings(
+            oauth_cfg=oauth_cfg,
+            user_identifier=user_identifier,
+        ),
+    )
+
+    assert len(bindings) == 1
+    assert bindings[0].name == 'admin'
+    assert bindings[0].origin.username == 'alice'
+    assert bindings[0].origin.group is None
+
+
+def test_find_oauth_role_bindings_no_match_yields_nothing():
+    oauth_cfg = _make_oauth_cfg()
+    oauth_cfg.role_bindings = [
+        _make_oauth_role_binding(
+            subject_type=secret_mgmt.oauth_cfg.SubjectType.OAUTH_GROUP,
+            subject_name='admins',
+            roles=['admin'],
+        ),
+    ]
+
+    user_identifier = dm.OAuthUserIdentifier(
+        username='bob',
+        groups=['devs'],
+        hostname='idp.example.com',
+    )
+
+    bindings = list(
+        middleware.auth.find_oauth_role_bindings(
+            oauth_cfg=oauth_cfg,
+            user_identifier=user_identifier,
+        ),
+    )
+
+    assert bindings == []
+
+
+# ---------------------------------------------------------------------------
+# OAuth (non-GitHub) login flow
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_oauth_login_via_code_and_client_id(signing_cfg):
+    view = _make_login_view(
+        body=b'{"code": "code", "client_id": "id"}',
+        user=_make_user_idp(),
+    )
+
+    oauth_cfg_mock = unittest.mock.MagicMock()
+    oauth_cfg_mock.type = secret_mgmt.oauth_cfg.OAuthCfgTypes.OAUTH
+
+    with (
+        unittest.mock.patch('ctx_util.secret_factory'),
+        unittest.mock.patch.object(
+            middleware.auth,
+            'find_oauth_cfg',
+            return_value=oauth_cfg_mock,
+        ),
+        unittest.mock.patch.object(
+            middleware.auth,
+            'find_oauth_identifier',
+            new=unittest.mock.AsyncMock(),
+        ),
+        unittest.mock.patch.object(
+            middleware.auth,
+            'set_session_and_refresh_token',
+            new=unittest.mock.AsyncMock(return_value=aiohttp.web.json_response()),
+        ),
+    ):
+        response = await view.post()
+
+    assert response.status == 200

@@ -738,6 +738,11 @@ class Rescore(aiohttp.web.View):
                 username=user_identifier.sub,
                 issuer=user_identifier.issuer,
             )
+        elif isinstance(user_identifier, dm.OAuthUserIdentifier):
+            rescoring_user = odg.model.OAuthUser(
+                username=user_identifier.username,
+                hostname=user_identifier.hostname,
+            )
         else:
             raise aiohttp.web.HTTPUnauthorized(
                 text='Rescorings require a GitHub or OIDC user identity',

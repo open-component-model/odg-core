@@ -995,6 +995,16 @@ class OidcUser(User):
         return _as_key(self.username, self.type, self.issuer)
 
 
+@dataclasses.dataclass(kw_only=True)
+class OAuthUser(User):
+    hostname: str
+    type: str = 'oauth-user'
+
+    @property
+    def key(self) -> str:
+        return _as_key(self.username, self.type, self.hostname)
+
+
 class MetaRescoringRules(enum.StrEnum):
     BDBA_TRIAGE = 'bdba-triage'
     CUSTOM_RESCORING = 'custom-rescoring'
@@ -1035,7 +1045,7 @@ class CustomRescoring:
     finding: _RescoringFindingField
     referenced_type: str
     severity: str
-    user: BDBAUser | GitHubUser | OidcUser | User
+    user: BDBAUser | GitHubUser | OidcUser | OAuthUser | User
     matching_rules: list[str] = dataclasses.field(default_factory=list)
     comment: str | None = None
     allowed_processing_time: str | None = None

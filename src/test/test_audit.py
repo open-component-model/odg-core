@@ -21,6 +21,7 @@ import odg.audit
 import odg_client.jwt
 import scanner_utils.scanner
 import secret_mgmt
+import secret_mgmt.oauth_cfg
 
 pytestmark = pytest.mark.anyio
 
@@ -227,7 +228,11 @@ async def test_auth_login_success(auth_client, monkeypatch):
     secret_factory = unittest.mock.Mock()
     secret_factory.oauth_cfg.return_value = [object()]
     monkeypatch.setattr(middleware.auth.ctx_util, 'secret_factory', lambda: secret_factory)
-    monkeypatch.setattr(middleware.auth, 'find_github_oauth_cfg', lambda **kwargs: object())
+    monkeypatch.setattr(
+        middleware.auth,
+        'find_oauth_cfg',
+        lambda **kwargs: types.SimpleNamespace(type=secret_mgmt.oauth_cfg.OAuthCfgTypes.GITHUB),
+    )
     monkeypatch.setattr(
         middleware.auth,
         'find_github_identifier',
