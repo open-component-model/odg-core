@@ -15,6 +15,7 @@ import pytest
 import structlog.testing
 
 import consts
+import deliverydb.model as dm
 import middleware.audit
 import middleware.auth
 import odg.audit
@@ -162,9 +163,13 @@ async def test_middleware_audits_failing_request(audit_client):
 @pytest.fixture
 def mock_db_session():
     session = unittest.mock.MagicMock()  # `add` is sync in sqlalchemy
-    session.get = unittest.mock.AsyncMock(
-        return_value=types.SimpleNamespace(user_id='user-1'),
-    )
+
+    async def _get(model_cls, key):
+        if model_cls is dm.User:
+            return types.SimpleNamespace(role_bindings=[{'name': 'reader'}])
+        return types.SimpleNamespace(user_id='user-1')
+
+    session.get = unittest.mock.AsyncMock(side_effect=_get)
     session.commit = unittest.mock.AsyncMock()
     session.rollback = unittest.mock.AsyncMock()
     return session
@@ -329,7 +334,7 @@ async def test_auth_logout_revokes_refresh_token(
             },
         ],
     )
-    mock_db_session.get.return_value = user
+    mock_db_session.get = unittest.mock.AsyncMock(return_value=user)
     monkeypatch.setattr(
         middleware.auth,
         'decode_jwt',

@@ -270,7 +270,7 @@ def update_github_role_bindings(
     role_bindings = [
         role_binding
         for role_binding in role_bindings
-        if role_binding.origin.type != dm.RoleBindingOriginType.GITHUB
+        if role_binding.origin.type is not dm.RoleBindingOriginType.GITHUB
     ]
 
     github_oauth_cfgs = [
@@ -321,7 +321,7 @@ def update_oidc_role_bindings(
     role_bindings = [
         role_binding
         for role_binding in role_bindings
-        if role_binding.origin.type != dm.RoleBindingOriginType.OIDC
+        if role_binding.origin.type is not dm.RoleBindingOriginType.OIDC
     ]
 
     oidc_role_bindings = set()
@@ -353,7 +353,7 @@ def update_oauth_role_bindings(
     role_bindings = [
         role_binding
         for role_binding in role_bindings
-        if role_binding.origin.type != dm.RoleBindingOriginType.OAUTH
+        if role_binding.origin.type is not dm.RoleBindingOriginType.OAUTH
     ]
 
     filtered_oauth_cfgs = [

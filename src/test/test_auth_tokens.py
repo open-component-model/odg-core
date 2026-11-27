@@ -2,6 +2,7 @@ import datetime
 import json
 import traceback
 import unittest.mock
+import urllib.parse
 import uuid
 
 import aiohttp.web
@@ -50,10 +51,16 @@ def _make_user(
 
 def _make_db_session(
     user: dm.User | None = None,
+    user_idp: dm.UserIdentifiers | None = None,
 ) -> unittest.mock.AsyncMock:
     db_session = unittest.mock.AsyncMock()
 
-    db_session.get = unittest.mock.AsyncMock(return_value=user)
+    async def _get(model_cls, key):
+        if model_cls is dm.User:
+            return user
+        return user_idp
+
+    db_session.get = unittest.mock.AsyncMock(side_effect=_get)
     db_session.add = unittest.mock.MagicMock()
     db_session.commit = unittest.mock.AsyncMock()
 
@@ -438,7 +445,7 @@ def _make_login_view(
     headers: dict[str, str] | None = None,
     user: dm.UserIdentifiers | None = None,
 ) -> middleware.auth.OAuthLogin:
-    db_session = _make_db_session(user)
+    db_session = _make_db_session(user=_make_user(), user_idp=user)
 
     app = unittest.mock.MagicMock()
     app.__getitem__ = lambda self, key: ISSUER
@@ -553,6 +560,7 @@ async def test_login_get_is_gone(query):
 
 class _GithubTokenResponse:
     status = 200
+    content_type = 'application/x-www-form-urlencoded'
 
     def raise_for_status(self):
         pass
@@ -573,6 +581,7 @@ async def test_find_github_identifier_sends_client_secret_in_body():
     oauth_cfg.token_url = 'https://github.example.com/login/oauth/access_token'
     oauth_cfg.client_id = 'client-id'
     oauth_cfg.client_secret = 'client-secret'
+    oauth_cfg.redirect_uri = None
 
     session = unittest.mock.MagicMock()
     session.post = unittest.mock.MagicMock(return_value=_GithubTokenResponse())
@@ -854,8 +863,11 @@ def _make_oauth_cfg(
 def _make_token_session(access_token: str = 'at-xyz') -> unittest.mock.MagicMock:
     token_res = unittest.mock.MagicMock()
     token_res.ok = True
+    token_res.content_type = 'application/x-www-form-urlencoded'
     token_res.raise_for_status = unittest.mock.MagicMock()
-    token_res.json = unittest.mock.AsyncMock(return_value={'access_token': access_token})
+    token_res.text = unittest.mock.AsyncMock(
+        return_value=urllib.parse.urlencode({'access_token': access_token}),
+    )
     token_res.__aenter__ = unittest.mock.AsyncMock(return_value=token_res)
     token_res.__aexit__ = unittest.mock.AsyncMock(return_value=None)
 
@@ -957,9 +969,12 @@ async def test_find_oauth_identifier_raises_401_on_error_in_token_response():
 
     error_res = unittest.mock.MagicMock()
     error_res.ok = True
+    error_res.content_type = 'application/x-www-form-urlencoded'
     error_res.raise_for_status = unittest.mock.MagicMock()
-    error_res.json = unittest.mock.AsyncMock(
-        return_value={'error': 'invalid_grant', 'error_description': 'code expired'},
+    error_res.text = unittest.mock.AsyncMock(
+        return_value=urllib.parse.urlencode(
+            {'error': 'invalid_grant', 'error_description': 'code expired'},
+        ),
     )
     error_res.__aenter__ = unittest.mock.AsyncMock(return_value=error_res)
     error_res.__aexit__ = unittest.mock.AsyncMock(return_value=None)
