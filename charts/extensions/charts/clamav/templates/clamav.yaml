@@ -92,13 +92,13 @@ spec:
             - name: freshclam-config
               mountPath: /etc/clamav/freshclam.conf
               subPath: freshclam
+            - name: freshclam-config
+              mountPath: /etc/freshclam.conf
+              subPath: freshclam
           lifecycle:
             preStop: # hook ensures that just created pods have at least enough time alive to add a termination signal handler
-              exec:
-                command:
-                  - python3
-                  - -c
-                  - "import time; time.sleep(60)"
+              sleep:
+                seconds: 60
           {{- with (.Values.deployment).resources }}
           resources:
             {{- toYaml . | nindent 12 }}

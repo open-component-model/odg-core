@@ -1,8 +1,11 @@
 import hashlib
+import importlib.util
+import os
 import socket
 import struct
 import tempfile
 import threading
+import time
 import unittest.mock
 
 import pytest
@@ -10,6 +13,15 @@ import pytest
 import malware.clamav as clamav
 import odg.findings
 import odg.model
+
+# clamav_entrypoint.py lives at src/malware/clamav_entrypoint.py but is not a
+# package member — load it directly so we can test its private helpers.
+_spec = importlib.util.spec_from_file_location(
+    'clamav_entrypoint',
+    os.path.join(os.path.dirname(__file__), '..', 'malware', 'clamav_entrypoint.py'),
+)
+_entrypoint = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_entrypoint)
 
 
 def _make_clamd_server(
@@ -187,3 +199,55 @@ def test_scan_raises_on_clamd_disconnect():
             with pytest.raises(OSError):
                 clamav.scan(malware_cfg=None, data=_file_chunks(path), filename=path)
         server.join(timeout=3)
+
+
+def test_wait_for_clamd_socket_success():
+    with tempfile.TemporaryDirectory() as tmp:
+        sock_path = f'{tmp}/clamd.sock'
+        # create the socket file after a short delay
+
+        def _create():
+            time.sleep(0.1)
+            open(sock_path, 'w').close()
+
+        threading.Thread(target=_create, daemon=True).start()
+        _entrypoint._wait_for_clamd_socket(sock_path, timeout=5)
+        assert os.path.exists(sock_path)
+
+
+def test_wait_for_clamd_socket_timeout():
+    with pytest.raises(TimeoutError, match='clamd socket'):
+        _entrypoint._wait_for_clamd_socket('/nonexistent/clamd.sock', timeout=0.1)
+
+
+def test_wait_for_virus_db_success():
+    with tempfile.TemporaryDirectory() as tmp:
+        # write db files after a short delay
+        def _create():
+            time.sleep(0.1)
+            open(f'{tmp}/main.cvd', 'w').close()
+            open(f'{tmp}/daily.cld', 'w').close()
+
+        threading.Thread(target=_create, daemon=True).start()
+        _entrypoint._wait_for_virus_db(db_dir=tmp, timeout=5)
+
+
+def test_wait_for_virus_db_timeout():
+    with tempfile.TemporaryDirectory() as tmp:
+        with pytest.raises(TimeoutError, match='virus definitions'):
+            _entrypoint._wait_for_virus_db(db_dir=tmp, timeout=0.1)
+
+
+def test_wait_for_virus_db_requires_both_main_and_daily():
+    with tempfile.TemporaryDirectory() as tmp:
+        open(f'{tmp}/main.cvd', 'w').close()
+        # daily is missing — should time out
+        with pytest.raises(TimeoutError):
+            _entrypoint._wait_for_virus_db(db_dir=tmp, timeout=0.1)
+
+
+def test_wait_for_virus_db_accepts_cld_suffix():
+    with tempfile.TemporaryDirectory() as tmp:
+        open(f'{tmp}/main.cld', 'w').close()
+        open(f'{tmp}/daily.cld', 'w').close()
+        _entrypoint._wait_for_virus_db(db_dir=tmp, timeout=1)

@@ -19,7 +19,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # Nothing from this stage's build tooling reaches the final image.
 FROM registry.suse.com/bci/python:3.14@sha256:5ee77207d55d42d760ade2f24418dc01c216f2bfde0c5ce14977137d4f59dd2e AS installer
 
-COPY --from=ghcr.io/astral-sh/uv:0.13.10@sha256:a3ea1357342c1a4bf9a0c53a3deb1b55379aefa037338d8113d5771efa01774f /uv /usr/local/bin/
+# renovate: datasource=docker depName=docker.io/astral/uv
+COPY --from=docker.io/astral/uv:0.13.10@sha256:a3ea1357342c1a4bf9a0c53a3deb1b55379aefa037338d8113d5771efa01774f /uv /usr/local/bin/
 
 RUN zypper --non-interactive install --no-recommends \
     clamav \
@@ -27,7 +28,7 @@ RUN zypper --non-interactive install --no-recommends \
     libclamunrar12 \
     postgresql16 \
  && zypper --non-interactive clean --all \
- && mkdir -p /clamav-libs/usr/lib64 /clamav-libs/lib64 /pg-libs/usr/lib64 /pg-libs/lib64 /git-libs/usr/lib64 /git-libs/lib64 \
+ && mkdir -p /clamav-libs/usr/lib64 /clamav-libs/lib64 /pg-libs/usr/lib64 /pg-libs/lib64 /git-libs/usr/lib64 /git-libs/lib64 /git-libs/usr/libexec/git \
  && bash -euo pipefail -c ' \
     for bin in /usr/sbin/clamd /usr/bin/freshclam; do \
         ldd "$bin" \
@@ -57,7 +58,17 @@ RUN zypper --non-interactive install --no-recommends \
                 /lib64/*)     cp --dereference "$lib" /git-libs/lib64/ ;; \
                 *)            echo "unexpected lib path: $lib" >&2; exit 1 ;; \
             esac; \
-          done' \
+          done \
+    && ldd /usr/libexec/git/git-remote-https \
+        | awk '"'"'/=>/ && !/vdso/ && $3 != "not" {print $3}'"'"' \
+        | while read -r lib; do \
+            case "$lib" in \
+                /usr/lib64/*) cp --dereference "$lib" /git-libs/usr/lib64/ ;; \
+                /lib64/*)     cp --dereference "$lib" /git-libs/lib64/ ;; \
+                *)            echo "unexpected lib path: $lib" >&2; exit 1 ;; \
+            esac; \
+          done \
+    && cp --dereference /usr/libexec/git/git-remote-https /git-libs/usr/libexec/git/' \
  && cp --dereference /usr/lib64/libclamunrar.so.12 /clamav-libs/usr/lib64/ \
  && cp --dereference /usr/lib64/libclamunrar_iface.so.12 /clamav-libs/usr/lib64/
 
@@ -98,7 +109,13 @@ RUN mkdir -p /rootfs/lib /rootfs/etc \
             test -f "$f" || continue; \
             mkdir -p "/rootfs$(dirname "$f")"; \
             cp --dereference "$f" "/rootfs$f"; \
-          done' \
+          done \
+    && interp=$(readelf -l /usr/bin/python3.14 | awk "/program interpreter/ {gsub(/[\[\]]/,\"\",\$NF); print \$NF}") \
+    && interp_src=$(readlink -f "$interp" 2>/dev/null || rpm -ql glibc | grep "ld-linux\|ld-musl" | head -1) \
+    && mkdir -p "/rootfs$(dirname "$interp")" \
+    && cp --dereference "$interp_src" "/rootfs$interp" \
+    && mkdir -p "/rootfs$(dirname "$interp_src")" \
+    && cp --dereference "$interp_src" "/rootfs$interp_src"' \
  && mkdir -p /rootfs/usr/lib64 /rootfs/lib64 \
  && cp -a /clamav-libs/usr/lib64/. /rootfs/usr/lib64/ \
  && cp -a /clamav-libs/lib64/. /rootfs/lib64/ \
@@ -106,6 +123,8 @@ RUN mkdir -p /rootfs/lib /rootfs/etc \
  && cp -a /pg-libs/lib64/. /rootfs/lib64/ \
  && cp -a /git-libs/usr/lib64/. /rootfs/usr/lib64/ \
  && cp -a /git-libs/lib64/. /rootfs/lib64/ \
+ && mkdir -p /rootfs/usr/libexec/git \
+ && cp -a /git-libs/usr/libexec/git/. /rootfs/usr/libexec/git/ \
  && cp -a /etc/certs /rootfs/etc/certs \
  && chmod 1777 /rootfs/tmp /rootfs/var/tmp \
  && ln -sf /usr/bin/python3.14 /rootfs/usr/local/bin/python3 \
@@ -162,6 +181,8 @@ COPY --from=installer /rootfs /
 COPY --from=installer /opt/venv /opt/venv
 
 # Static Go binaries — no .so dependencies
+# renovate: datasource=docker depName=alpine/helm
+COPY --from=alpine/helm:3.17.3@sha256:d899e6316789fec04ee95300a18e454b7942539cbb3d89bde3e0655d6ca2e895 /usr/bin/helm /usr/local/bin/helm
 COPY --from=aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb \
     /usr/local/bin/trivy /usr/local/bin/trivy
 # Alpine's syft (1.42) predates native Go FIPS 140 detection (`goCryptoSettings`, syft >= 1.51)
@@ -174,8 +195,9 @@ COPY --from=installer /usr/lib/postgresql16/bin/pg_dump /usr/local/bin/pg_dump
 COPY --from=installer /usr/sbin/clamd /usr/sbin/clamd
 COPY --from=installer /usr/bin/freshclam /usr/bin/freshclam
 
-# git binary — needed by the SLA report extension (gitpython calls the git CLI)
+# git binary and HTTPS transport — needed by the SLA report extension (gitpython calls the git CLI)
 COPY --from=installer /usr/bin/git /usr/bin/git
+COPY --from=installer /usr/libexec/git/git-remote-https /usr/libexec/git/git-remote-https
 
 # CA certificates (SUSE uses /var/lib/ca-certificates; certifi symlink points to ca-bundle.pem)
 COPY --from=installer /var/lib/ca-certificates/ /var/lib/ca-certificates/
