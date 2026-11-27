@@ -1,6 +1,7 @@
 import dataclasses
 import enum
 import hashlib
+import typing
 
 import dacite
 import sqlalchemy as sa
@@ -94,6 +95,7 @@ class DBCache(Base):
 class RoleBindingOriginType(enum.StrEnum):
     GITHUB = 'github'
     MANUAL = 'manual'
+    OAUTH = 'oauth'
     OIDC = 'oidc'
 
 
@@ -142,10 +144,24 @@ class OidcRoleBindingOrigin(RoleBindingOrigin):
         return f'{self.type}|{self.issuer}|{self.sub}'
 
 
+@dataclasses.dataclass(kw_only=True)
+class OAuthRoleBindingOrigin(RoleBindingOrigin):
+    type: RoleBindingOriginType = RoleBindingOriginType.OAUTH
+    issuer: str
+    username: str | None = None
+    group: str | None = None
+
+    @property
+    def key(self) -> str:
+        return f'{self.type}|{self.issuer}|{self.username}|{self.group}'
+
+
 @dataclasses.dataclass
 class RoleBinding:
     name: str
-    origin: GitHubRoleBindingOrigin | OidcRoleBindingOrigin | RoleBindingOrigin
+    origin: (
+        GitHubRoleBindingOrigin | OidcRoleBindingOrigin | OAuthRoleBindingOrigin | RoleBindingOrigin
+    )
 
     @property
     def key(self) -> str:
@@ -153,6 +169,11 @@ class RoleBinding:
 
     def __hash__(self) -> int:
         return hash(self.key)
+
+    def __eq__(self, other: typing.Self) -> bool:
+        if not isinstance(other, type(self)):
+            return False
+        return self.key == other.key
 
 
 @dataclasses.dataclass
@@ -209,6 +230,16 @@ class GitHubUserIdentifier(UserIdentifier):
 
 
 @dataclasses.dataclass
+class OAuthUserIdentifier(UserIdentifier):
+    issuer: str
+    groups: list[str]
+
+    @property
+    def normalised(self) -> str:
+        return f'username:{self.username}_issuer:{self.issuer}'
+
+
+@dataclasses.dataclass
 class GitHubAppIdentifier(Identifier):
     app_name: str
     hostname: str
@@ -240,7 +271,13 @@ class UserIdentifiers(Base):
     @property
     def deserialised_identifier(
         self,
-    ) -> GitHubAppIdentifier | GitHubUserIdentifier | OidcIdentifier | UserIdentifier:
+    ) -> (
+        GitHubAppIdentifier
+        | GitHubUserIdentifier
+        | OidcIdentifier
+        | OAuthUserIdentifier
+        | UserIdentifier
+    ):
         idp_type = secret_mgmt.oauth_cfg.OAuthCfgTypes(self.type)
 
         if idp_type is secret_mgmt.oauth_cfg.OAuthCfgTypes.GITHUB:
@@ -257,6 +294,12 @@ class UserIdentifiers(Base):
         if idp_type is secret_mgmt.oauth_cfg.OAuthCfgTypes.OIDC:
             return dacite.from_dict(
                 data_class=OidcIdentifier,
+                data=self.identifier,
+            )
+
+        if idp_type is secret_mgmt.oauth_cfg.OAuthCfgTypes.OAUTH:
+            return dacite.from_dict(
+                data_class=OAuthUserIdentifier,
                 data=self.identifier,
             )
 

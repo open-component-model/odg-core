@@ -142,6 +142,53 @@ def _prepared_signing_key(
     return alg_obj.prepare_key(private_key)
 
 
+async def _fetch_oauth_endpoints(
+    well_known_url: str,
+) -> tuple[str, str, str, str]:
+    """
+    Returns (authorization_url, token_url, userinfo_url, issuer)
+    """
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                well_known_url,
+                timeout=aiohttp.ClientTimeout(total=10),
+                allow_redirects=False,
+            ) as res:
+                res.raise_for_status()
+
+                discovery = await res.json()
+    except Exception:
+        raise aiohttp.web.HTTPUnauthorized(
+            text=f'failed to fetch OIDC discovery document from {well_known_url}',
+        )
+
+    authorization_url = discovery.get('authorization_endpoint')
+    token_url = discovery.get('token_endpoint')
+    userinfo_url = discovery.get('userinfo_endpoint')
+    issuer = discovery.get('issuer')
+
+    if not authorization_url or not token_url or not userinfo_url or not issuer:
+        raise aiohttp.web.HTTPNotFound(
+            text=f'well-known config under {well_known_url} is missing endpoints',
+        )
+
+    expected_origin = urllib.parse.urlparse(well_known_url)
+    for name, url in (
+        ('authorization_endpoint', authorization_url),
+        ('token_endpoint', token_url),
+        ('userinfo_endpoint', userinfo_url),
+        ('issuer', issuer),
+    ):
+        parsed = urllib.parse.urlparse(url)
+        if (parsed.scheme, parsed.netloc) != (expected_origin.scheme, expected_origin.netloc):
+            raise aiohttp.web.HTTPBadGateway(
+                text=f'discovery {name} {url!r} does not match origin of {well_known_url}',
+            )
+
+    return authorization_url, token_url, userinfo_url, issuer
+
+
 @noauth
 class OAuthCfgs(aiohttp.web.View):
     async def get(self):
@@ -158,18 +205,33 @@ class OAuthCfgs(aiohttp.web.View):
                   $ref: '#/components/schemas/AuthConfig'
         """
 
-        def oauth_cfg_to_dict(oauth_cfg: secret_mgmt.oauth_cfg.OAuthCfg):
-            github_host = urllib.parse.urlparse(oauth_cfg.api_url).hostname.lower()
+        async def oauth_cfg_to_dict(
+            oauth_cfg: secret_mgmt.oauth_cfg.OAuthCfg,
+        ) -> dict | None:
+            hostname = urllib.parse.urlparse(oauth_cfg.api_url).hostname.lower()
 
             # note: no `redirect_uri`/`oauth_url_with_redirect` here on purpose: the OAuth
             # callback is owned by the UI (its landing page POSTs the code to /auth); GET
             # /auth (the former callback target) returns 410 Gone
+            if not (oauth_url := oauth_cfg.authorization_url):
+                try:
+                    oauth_url, _, _, _ = await _fetch_oauth_endpoints(
+                        well_known_url=oauth_cfg.well_known_url,
+                    )
+                except Exception:
+                    logger.warning(
+                        'skipping oauth provider: discovery failed',
+                        well_known_url=oauth_cfg.well_known_url,
+                    )
+                    return None
+
             return {
                 'name': oauth_cfg.name,
-                'github_host': github_host,
+                'hostname': hostname,
                 'api_url': oauth_cfg.api_url,
-                'oauth_url': oauth_cfg.oauth_url,
+                'oauth_url': oauth_url,
                 'client_id': oauth_cfg.client_id,
+                'scope': oauth_cfg.scope,
             }
 
         secret_factory = ctx_util.secret_factory()
@@ -180,11 +242,15 @@ class OAuthCfgs(aiohttp.web.View):
             oauth_cfgs = []
 
         return aiohttp.web.json_response(
-            data=[oauth_cfg_to_dict(oauth_cfg) for oauth_cfg in oauth_cfgs],
+            data=[
+                cfg_dict
+                for oauth_cfg in oauth_cfgs
+                if (cfg_dict := await oauth_cfg_to_dict(oauth_cfg)) is not None
+            ],
         )
 
 
-def find_github_oauth_cfg(
+def find_oauth_cfg(
     oauth_cfgs: collections.abc.Iterable[secret_mgmt.oauth_cfg.OAuthCfg],
     api_url: str | None = None,
     client_id: str | None = None,
@@ -192,14 +258,8 @@ def find_github_oauth_cfg(
     if not (bool(api_url) ^ bool(client_id)):
         raise ValueError('exactly one of `api_url` and `client_id` must be provided')
 
-    filtered_oauth_cfgs = [
-        oauth_cfg
-        for oauth_cfg in oauth_cfgs
-        if oauth_cfg.type is secret_mgmt.oauth_cfg.OAuthCfgTypes.GITHUB
-    ]
-
     if api_url:
-        for oauth_cfg in filtered_oauth_cfgs:
+        for oauth_cfg in oauth_cfgs:
             if oauth_cfg.api_url == api_url:
                 return oauth_cfg
 
@@ -209,7 +269,7 @@ def find_github_oauth_cfg(
             },
         )
 
-    for oauth_cfg in filtered_oauth_cfgs:
+    for oauth_cfg in oauth_cfgs:
         if oauth_cfg.client_id == client_id:
             return oauth_cfg
 
@@ -233,6 +293,7 @@ async def find_github_identifier(
     oauth_cfg: secret_mgmt.oauth_cfg.OAuthCfg,
     github_access_token: str | None = None,
     github_code: str | None = None,
+    redirect_uri: str | None = None,
 ) -> dm.GitHubAppIdentifier | dm.GitHubUserIdentifier:
     if github_code:
         # pass the OAuth parameters in the POST body (RFC 6749), so the client secret does not
@@ -244,18 +305,31 @@ async def find_github_identifier(
                     'client_id': oauth_cfg.client_id,
                     'client_secret': oauth_cfg.client_secret,
                     'code': github_code,
+                    **({'redirect_uri': redirect_uri} if redirect_uri else {}),
                 },
             ) as res:
                 res.raise_for_status()
 
-                parsed = urllib.parse.parse_qs(await res.text())
+                if 'json' in res.content_type:
+                    parsed_raw = await res.json()
 
-                if 'error' in parsed:
+                    def get_field(key: str) -> str | None:
+                        return parsed_raw.get(key)
+                else:
+                    parsed_raw = urllib.parse.parse_qs(await res.text())
+
+                    def get_field(key: str) -> str | None:
+                        return (parsed_raw.get(key) or [None])[0]
+
+                if error := get_field('error'):
                     raise aiohttp.web.HTTPUnauthorized(
-                        text=(parsed.get('error_description') or parsed['error'])[0],
+                        text=get_field('error_description') or error,
                     )
 
-                github_access_token = parsed['access_token'][0]
+                if not (github_access_token := get_field('access_token')):
+                    raise aiohttp.web.HTTPUnauthorized(
+                        text='token response is missing access_token',
+                    )
 
     elif not github_access_token:
         raise ValueError('either a `github_code` or an `github_access_token` must be provided')
@@ -300,9 +374,93 @@ async def find_github_identifier(
     )
 
 
+async def find_oauth_identifier(
+    oauth_cfg: secret_mgmt.oauth_cfg.OAuthCfg,
+    access_token: str | None = None,
+    code: str | None = None,
+    redirect_uri: str | None = None,
+) -> dm.OAuthUserIdentifier:
+    _, token_url, userinfo_url, issuer = await _fetch_oauth_endpoints(
+        well_known_url=oauth_cfg.well_known_url,
+    )
+
+    if code:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                url=token_url,
+                data={
+                    'grant_type': 'authorization_code',
+                    'client_id': oauth_cfg.client_id,
+                    'client_secret': oauth_cfg.client_secret,
+                    'code': code,
+                    **({'redirect_uri': redirect_uri} if redirect_uri else {}),
+                },
+            ) as res:
+                if not res.ok:
+                    body = await res.text()
+                    logger.warning('token exchange failed', status=res.status, body=body)
+                    res.raise_for_status()
+
+                if 'json' in res.content_type:
+                    parsed_raw = await res.json()
+
+                    def get_field(key: str) -> str | None:
+                        return parsed_raw.get(key)
+                else:
+                    parsed_raw = urllib.parse.parse_qs(await res.text())
+
+                    def get_field(key: str) -> str | None:
+                        return (parsed_raw.get(key) or [None])[0]
+
+                if error := get_field('error'):
+                    raise aiohttp.web.HTTPUnauthorized(
+                        text=get_field('error_description') or error,
+                    )
+
+                if not (access_token := get_field('access_token')):
+                    raise aiohttp.web.HTTPUnauthorized(
+                        text='token response is missing access_token',
+                    )
+
+    elif not access_token:
+        raise ValueError('either a `code` or an `access_token` must be provided')
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(
+            url=userinfo_url,
+            headers={
+                'Authorization': f'Bearer {access_token}',
+            },
+        ) as res:
+            if not res.ok:
+                body = await res.text()
+                logger.warning('userinfo exchange failed', status=res.status, body=body)
+                res.raise_for_status()
+
+            userinfo = await res.json()
+
+            if 'error' in userinfo:
+                raise aiohttp.web.HTTPUnauthorized(
+                    text=userinfo.get('error_description') or userinfo['error'],
+                )
+
+    if (username := userinfo.get(oauth_cfg.username_claim)) is None:
+        raise aiohttp.web.HTTPUnauthorized(
+            text=f'userinfo response is missing claim {oauth_cfg.username_claim}',
+        )
+
+    return dm.OAuthUserIdentifier(
+        username=username,
+        groups=userinfo.get(oauth_cfg.groups_claim, []),
+        issuer=issuer,
+    )
+
+
 def find_role_bindings(
     cfg: secret_mgmt.oauth_cfg.OAuthCfg | secret_mgmt.oauth_cfg.OidcCfg,
-    user_identifier: dm.GitHubAppIdentifier | dm.GitHubUserIdentifier | dm.OidcIdentifier,
+    user_identifier: (
+        dm.GitHubAppIdentifier | dm.GitHubUserIdentifier | dm.OidcIdentifier | dm.OAuthUserIdentifier
+    ),
 ) -> collections.abc.Iterable[dm.RoleBinding]:
     if isinstance(cfg, secret_mgmt.oauth_cfg.OidcCfg):
         yield from find_oidc_role_bindings(
@@ -382,7 +540,10 @@ def find_role_bindings(
             )
 
     else:
-        raise ValueError(f'unsupported {cfg.type=}')
+        yield from find_oauth_role_bindings(
+            oauth_cfg=oauth_cfg,
+            user_identifier=user_identifier,
+        )
 
 
 def find_oidc_cfg(
@@ -506,6 +667,46 @@ def find_oidc_role_bindings(
                 origin=dm.OidcRoleBindingOrigin(
                     issuer=user_identifier.issuer,
                     sub=user_identifier.sub,
+                ),
+            )
+            for role in role_binding.roles
+        )
+
+
+def find_oauth_role_bindings(
+    oauth_cfg: secret_mgmt.oauth_cfg.OAuthCfg,
+    user_identifier: dm.OAuthUserIdentifier,
+) -> collections.abc.Iterable[dm.RoleBinding]:
+    def find_oauth_subject(
+        subjects: list[secret_mgmt.oauth_cfg.Subject],
+    ) -> secret_mgmt.oauth_cfg.Subject | None:
+        for subject in subjects:
+            if subject.type is secret_mgmt.oauth_cfg.SubjectType.OAUTH_GROUP:
+                if any(subject.matches(group) for group in user_identifier.groups):
+                    return subject
+
+            elif subject.type is secret_mgmt.oauth_cfg.SubjectType.OAUTH_SUB:
+                if subject.matches(user_identifier.username):
+                    return subject
+
+    for role_binding in oauth_cfg.role_bindings:
+        if not (subject := find_oauth_subject(subjects=role_binding.subjects)):
+            continue
+
+        group = None
+        username = None
+        if subject.type is secret_mgmt.oauth_cfg.SubjectType.OAUTH_GROUP:
+            group = subject.name
+        elif subject.type is secret_mgmt.oauth_cfg.SubjectType.OAUTH_SUB:
+            username = subject.name
+
+        yield from (
+            dm.RoleBinding(
+                name=role,
+                origin=dm.OAuthRoleBindingOrigin(
+                    issuer=user_identifier.issuer,
+                    username=username,
+                    group=group,
                 ),
             )
             for role in role_binding.roles
@@ -685,6 +886,7 @@ class AuthRequest:
     client_id: str | None = None
     access_token: str | None = None
     api_url: str | None = None
+    redirect_uri: str | None = None
     use_refresh_token: bool | None = None
 
 
@@ -805,6 +1007,7 @@ class OAuthLogin(aiohttp.web.View):
             client_id=auth_request.client_id,
             access_token=auth_request.access_token,
             api_url=auth_request.api_url,
+            redirect_uri=auth_request.redirect_uri,
             use_refresh_token=use_refresh_token,
         )
 
@@ -817,6 +1020,7 @@ class OAuthLogin(aiohttp.web.View):
         client_id: str | None,
         access_token: str | None,
         api_url: str | None,
+        redirect_uri: str | None,
         use_refresh_token: bool,
     ) -> aiohttp.web.StreamResponse:
         """
@@ -831,6 +1035,7 @@ class OAuthLogin(aiohttp.web.View):
                 client_id=client_id,
                 access_token=access_token,
                 api_url=api_url,
+                redirect_uri=redirect_uri,
                 use_refresh_token=use_refresh_token,
             )
         except Exception as e:
@@ -850,11 +1055,12 @@ class OAuthLogin(aiohttp.web.View):
         client_id: str | None,
         access_token: str | None,
         api_url: str | None,
+        redirect_uri: str | None,
         use_refresh_token: bool,
     ) -> aiohttp.web.StreamResponse:
 
         if (access_token and api_url) or (client_id and code):
-            idp_type = secret_mgmt.oauth_cfg.OAuthCfgTypes.GITHUB
+            idp_type = None  # will be set later when we know if it is GitHub or usual OAuth
 
         elif not api_url and (
             oidc_token := (
@@ -878,25 +1084,7 @@ class OAuthLogin(aiohttp.web.View):
 
         secret_factory = ctx_util.secret_factory()
 
-        if idp_type is secret_mgmt.oauth_cfg.OAuthCfgTypes.GITHUB:
-            try:
-                oauth_cfgs = secret_factory.oauth_cfg()
-            except secret_mgmt.SecretTypeNotFound:
-                raise aiohttp.web.HTTPUnauthorized(text='No OAuth providers configured')
-
-            oauth_cfg = find_github_oauth_cfg(
-                oauth_cfgs=oauth_cfgs,
-                api_url=api_url,
-                client_id=client_id,
-            )
-
-            user_identifier = await find_github_identifier(
-                oauth_cfg=oauth_cfg,
-                github_access_token=access_token,
-                github_code=code,
-            )
-
-        elif idp_type is secret_mgmt.oauth_cfg.OAuthCfgTypes.OIDC:
+        if idp_type is secret_mgmt.oauth_cfg.OAuthCfgTypes.OIDC:
             try:
                 oidc_cfgs = secret_factory.oidc_cfg()
             except secret_mgmt.SecretTypeNotFound:
@@ -912,7 +1100,36 @@ class OAuthLogin(aiohttp.web.View):
             )
 
         else:
-            raise aiohttp.web.HTTPUnauthorized(text=f'Unsupported {idp_type=}')
+            try:
+                oauth_cfgs = secret_factory.oauth_cfg()
+            except secret_mgmt.SecretTypeNotFound:
+                raise aiohttp.web.HTTPUnauthorized(text='No OAuth providers configured')
+
+            oauth_cfg = find_oauth_cfg(
+                oauth_cfgs=oauth_cfgs,
+                api_url=api_url,
+                client_id=client_id,
+            )
+
+            if oauth_cfg.type is secret_mgmt.oauth_cfg.OAuthCfgTypes.GITHUB:
+                idp_type = secret_mgmt.oauth_cfg.OAuthCfgTypes.GITHUB
+
+                user_identifier = await find_github_identifier(
+                    oauth_cfg=oauth_cfg,
+                    github_access_token=access_token,
+                    github_code=code,
+                    redirect_uri=redirect_uri,
+                )
+
+            else:
+                idp_type = secret_mgmt.oauth_cfg.OAuthCfgTypes.OAUTH
+
+                user_identifier = await find_oauth_identifier(
+                    oauth_cfg=oauth_cfg,
+                    access_token=access_token,
+                    code=code,
+                    redirect_uri=redirect_uri,
+                )
 
         user_idp = await db_session.get(
             dm.UserIdentifiers,
@@ -924,6 +1141,29 @@ class OAuthLogin(aiohttp.web.View):
 
         if user_idp:
             user_id = user_idp.user_id
+
+            if idp_type is secret_mgmt.oauth_cfg.OAuthCfgTypes.OAUTH:
+                old_identifier = user_idp.identifier
+                try:
+                    # update non-identifying properties, e.g. assigned groups
+                    user_idp.identifier = util.dict_serialisation(user_identifier)
+                    await db_session.commit()
+                    odg.audit.emit(
+                        action='user_identity_updated',
+                        msg='user identity metadata updated',
+                        user_id=user_id,
+                        odg_audit_outcome=odg.audit.Outcome.ALLOWED,
+                        odg_audit_detail={
+                            'old_identifier': odg.audit.stringify(old_identifier),
+                            'new_identifier': odg.audit.stringify(
+                                util.dict_serialisation(user_identifier),
+                            ),
+                        },
+                    )
+                except Exception:
+                    await db_session.rollback()
+                    logger.warning('failed to update user identifier metadata', exc_info=True)
+
         else:
             user_id = str(uuid.uuid4())
 
@@ -964,6 +1204,7 @@ class OAuthLogin(aiohttp.web.View):
             use_refresh_token=use_refresh_token,
         )
 
+        user = await db_session.get(dm.User, user_id)
         odg.audit.emit(
             action='auth_login',
             msg='login succeeded',
@@ -973,6 +1214,7 @@ class OAuthLogin(aiohttp.web.View):
             odg_audit_detail={
                 'idp_type': str(idp_type),
                 'use_refresh_token': use_refresh_token,
+                'roles': odg.audit.capped(rb['name'] for rb in (user.role_bindings or [])),
             },
         )
 
@@ -1502,6 +1744,24 @@ class User(aiohttp.web.View):
                                 app_name:
                                   type: string
                                 hostname:
+                                  type: string
+                            - type: object
+                              required: [username, hostname, groups]
+                              properties:
+                                username:
+                                  type: string
+                                hostname:
+                                  type: string
+                                groups:
+                                  type: array
+                                  items:
+                                    type: string
+                            - type: object
+                              required: [sub, issuer]
+                              properties:
+                                sub:
+                                  type: string
+                                issuer:
                                   type: string
                     roles:
                       type: array

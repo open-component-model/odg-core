@@ -40,23 +40,23 @@ components:
       type: object
       required:
       - name
-      - github_name
-      - github_host
+      - hostname
       - api_url
       - oauth_url
       - client_id
+      - scope
       properties:
         name:
           type: string
-        github_name:
-          type: string
-        github_host:
+        hostname:
           type: string
         api_url:
           type: string
         oauth_url:
           type: string
         client_id:
+          type: string
+        scope:
           type: string
     OpenIdConfig:
       type: object

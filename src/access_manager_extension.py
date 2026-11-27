@@ -209,6 +209,56 @@ def iter_oidc_role_bindings(
             )
 
 
+def iter_oauth_role_bindings(
+    identifier: dm.OAuthUserIdentifier,
+    oauth_cfgs: collections.abc.Iterable[secret_mgmt.oauth_cfg.OAuthCfg],
+) -> collections.abc.Iterable[dm.RoleBinding]:
+    # groups are a snapshot from the last login; they are not re-fetched here because the access
+    # manager has no stored token to call the userinfo endpoint. a user removed from a group
+    # retains the derived role until their next login (or until their refresh token expires).
+    for oauth_cfg in oauth_cfgs:
+        # derive expected issuer from well_known_url (per RFC 8414: issuer + "/.well-known/...")
+        expected_issuer = oauth_cfg.well_known_url.removesuffix('/.well-known/openid-configuration')
+
+        if identifier.issuer != expected_issuer:
+            continue
+
+        def find_oauth_subject(
+            subjects: list[secret_mgmt.oauth_cfg.Subject],
+        ) -> secret_mgmt.oauth_cfg.Subject | None:
+            for subject in subjects:
+                if subject.type is secret_mgmt.oauth_cfg.SubjectType.OAUTH_GROUP:
+                    if any(subject.matches(group) for group in identifier.groups):
+                        return subject
+
+                elif subject.type is secret_mgmt.oauth_cfg.SubjectType.OAUTH_SUB:
+                    if subject.matches(identifier.username):
+                        return subject
+
+        for role_binding in oauth_cfg.role_bindings:
+            if not (subject := find_oauth_subject(subjects=role_binding.subjects)):
+                continue
+
+            group = None
+            username = None
+            if subject.type is secret_mgmt.oauth_cfg.SubjectType.OAUTH_GROUP:
+                group = subject.name
+            elif subject.type is secret_mgmt.oauth_cfg.SubjectType.OAUTH_SUB:
+                username = subject.name
+
+            yield from (
+                dm.RoleBinding(
+                    name=role,
+                    origin=dm.OAuthRoleBindingOrigin(
+                        issuer=identifier.issuer,
+                        username=username,
+                        group=group,
+                    ),
+                )
+                for role in role_binding.roles
+            )
+
+
 def update_github_role_bindings(
     identifiers: collections.abc.Iterable[dm.UserIdentifiers],
     role_bindings: collections.abc.Sequence[dm.RoleBinding],
@@ -224,7 +274,7 @@ def update_github_role_bindings(
     role_bindings = [
         role_binding
         for role_binding in role_bindings
-        if role_binding.origin.type != dm.RoleBindingOriginType.GITHUB
+        if role_binding.origin.type is not dm.RoleBindingOriginType.GITHUB
     ]
 
     github_oauth_cfgs = [
@@ -275,7 +325,7 @@ def update_oidc_role_bindings(
     role_bindings = [
         role_binding
         for role_binding in role_bindings
-        if role_binding.origin.type != dm.RoleBindingOriginType.OIDC
+        if role_binding.origin.type is not dm.RoleBindingOriginType.OIDC
     ]
 
     oidc_role_bindings = set()
@@ -295,6 +345,44 @@ def update_oidc_role_bindings(
             )
 
     role_bindings.extend(oidc_role_bindings)
+
+    return role_bindings
+
+
+def update_oauth_role_bindings(
+    identifiers: collections.abc.Iterable[dm.UserIdentifiers],
+    role_bindings: collections.abc.Sequence[dm.RoleBinding],
+    oauth_cfgs: collections.abc.Iterable[secret_mgmt.oauth_cfg.OAuthCfg],
+) -> list[dm.RoleBinding]:
+    role_bindings = [
+        role_binding
+        for role_binding in role_bindings
+        if role_binding.origin.type is not dm.RoleBindingOriginType.OAUTH
+    ]
+
+    filtered_oauth_cfgs = [
+        oauth_cfg
+        for oauth_cfg in oauth_cfgs
+        if oauth_cfg.type is secret_mgmt.oauth_cfg.OAuthCfgTypes.OAUTH
+    ]
+
+    oauth_role_bindings = set()
+
+    for identifier in identifiers:
+        if identifier.type != secret_mgmt.oauth_cfg.OAuthCfgTypes.OAUTH:
+            continue
+
+        identifier = identifier.deserialised_identifier
+
+        if isinstance(identifier, dm.OAuthUserIdentifier):
+            oauth_role_bindings.update(
+                iter_oauth_role_bindings(
+                    identifier=identifier,
+                    oauth_cfgs=filtered_oauth_cfgs,
+                ),
+            )
+
+    role_bindings.extend(oauth_role_bindings)
 
     return role_bindings
 
@@ -340,6 +428,11 @@ async def update_user_role_bindings(
                 identifiers=user.identifiers,
                 role_bindings=role_bindings,
                 oidc_cfgs=oidc_cfgs,
+            )
+            role_bindings = update_oauth_role_bindings(
+                identifiers=user.identifiers,
+                role_bindings=role_bindings,
+                oauth_cfgs=oauth_cfgs,
             )
             len_role_bindings_after = len(role_bindings)
 

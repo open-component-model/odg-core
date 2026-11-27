@@ -1943,18 +1943,34 @@ secrets:
       name: ""
       # @param secrets.oauth-cfg.<name>.type the type of oauth configuration
       # options:
-      # - github
-      type: ""
-      # @param secrets.oauth-cfg.<name>.api_url the api url of the GitHub instance
+      # - github: GitHub App; authorization/token endpoints are derived from api_url, group
+      #   membership is resolved via the GitHub API
+      # - oauth (default): any OIDC-compliant provider; endpoints are discovered via well_known_url
+      #   (or <api_url>/.well-known/openid-configuration); group membership is read from a claim
+      type: oauth
+      # @param secrets.oauth-cfg.<name>.api_url the base url of the IDP instance; used to derive
+      # well_known_url when well_known_url is not set explicitly
       # e.g.
-      # api_url: https://api.github.com
+      # api_url: https://api.github.com          # GitHub
+      # api_url: https://accounts.example.com    # generic OIDC provider
       api_url: ""
-      # @param secrets.oauth-cfg.<name>.client_id the client id of the GitHub App (as displayed in
-      # its settings)
+      # @param secrets.oauth-cfg.<name>.well_known_url optional override for the OpenID Connect
+      # discovery document url; defaults to <api_url>/.well-known/openid-configuration
+      # only set this when the provider's discovery endpoint is not at the standard path
+      # e.g.
+      # well_known_url: https://accounts.example.com/oauth2/.well-known/openid-configuration
+      well_known_url: null
+      # @param secrets.oauth-cfg.<name>.client_id the client id of the OAuth App
       client_id: ""
-      # @param secrets.oauth-cfg.<name>.client_secret a client secret of the GitHub App (can be
-      # created in its settings)
+      # @param secrets.oauth-cfg.<name>.client_secret a client secret of the OAuth App
       client_secret: ""
+      # @param secrets.oauth-cfg.<name>.username_claim claim in the userinfo response whose value is
+      # used as the user's unique identifier; defaults to "sub"
+      username_claim: sub
+      # @param secrets.oauth-cfg.<name>.groups_claim claim in the userinfo response that contains the
+      # list of groups the user belongs to; used for role binding matching with type "oauth-group";
+      # defaults to "groups"
+      groups_claim: groups
       # @param secrets.oauth-cfg.<name>.role_bindings a list of mappings between user roles and the
       # respective subjects these roles should be assigned to
       role_bindings:
@@ -1973,16 +1989,17 @@ secrets:
           subjects:
               # @param secrets.oauth-cfg.<name>.role_bindings[].subjects[].type the type of subject
               # options:
-              # - github-app: name is matched as a regex against the app slug
-              # - github-user: name is matched as a regex against the username
+              # - github-app: name is matched as a regex against the app slug (GitHub only)
+              # - github-user: name is matched as a regex against the username (GitHub only)
               # - github-org: name is expected as <org-name> (exact, used to query GitHub API)
               # - github-team: name is expected as <org-name>/<team-slug> (exact, used to query GitHub API)
+              # - oauth-group: name is matched as a regex against each value in the groups_claim list
+              # - oauth-sub: name is matched as a regex against the username_claim value
             - type: ""
               # @param secrets.oauth-cfg.<name>.role_bindings[].subjects[].name the name of the subject.
-              # For github-user and github-app, the value is interpreted as a Python regex (re.fullmatch)
-              # so plain names (e.g. "alice") match literally, while patterns (e.g. "^my-bot-.*") are
-              # also supported. For github-org and github-team, the value is used as-is to query the
-              # GitHub API for membership and is not interpreted as a regex.
+              # Interpreted as a Python regex (re.fullmatch): plain names (e.g. "alice") match
+              # literally, patterns (e.g. "shoot-.*") are also supported. For github-org and
+              # github-team, the value is used as-is to query the GitHub API and is not a regex.
               name: ""
 
   # @param secrets.oidc-cfg mapping of a secret-name (freely selectable) and the OIDC configuration
