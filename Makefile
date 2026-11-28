@@ -1,4 +1,4 @@
-.PHONY: help setup lint lint-staged format format-staged test build-clients build-core build-docker build-docker-local build-docker-debug-local build-helm-local .check-build-prereqs run-db run clean
+.PHONY: help setup lint lint-staged format format-staged test build-clients build-core build-docker build-docker-local build-docker-local-amd64 build-docker-debug-local build-helm-local .check-build-prereqs run-db run clean
 
 # Configuration variables with defaults
 DB_PASSWORD ?= MyPassword
@@ -21,6 +21,7 @@ help:
 	@echo "  build-core     - Build odg-core-libs package"
 	@echo "  build-docker   - Build Docker image"
 	@echo "  build-docker-local - Build Docker image for current architecture only"
+	@echo "  build-docker-local-amd64 - Build Docker image for linux/amd64 (loads into local Docker)"
 	@echo "  build-docker-debug-local - Build debug Docker image for current architecture only"
 	@echo "  build-helm-local  - Package Helm charts into dist/ for local use"
 	@echo "  run-db         - Run a PostgreSQL database instance"
@@ -204,6 +205,17 @@ build-docker-local: .check-build-prereqs
 		-f Dockerfile \
 		.
 	@echo "Docker image built: odg-core:$(ODG_CORE_LIBS_VERSION)"
+
+build-docker-local-amd64: .check-build-prereqs
+	@echo "Building Docker image (linux/amd64)..."
+	@docker-buildx build \
+		--build-arg ODG_CORE_LIBS_VERSION=$(ODG_CORE_LIBS_VERSION) \
+		--platform linux/amd64 \
+		--load \
+		-t odg-core:$(ODG_CORE_LIBS_VERSION)-amd64 \
+		-f Dockerfile \
+		.
+	@echo "Docker image built: odg-core:$(ODG_CORE_LIBS_VERSION)-amd64"
 
 # Build debug Docker image for current architecture only (local development)
 build-docker-debug-local: build-docker-local

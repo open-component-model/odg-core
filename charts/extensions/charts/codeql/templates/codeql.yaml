@@ -82,10 +82,8 @@ spec:
               readOnly: true
           lifecycle:
             preStop:
-              exec:
-                command:
-                  - sleep
-                  - "60"
+              sleep:
+                seconds: 60
           {{- with (.Values.deployment).resources }}
           resources:
             {{- toYaml . | nindent 12 }}
